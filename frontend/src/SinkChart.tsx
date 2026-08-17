@@ -42,24 +42,28 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   const [notice, setNotice] = useState('')
   const valid = points.filter(point => Number.isFinite(point.snr_db) && point.total_bits > 0)
   if (!valid.length) return <div className="sink-chart empty">Run an experiment to see BER vs SNR.</div>
+  const firstZero = valid.findIndex(point => point.ber === 0)
+  // Once BER reaches zero, later sweep points carry no measurable information
+  // on a log plot. Keep the first zero as the terminal point and omit the rest.
+  const plotted = firstZero >= 0 ? valid.slice(0, firstZero + 1) : valid
 
   const minX = Math.min(...valid.map(point => point.snr_db))
   const maxX = Math.max(...valid.map(point => point.snr_db))
   const xRange = Math.max(maxX - minX, 1)
-  const values = valid.map(point => Math.max(Number(point.ber ?? 0), 1e-8))
+  const values = plotted.map(point => Math.max(Number(point.ber ?? 0), 1e-8))
   const maxLog = Math.ceil(Math.max(...values.map(value => Math.log10(value)), -1))
   const minLog = Math.min(-8, Math.floor(Math.min(...values.map(value => Math.log10(value)))))
   const yRange = Math.max(maxLog - minLog, 1)
   const x = (value: number) => chart.left + ((value - minX) / xRange) * (chart.width - chart.left - chart.right)
   const y = (value: number) => chart.top + ((maxLog - Math.log10(Math.max(value, 1e-8))) / yRange) * (chart.height - chart.top - chart.bottom)
   const linePoints: string[] = []
-  valid.forEach((point, index) => {
+  plotted.forEach((point, index) => {
     const pointX = x(point.snr_db)
     const pointY = y(Number(point.ber ?? 0))
-    if (index > 0 && point.ber === 0 && valid[index - 1].ber !== 0) {
+    if (index > 0 && point.ber === 0 && plotted[index - 1].ber !== 0) {
       // A measured BER of zero is below the chart's finite log-scale floor.
       // Drop at the previous measured point, then continue along the floor.
-      linePoints.push(`${x(valid[index - 1].snr_db)},${pointY}`)
+      linePoints.push(`${x(plotted[index - 1].snr_db)},${pointY}`)
     }
     linePoints.push(`${pointX},${pointY}`)
   })
@@ -95,13 +99,13 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
         return <g key={tick}><line x1={chart.left} x2={chart.width - chart.right} y1={yy} y2={yy} stroke="#e3e8ef" /><text x={chart.left - 7} y={yy + 3} textAnchor="end" style={labelStyle}>{`1e${tick.toFixed(0)}`}</text></g>
       })}
       <polyline points={line} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinejoin="round" />
-      {valid.map(point => <circle key={`${point.snr_db}-${point.frames}`} cx={x(point.snr_db)} cy={y(Number(point.ber ?? 0))} r="3.5" fill="#2563eb" stroke="#fff" strokeWidth="1.5"><title>{`${point.snr_db} dB: BER ${point.ber ?? 0}`}</title></circle>)}
+      {plotted.map(point => <circle key={`${point.snr_db}-${point.frames}`} cx={x(point.snr_db)} cy={y(Number(point.ber ?? 0))} r="3.5" fill="#2563eb" stroke="#fff" strokeWidth="1.5"><title>{`${point.snr_db} dB: BER ${point.ber ?? 0}`}</title></circle>)}
       <text x={chart.width / 2} y={chart.height - 5} textAnchor="middle" style={labelStyle}>SNR (dB)</text>
       <text x="11" y={chart.height / 2} textAnchor="middle" transform={`rotate(-90 11 ${chart.height / 2})`} style={labelStyle}>BER (log)</text>
       <text x={chart.left} y={chart.height - 17} textAnchor="middle" style={labelStyle}>{minX.toFixed(1)}</text>
       <text x={chart.width - chart.right} y={chart.height - 17} textAnchor="middle" style={labelStyle}>{maxX.toFixed(1)}</text>
     </svg>
     {notice && <div className="chart-notice">{notice}</div>}
-    <div className="sink-chart-label">{valid.length} SNR points · {valid[valid.length - 1]?.frames ?? 0} frames at last point</div>
+    <div className="sink-chart-label">{plotted.length} SNR points plotted · {plotted[plotted.length - 1]?.frames ?? 0} frames at last point</div>
   </div>
 }

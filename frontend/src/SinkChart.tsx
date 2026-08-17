@@ -59,6 +59,20 @@ function downloadReferenceFile(reference: BerReference) {
   URL.revokeObjectURL(link.href)
 }
 
+async function saveReferenceFile(reference: BerReference) {
+  const fileName = `${reference.name.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-|-$/g, '') || 'ber-reference'}.ber.json`
+  const pickerWindow = window as Window & { showSaveFilePicker?: (options: unknown) => Promise<{ createWritable: () => Promise<{ write: (data: Blob) => Promise<void>; close: () => Promise<void> }> }> }
+  if (!pickerWindow.showSaveFilePicker) { downloadReferenceFile(reference); return }
+  const handle = await pickerWindow.showSaveFilePicker({
+    suggestedName: fileName,
+    types: [{ description: 'SignalLab BER reference', accept: { 'application/json': ['.ber.json', '.json'] } }],
+  })
+  const writable = await handle.createWritable()
+  const payload = { format: 'signallab-ber-reference', version: 1, reference }
+  await writable.write(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
+  await writable.close()
+}
+
 async function svgToPng(svg: SVGSVGElement): Promise<Blob> {
   const clone = svg.cloneNode(true) as SVGSVGElement
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
@@ -102,6 +116,8 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   const [references, setReferences] = useState<BerReference[]>([])
   const [visibleReferenceIds, setVisibleReferenceIds] = useState<string[]>([])
   const [selectedCurveId, setSelectedCurveId] = useState('current')
+  const [editedCurrentPoints, setEditedCurrentPoints] = useState<SinkPoint[]>(points)
+  const [detailsOpen, setDetailsOpen] = useState(false)
 
   useEffect(() => {
     const syncReferences = () => setReferences(readReferences())
@@ -109,11 +125,13 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
     window.addEventListener('signallab-ber-reference-change', syncReferences)
     return () => window.removeEventListener('signallab-ber-reference-change', syncReferences)
   }, [])
+  useEffect(() => { setEditedCurrentPoints(points) }, [points])
 
   const activeReferences = references.filter(reference => visibleReferenceIds.includes(reference.id))
-  const current = plottedPoints(points)
+  const current = plottedPoints(editedCurrentPoints)
   const selectedReference = selectedCurveId === 'current' ? null : references.find(reference => reference.id === selectedCurveId)
   const selectedCurve = selectedReference || { name: curveName, color: curveColor, style: curveStyle }
+  const selectedPoints = selectedReference?.points || editedCurrentPoints
   const curves = [
     { id: 'current', name: curveName.trim() || 'Current run', color: curveColor, style: curveStyle, ...current },
     ...activeReferences.map(reference => ({ id: reference.id, name: reference.name, color: reference.color, style: reference.style, ...plottedPoints(reference.points) })),
@@ -153,7 +171,7 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
     persistReferences(next)
   }
 
-  const saveReferenceFile = () => {
+  const saveSelectedReference = async () => {
     let reference: BerReference | null = selectedReference ? { ...selectedReference, points: selectedReference.points.map(point => ({ ...point })) } : null
     if (!reference && current.valid.length) {
       reference = {
@@ -171,7 +189,12 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
       persistReferences(next)
     }
     if (!reference) return
-    downloadReferenceFile(reference)
+    try {
+      await saveReferenceFile(reference)
+    } catch (error) {
+      if ((error as DOMException).name !== 'AbortError') setNotice((error as Error).message || 'Could not save BER reference file.')
+      return
+    }
     setNotice(`Saved file “${reference.name}”`)
   }
 
@@ -209,6 +232,39 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
     setNotice('Reference deleted')
   }
 
+  const updateSelectedPoint = (index: number, field: keyof SinkPoint, value: number | null) => {
+    const nextPoints = selectedPoints.map((point, pointIndex) => pointIndex === index ? { ...point, [field]: value } : point)
+    if (selectedCurveId === 'current') {
+      setEditedCurrentPoints(nextPoints)
+    } else {
+      const next = references.map(reference => reference.id === selectedCurveId ? { ...reference, points: nextPoints } : reference)
+      setReferences(next)
+      persistReferences(next)
+    }
+  }
+
+  const addSelectedPoint = () => {
+    const last = selectedPoints[selectedPoints.length - 1]
+    const nextPoint: SinkPoint = { snr_db: last ? last.snr_db + 1 : 0, bit_errors: 0, total_bits: last?.total_bits || 1, frames: last?.frames || 1, ber: 0 }
+    const nextPoints = [...selectedPoints, nextPoint]
+    if (selectedCurveId === 'current') setEditedCurrentPoints(nextPoints)
+    else {
+      const next = references.map(reference => reference.id === selectedCurveId ? { ...reference, points: nextPoints } : reference)
+      setReferences(next)
+      persistReferences(next)
+    }
+  }
+
+  const removeSelectedPoint = (index: number) => {
+    const nextPoints = selectedPoints.filter((_, pointIndex) => pointIndex !== index)
+    if (selectedCurveId === 'current') setEditedCurrentPoints(nextPoints)
+    else {
+      const next = references.map(reference => reference.id === selectedCurveId ? { ...reference, points: nextPoints } : reference)
+      setReferences(next)
+      persistReferences(next)
+    }
+  }
+
   const exportImage = async (copy: boolean) => {
     if (!svgRef.current) return
     try {
@@ -221,14 +277,14 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   }
 
   return <div className="sink-chart">
-    <div className="sink-chart-toolbar"><div className="sink-chart-title">BER vs SNR {live && <span className="live-badge">LIVE</span>}</div><div className="chart-actions"><button onClick={() => exportImage(true)} title="Copy chart as PNG" aria-label="Copy chart as PNG">Copy</button><button onClick={() => exportImage(false)} title="Export chart as PNG" aria-label="Export chart as PNG">PNG</button></div></div>
+    <div className="sink-chart-toolbar"><div className="sink-chart-title">BER vs SNR {live && <span className="live-badge">LIVE</span>}</div><div className="chart-actions"><button onClick={() => exportImage(true)} title="Copy chart as PNG" aria-label="Copy chart as PNG">Copy</button><button onClick={() => exportImage(false)} title="Export chart as PNG" aria-label="Export chart as PNG">PNG</button><button onClick={() => setDetailsOpen(true)} title="Open detailed BER report" aria-label="Open detailed BER report">Details</button></div></div>
     <div className="ber-curve-controls" title="Choose a BER curve, then edit its name and style">
       <select className="ber-curve-select" value={selectedCurveId} onChange={event => { const id = event.target.value; setSelectedCurveId(id); if (id !== 'current') setVisibleReferenceIds(ids => ids.includes(id) ? ids : [...ids, id]) }} aria-label="Select BER curve to edit"><option value="current">Current run</option>{references.map(reference => <option key={reference.id} value={reference.id}>{reference.name}</option>)}</select>
       <div className="ber-curve-editor-row">
         <input className="ber-curve-name" value={selectedCurve.name} onChange={event => updateSelectedCurve({ name: event.target.value })} aria-label="BER curve name" placeholder="Curve name" />
         <input className="ber-color-input" type="color" value={selectedCurve.color} onChange={event => updateSelectedCurve({ color: event.target.value })} aria-label="BER curve color" />
         <select value={selectedCurve.style} onChange={event => updateSelectedCurve({ style: event.target.value as BerLineStyle })} aria-label="BER curve style">{lineStyles.map(style => <option key={style.value} value={style.value}>{style.label}</option>)}</select>
-        <button className="ber-save" onClick={saveReferenceFile} disabled={selectedCurveId === 'current' && !current.valid.length} title="Save selected BER curve as a JSON file">Save .BER</button>
+        <button className="ber-save" onClick={() => void saveSelectedReference()} disabled={selectedCurveId === 'current' && !current.valid.length} title="Save selected BER curve as a JSON file">Save .BER</button>
         <button className="ber-load" onClick={() => referenceFileRef.current?.click()} title="Browse for a BER reference JSON file" aria-label="Browse BER reference file">Browse file</button>
         <input ref={referenceFileRef} type="file" accept=".json,.ber.json,application/json" hidden onChange={event => { void loadReferenceFile(event.target.files?.[0]); event.target.value = '' }} />
       </div>
@@ -245,5 +301,19 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
     <div className="ber-legend" aria-label="BER curve legend">{curves.map((curve, index) => <div className="ber-legend-item" key={curve.id}><span className="ber-legend-swatch" style={{ borderTopColor: curve.color, borderTopStyle: curve.style === 'dot' ? 'dotted' : curve.style === 'dash' || curve.style === 'dashdot' ? 'dashed' : 'solid' }} /><span className="ber-legend-name">{curve.name}</span>{index > 0 && <><button className="ber-legend-action" onClick={() => removeReference(curve.id)} title="Hide reference">Hide</button><button className="ber-legend-delete" onClick={() => deleteReference(curve.id)} title="Delete saved reference">×</button></>}</div>)}</div>
     {notice && <div className="chart-notice">{notice}</div>}
     <div className="sink-chart-label">{current.plotted.length} SNR points plotted · {current.plotted[current.plotted.length - 1]?.frames ?? 0} frames at last point</div>
+    {detailsOpen && <div className="ber-report-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDetailsOpen(false) }}>
+      <div className="ber-report" role="dialog" aria-modal="true" aria-label="BER details report">
+        <div className="ber-report-header"><div><small>BER REPORT</small><h2>BER vs SNR details</h2></div><button className="ber-report-close" onClick={() => setDetailsOpen(false)} aria-label="Close report">×</button></div>
+        <div className="ber-report-layout">
+          <aside className="ber-report-curves"><div className="ber-report-section-title">CURVES</div><button className={`ber-report-curve ${selectedCurveId === 'current' ? 'active' : ''}`} onClick={() => setSelectedCurveId('current')}><span className="ber-report-dot" style={{ background: curveColor }} />{curveName || 'Current run'}</button>{references.map(reference => <button key={reference.id} className={`ber-report-curve ${selectedCurveId === reference.id ? 'active' : ''}`} onClick={() => { setSelectedCurveId(reference.id); setVisibleReferenceIds(ids => ids.includes(reference.id) ? ids : [...ids, reference.id]) }}><span className="ber-report-dot" style={{ background: reference.color }} />{reference.name}</button>)}</aside>
+          <section className="ber-report-editor">
+            <div className="ber-report-editor-controls"><label>Name<input value={selectedCurve.name} onChange={event => updateSelectedCurve({ name: event.target.value })} /></label><label>Color<input type="color" value={selectedCurve.color} onChange={event => updateSelectedCurve({ color: event.target.value })} /></label><label>Style<select value={selectedCurve.style} onChange={event => updateSelectedCurve({ style: event.target.value as BerLineStyle })}>{lineStyles.map(style => <option key={style.value} value={style.value}>{style.label}</option>)}</select></label></div>
+            <div className="ber-report-table-head"><strong>{selectedCurve.name || 'Current run'} · {selectedPoints.length} points</strong><button onClick={addSelectedPoint}>+ Add point</button></div>
+            <div className="ber-report-table-scroll"><table className="ber-report-table"><thead><tr><th>SNR (dB)</th><th>BER</th><th>Frames</th><th>Errors</th><th /></tr></thead><tbody>{selectedPoints.map((point, index) => <tr key={`${selectedCurveId}-${index}`}><td><input type="number" step="any" value={point.snr_db} onChange={event => updateSelectedPoint(index, 'snr_db', Number(event.target.value))} /></td><td><input type="number" step="any" min="0" max="1" value={point.ber ?? ''} onChange={event => updateSelectedPoint(index, 'ber', event.target.value === '' ? null : Number(event.target.value))} /></td><td><input type="number" min="0" value={point.frames} onChange={event => updateSelectedPoint(index, 'frames', Number(event.target.value))} /></td><td><input type="number" min="0" value={point.bit_errors} onChange={event => updateSelectedPoint(index, 'bit_errors', Number(event.target.value))} /></td><td><button className="ber-report-remove" onClick={() => removeSelectedPoint(index)} aria-label={`Remove point ${index + 1}`}>×</button></td></tr>)}</tbody></table></div>
+            <div className="ber-report-footer"><button className="ber-save" onClick={() => void saveSelectedReference()} disabled={selectedCurveId === 'current' && !current.valid.length}>Save selected .BER</button><button className="ber-load" onClick={() => referenceFileRef.current?.click()}>Browse / load .BER</button>{selectedCurveId !== 'current' && <button className="ber-report-delete" onClick={() => deleteReference(selectedCurveId)}>Delete selected</button>}</div>
+          </section>
+        </div>
+      </div>
+    </div>}
   </div>
 }

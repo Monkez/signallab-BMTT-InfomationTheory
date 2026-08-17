@@ -21,6 +21,7 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 5. Nhấn **Run simulation**. Kết quả cập nhật trong panel bên phải.
 6. Theo dõi **Console** ở phía dưới vùng canvas để xem job, cảnh báo và lỗi. Graph luôn nằm ở cột trung tâm làm vùng làm việc chính; Experiment/Block nằm ở inspector bên phải, còn Console dùng theme sáng và cùng chiều rộng với graph, không phủ lên hai sidebar. Hai sidebar kéo dài liên tục qua cả vùng View và Console nên không còn khoảng trống phía dưới. Có thể kéo mép trên để đổi chiều cao hoặc ẩn bằng nút Console trên thanh công cụ. Khi job đang chạy, phần **LIVE RESULTS** cập nhật BER theo từng batch.
 7. Trong phần kết quả, **Overall bit error rate** được tách thành card tổng hợp riêng; biểu đồ **BER vs SNR** nằm ở khu vực độc lập bên dưới. Chọn đường trong danh sách, chỉnh tên/màu/kiểu nét rồi bấm **Save .BER** để xuất đường thành file JSON. Dùng **Browse file** để nạp lại file reference từ máy; legend cho phép ẩn hoặc xóa từng reference. Các reference đã nạp vẫn được lưu trong trình duyệt để dùng lại sau khi mở app.
+8. Bấm **Details** trên biểu đồ để mở báo cáo BER chuyên sâu. Tại đây có thể chọn từng đường, chỉnh style, sửa SNR/BER/frame/error theo từng điểm, thêm/xóa điểm, lưu đường đang chọn thành file và browse nạp reference.
 
 ## Thao tác canvas
 

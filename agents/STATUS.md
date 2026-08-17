@@ -22,5 +22,6 @@
 - Grid layout đã đặt tường minh library ở cột trái, graph + console ở cột trung tâm, inspector ở cột phải để graph luôn là trọng tâm kể cả khi resize/ẩn panel.
 - Biểu đồ BER hỗ trợ chọn từng đường để chỉnh tên/màu/kiểu nét, legend, xuất `.ber.json`, browse nạp file và lưu reference vào localStorage để so sánh nhiều đường BER.
 - Khu vực Results đã tách card Overall BER khỏi vùng BER vs SNR; input file ẩn không còn bị CSS hiển thị thành Choose File.
+- Hàng điều khiển BER dùng flex-wrap và giới hạn min-width để Save/Browse không tràn khỏi chart khi inspector hẹp.
 - MiniMap đã thu nhỏ còn 150×92px, dùng node renderer có stripe/viền và màu theo nhóm block, mask sáng tương phản; vẫn hỗ trợ pan/zoom.
 - Bổ sung Text File Source và Image File Source có file picker/base64; thêm Huffman, Shannon-Fano, RLE và ZIP/DEFLATE Encoder/Decoder. Backend round-trip tests đã nâng lên 6/6 pass, frontend build pass.

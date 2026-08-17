@@ -147,11 +147,11 @@ input:focus, select:focus, textarea:focus { border-color: #4d78cb; box-shadow: 0
 .ber-curve-controls { display: grid; gap: 4px; margin: 3px 0 5px; }
 .ber-curve-controls input, .ber-curve-controls select { height: 24px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: #526174; font-size: 9px; }
 .ber-curve-select { width: 100%; margin: 0 !important; padding: 0 6px; }
-.ber-curve-editor-row { display: grid; grid-template-columns: minmax(92px, 1fr) 28px 78px auto auto; align-items: center; gap: 4px; }
-.ber-curve-name { min-width: 0; width: 100%; padding: 0 6px; }
-.ber-color-input { width: 28px; padding: 2px; cursor: pointer; }
-.ber-curve-controls select { max-width: 78px; padding: 0 4px; }
-.ber-save, .ber-load { height: 24px; padding: 0 6px; border: 1px solid #b8cce9; border-radius: 4px; background: #f3f7ff; color: #285da9; font-size: 9px; cursor: pointer; white-space: nowrap; }
+.ber-curve-editor-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.ber-curve-name { min-width: 90px; width: auto; flex: 1 1 100px; padding: 0 6px; }
+.ber-color-input { width: 28px !important; flex: 0 0 28px; padding: 2px; cursor: pointer; }
+.ber-curve-editor-row select { width: auto; min-width: 70px; max-width: none; flex: 1 1 70px; padding: 0 4px; }
+.ber-save, .ber-load { min-width: 0; height: 24px; flex: 1 1 76px; padding: 0 6px; border: 1px solid #b8cce9; border-radius: 4px; background: #f3f7ff; color: #285da9; font-size: 9px; cursor: pointer; white-space: nowrap; }
 .ber-save:hover, .ber-load:hover { border-color: #7fa7df; background: #eaf2ff; }
 .ber-save:disabled, .ber-load:disabled { opacity: .5; cursor: default; }
 .ber-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 2px 2px 0; }

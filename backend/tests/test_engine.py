@@ -28,11 +28,24 @@ def test_graph_is_valid_and_high_snr_has_no_errors():
 def test_simulation_is_reproducible():
     graph = sample_graph()
     graph.nodes[3].params["ebn0_db"] = 0
-    config = SimulationConfig(trials=4, workers=1, seed=123, chunk_size=2, device="cpu")
+    config = SimulationConfig(
+        trials=4,
+        max_frames=4,
+        min_frames=1,
+        min_errors=0,
+        snr_db_start=0,
+        snr_db_stop=4,
+        snr_db_step=2,
+        workers=1,
+        seed=123,
+        chunk_size=2,
+        device="cpu",
+    )
     first = run_simulation(graph, config)
     second = run_simulation(graph, config)
     assert first["bit_errors"] == second["bit_errors"]
     assert first["total_bits"] == second["total_bits"]
+    assert [point["snr_db"] for point in first["snr_points"]] == [0.0, 2.0, 4.0]
 
 
 def test_cycle_is_rejected():

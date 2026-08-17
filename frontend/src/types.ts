@@ -28,6 +28,12 @@ export type BlockSpec = {
 
 export type SimulationConfig = {
   trials: number
+  max_frames: number
+  min_frames: number
+  min_errors: number
+  snr_db_start: number
+  snr_db_stop: number
+  snr_db_step: number
   workers: number
   seed: number
   device: 'auto' | 'cpu' | 'gpu'
@@ -52,5 +58,12 @@ export type Job = {
     device: string
     workers: number
     warnings: string[]
+    snr_points: Array<{
+      snr_db: number
+      bit_errors: number
+      total_bits: number
+      frames: number
+      ber: number | null
+    }>
   }
 }

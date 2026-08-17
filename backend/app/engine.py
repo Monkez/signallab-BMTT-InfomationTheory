@@ -86,7 +86,13 @@ def topological_order(graph_dict: dict[str, Any]) -> list[str]:
     return order
 
 
-def execute_trial(graph_dict: dict[str, Any], trial_index: int, seed: int, device: str = "cpu") -> dict[str, int]:
+def execute_trial(
+    graph_dict: dict[str, Any],
+    trial_index: int,
+    seed: int,
+    device: str = "cpu",
+    snr_db: float | None = None,
+) -> dict[str, int]:
     xp = np
     actual_device = "cpu"
     if device == "gpu":
@@ -97,7 +103,7 @@ def execute_trial(graph_dict: dict[str, Any], trial_index: int, seed: int, devic
         except Exception:
             pass
     rng = np.random.default_rng(seed)
-    context = make_context(xp, rng, trial_index, seed, actual_device)
+    context = make_context(xp, rng, trial_index, seed, actual_device, snr_db)
     nodes = {node["id"]: node for node in graph_dict["nodes"]}
     outputs: dict[str, dict[str, Any]] = {}
     metrics = {"bit_errors": 0, "total_bits": 0}
@@ -121,10 +127,15 @@ def execute_trial(graph_dict: dict[str, Any], trial_index: int, seed: int, devic
     return metrics
 
 
-def _run_chunk(graph_dict: dict[str, Any], items: list[tuple[int, int]], device: str) -> dict[str, int]:
+def _run_chunk(
+    graph_dict: dict[str, Any],
+    items: list[tuple[int, int]],
+    device: str,
+    snr_db: float,
+) -> dict[str, int]:
     total = {"bit_errors": 0, "total_bits": 0, "completed_trials": 0}
     for trial_index, seed in items:
-        result = execute_trial(graph_dict, trial_index, seed, device)
+        result = execute_trial(graph_dict, trial_index, seed, device, snr_db)
         total["bit_errors"] += result["bit_errors"]
         total["total_bits"] += result["total_bits"]
         total["completed_trials"] += 1
@@ -142,8 +153,16 @@ def run_simulation(
         raise ValueError("; ".join(validation.errors))
     started = time.perf_counter()
     graph_dict = graph.model_dump()
-    seeds = np.random.SeedSequence(config.seed).spawn(config.trials)
-    items = [(i, int(seed.generate_state(1)[0])) for i, seed in enumerate(seeds)]
+    max_frames = config.max_frames or config.trials
+    min_frames = min(config.min_frames, max_frames)
+    if config.snr_db_stop < config.snr_db_start:
+        raise ValueError("SNR stop must be greater than or equal to SNR start")
+    snr_values = [
+        round(float(value), 6)
+        for value in np.arange(config.snr_db_start, config.snr_db_stop + config.snr_db_step * 0.5, config.snr_db_step)
+    ]
+    if not snr_values:
+        snr_values = [round(float(config.snr_db_start), 6)]
     gpu = gpu_status()
     gpu_compatible = all(SPEC_BY_TYPE[node.type].gpu_compatible for node in graph.nodes)
     if config.device == "gpu" and not gpu["available"]:
@@ -151,32 +170,71 @@ def run_simulation(
     device = "gpu" if config.device in ("gpu", "auto") and gpu["available"] and gpu_compatible else "cpu"
     cpu_count = os.cpu_count() or 1
     workers = config.workers or max(1, cpu_count - 1)
-    workers = min(workers, config.trials, cpu_count)
+    workers = min(workers, max_frames, cpu_count)
     if device == "gpu":
         workers = 1
-    chunks = [items[i : i + config.chunk_size] for i in range(0, len(items), config.chunk_size)]
     aggregate = {"bit_errors": 0, "total_bits": 0, "completed_trials": 0}
+    point_results: list[dict[str, Any]] = []
+    total_budget = len(snr_values) * max_frames
+    was_cancelled = False
 
-    def consume(result):
-        for key in aggregate:
-            aggregate[key] += result[key]
-        if progress:
-            progress({**aggregate, "trials": config.trials, "device": device, "workers": workers})
-
-    if workers == 1 or config.trials < max(4, config.chunk_size):
-        for chunk in chunks:
+    for snr_index, snr_db in enumerate(snr_values):
+        point = {"bit_errors": 0, "total_bits": 0, "frames": 0}
+        seed_sequence = np.random.SeedSequence([config.seed, snr_index])
+        seeds = seed_sequence.spawn(max_frames)
+        items = [(i, int(seed.generate_state(1)[0])) for i, seed in enumerate(seeds)]
+        offset = 0
+        while offset < max_frames:
             if cancelled and cancelled():
+                was_cancelled = True
                 break
-            consume(_run_chunk(graph_dict, chunk, device))
-    else:
-        with ProcessPoolExecutor(max_workers=workers) as pool:
-            futures = [pool.submit(_run_chunk, graph_dict, chunk, device) for chunk in chunks]
-            for future in as_completed(futures):
-                if cancelled and cancelled():
-                    for pending in futures:
-                        pending.cancel()
-                    break
-                consume(future.result())
+            batch = items[offset : offset + config.chunk_size * workers]
+            chunks = [batch[i : i + config.chunk_size] for i in range(0, len(batch), config.chunk_size)]
+            results: list[dict[str, int]] = []
+            if workers == 1 or len(batch) < max(4, config.chunk_size):
+                results = [_run_chunk(graph_dict, chunk, device, snr_db) for chunk in chunks]
+            else:
+                with ProcessPoolExecutor(max_workers=workers) as pool:
+                    futures = [pool.submit(_run_chunk, graph_dict, chunk, device, snr_db) for chunk in chunks]
+                    for future in as_completed(futures):
+                        if cancelled and cancelled():
+                            was_cancelled = True
+                            for pending in futures:
+                                pending.cancel()
+                            break
+                        results.append(future.result())
+            for result in results:
+                point["bit_errors"] += result["bit_errors"]
+                point["total_bits"] += result["total_bits"]
+                point["frames"] += result["completed_trials"]
+                aggregate["bit_errors"] += result["bit_errors"]
+                aggregate["total_bits"] += result["total_bits"]
+                aggregate["completed_trials"] += result["completed_trials"]
+            offset += len(batch)
+            if progress:
+                progress({
+                    **aggregate,
+                    "trials": total_budget,
+                    "device": device,
+                    "workers": workers,
+                    "snr_db": snr_db,
+                    "snr_index": snr_index,
+                    "snr_count": len(snr_values),
+                })
+            stop_criteria_met = point["frames"] >= min_frames and (
+                point["bit_errors"] >= config.min_errors or point["frames"] >= max_frames
+            )
+            if was_cancelled or stop_criteria_met:
+                break
+        point_results.append({
+            "snr_db": snr_db,
+            "bit_errors": point["bit_errors"],
+            "total_bits": point["total_bits"],
+            "frames": point["frames"],
+            "ber": point["bit_errors"] / point["total_bits"] if point["total_bits"] else None,
+        })
+        if was_cancelled:
+            break
     elapsed = time.perf_counter() - started
     bits = aggregate["total_bits"]
     return {
@@ -186,7 +244,7 @@ def run_simulation(
         "throughput_bps": bits / elapsed if elapsed else 0,
         "device": device,
         "workers": workers,
-        "cancelled": aggregate["completed_trials"] < config.trials,
+        "cancelled": was_cancelled,
+        "snr_points": point_results,
         "warnings": validation.warnings + (["GPU unavailable or graph incompatible; used CPU"] if config.device == "auto" and device == "cpu" else []),
     }
-

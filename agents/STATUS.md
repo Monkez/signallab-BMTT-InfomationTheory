@@ -11,3 +11,5 @@
 - Hoàn tất: port orientation theo block (`standard`/`reversed`), lưu trong project JSON, UI test xác nhận input chuyển sang phải.
 - Hoàn tất sửa lỗi: React Flow đo lại node internals sau khi đảo port, 2/7 edge path liên quan đã thay đổi đúng trong UI test; PyInstaller nhúng `assets/app.ico` thay icon Python mặc định.
 - Quyết định: code tùy biến được xem là trusted-local code trong MVP.
+- Cập nhật hiện tại: hoàn tất SNR sweep Monte-Carlo với stopping criteria theo từng điểm; AWGN tham chiếu `context.snr_db`; thêm biểu đồ BER SVG cho Sink và Experiment; chọn block ngay khi drag; sidebar hai bên có ẩn/hiện và resize.
+- Kiểm thử mới nhất: backend 3/3 pass, frontend `npm run build` pass, browser E2E xác nhận drag-select, sidebar toggle, SNR sweep, Sink chart và port reversal. `build_app.bat` đã chạy thành công; EXE phát hành đã cập nhật.

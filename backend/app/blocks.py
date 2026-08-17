@@ -23,7 +23,7 @@ SPECS = [
     BlockSpec("bit_source", "Bit Source", "Sources", "Generate random binary messages.", {"length": 4096}, [], ["out"]),
     BlockSpec("hamming74_encode", "Hamming (7,4) Encoder", "Channel coding", "Encode 4 data bits into a Hamming(7,4) codeword.", {}, ["in"], ["out", "reference"]),
     BlockSpec("bpsk_mod", "BPSK Modulator", "Modulation", "Map 0 → +1 and 1 → -1.", {}, ["in"], ["out"]),
-    BlockSpec("awgn", "AWGN Channel", "Channels", "Add white Gaussian noise for the configured Eb/N0.", {"ebn0_db": 4.0}, ["in"], ["out"]),
+    BlockSpec("awgn", "AWGN Channel", "Channels", "Add noise from the experiment SNR sweep or a fixed value.", {"ebn0_db": 4.0, "snr_mode": "experiment"}, ["in"], ["out"]),
     BlockSpec("bpsk_demod", "BPSK Demodulator", "Receivers", "Hard-decision BPSK detector.", {}, ["in"], ["out"]),
     BlockSpec("hamming74_decode", "Hamming (7,4) Decoder", "Channel coding", "Syndrome decode and correct one bit per codeword.", {}, ["in"], ["out"]),
     BlockSpec("ber", "BER Meter", "Sinks", "Compare received bits with a reference stream.", {}, ["reference", "estimate"], []),
@@ -58,7 +58,9 @@ def bpsk_mod(inputs, params, context):
 
 def awgn(inputs, params, context):
     samples = context.xp.asarray(inputs["in"])
-    ebn0_db = float(params.get("ebn0_db", 4.0))
+    # Legacy projects without snr_mode keep their fixed Eb/N0 behavior.
+    mode = params.get("snr_mode", "fixed")
+    ebn0_db = float(params.get("ebn0_db", 4.0)) if mode == "fixed" or context.snr_db is None else float(context.snr_db)
     sigma = (1.0 / (2.0 * 10.0 ** (ebn0_db / 10.0))) ** 0.5
     if context.device == "gpu":
         noise = context.xp.random.default_rng(context.seed).normal(0.0, sigma, samples.shape)
@@ -127,6 +129,5 @@ def to_numpy(value):
     return np.asarray(value)
 
 
-def make_context(xp, rng, trial_index: int, seed: int, device: str):
-    return SimpleNamespace(xp=xp, rng=rng, trial_index=trial_index, seed=seed, device=device)
-
+def make_context(xp, rng, trial_index: int, seed: int, device: str, snr_db: float | None = None):
+    return SimpleNamespace(xp=xp, rng=rng, trial_index=trial_index, seed=seed, device=device, snr_db=snr_db)

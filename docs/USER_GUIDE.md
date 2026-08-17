@@ -14,10 +14,10 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 
 ## Tạo mô phỏng
 
-1. Chọn khối trong thanh bên hoặc dùng sơ đồ mẫu.
+1. Chọn khối trong thanh bên hoặc dùng sơ đồ mẫu. Khi bắt đầu kéo block, block được chọn ngay.
 2. Kéo từ cổng bên phải của một khối sang cổng bên trái khối kế tiếp.
 3. Chọn khối để sửa tên và tham số. Với Python Block, sửa hàm `process` theo mẫu.
-4. Chọn số trial, số worker, seed và thiết bị.
+4. Trong tab **Experiment**, chọn SNR Start/Stop/Step, frame tối đa/tối thiểu và lỗi tối thiểu cho mỗi điểm. Chọn worker, seed và thiết bị.
 5. Nhấn **Run simulation**. Kết quả cập nhật trong panel bên phải.
 
 ## Thao tác canvas
@@ -28,13 +28,19 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 - Dùng các nút zoom ở góc dưới canvas nếu sơ đồ lớn.
 - Trong panel **Block**, dùng **Port layout** để đổi giữa `Input left · Output right` và `Input right · Output left`. Cấu hình được lưu cùng file Export.
 - Sau khi đổi layout, các đường nối hiện tại tự động được đo lại và bám theo handle mới.
+- Dùng hai nút panel trên thanh trên để ẩn/hiện **Block library** hoặc **Inspector**. Kéo mép sidebar để đổi kích thước.
 
 ## Cấu hình Monte-Carlo
 
-- `Trials`: số lần lặp độc lập.
+- `SNR Start/Stop/Step`: tạo dải SNR dB chạy tuần tự.
+- `Max frames / SNR`: giới hạn cứng số frame tại mỗi SNR.
+- `Min frames / SNR`: không dừng sớm trước số frame này.
+- `Min errors / SNR`: dừng sớm khi đủ số lỗi sau khi đạt min frames.
+- Với block **AWGN**, chọn `Experiment sweep` để lấy `context.snr_db`; chọn `Fixed block value` để dùng `ebn0_db` riêng.
 - `Workers = 0`: hệ thống tự chọn; đặt `1` để debug dễ hơn.
 - `Seed`: cho kết quả tái lập.
 - `Auto`: chọn GPU nếu có và phù hợp, nếu không dùng CPU.
+- Sau khi chạy, BER Meter và tab Experiment hiển thị đồ thị BER theo SNR cùng số frame/lỗi từng điểm.
 
 ## Lưu dự án
 

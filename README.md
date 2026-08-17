@@ -2,11 +2,13 @@
 
 SignalLab is a local, visual digital-communications simulator inspired by Simulink and GNU Radio. Build a block graph in the browser, edit simple Python blocks, and run reproducible Monte-Carlo experiments on CPU or a compatible GPU.
 
-## Quick start (Windows)
+## Quick start (Windows desktop)
 
 1. Run `setup.bat` once.
-2. Run `run.bat`.
-3. Open <http://localhost:5173> (the script normally opens it for you).
+2. Run `build_app.bat` once to create the desktop release.
+3. Run `run.bat`, or open `dist\SignalLab\SignalLab.exe`.
+
+Keep the complete `dist\SignalLab` directory together when copying the app. The EXE uses bundled runtime files in its `_internal` directory.
 
 See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for usage and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
@@ -18,5 +20,4 @@ cd frontend
 npm run build
 ```
 
-The optional CUDA path requires a CuPy package matching the installed CUDA toolkit. SignalLab falls back to CPU automatically when CuPy is unavailable.
-
+Use `run_dev.bat` only for frontend/backend development with Vite hot reload. The optional CUDA path requires a CuPy package matching the installed CUDA toolkit. SignalLab falls back to CPU automatically when CuPy is unavailable.

@@ -116,10 +116,10 @@ function App() {
 
       <main className="canvas-wrap">
         <div className="canvas-label"><span>FLOWGRAPH</span><span>{nodes.length} blocks · {edges.length} links</span></div>
-        <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running' }))} nodeTypes={{ signal: SignalNode }} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onNodeClick={onNodeClick} onPaneClick={() => setSelectedId(null)} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#62718d' } }}>
-          <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#273147" />
+        <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running' }))} nodeTypes={{ signal: SignalNode }} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onNodeClick={onNodeClick} onPaneClick={() => setSelectedId(null)} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
+          <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#ccd3dc" />
           <Controls position="bottom-left" />
-          <MiniMap position="bottom-right" pannable zoomable nodeColor="#6575ff" maskColor="rgba(8,11,18,.72)" />
+          <MiniMap position="bottom-right" pannable zoomable nodeColor="#7c8da5" maskColor="rgba(235,239,244,.72)" />
         </ReactFlow>
       </main>
 
@@ -148,4 +148,3 @@ function App() {
 }
 
 export default App
-

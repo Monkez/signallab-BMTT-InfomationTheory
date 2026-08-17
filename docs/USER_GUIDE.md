@@ -1,10 +1,16 @@
 # Hướng dẫn sử dụng
 
-## Khởi động
+## Khởi động bản desktop
 
-Chạy `setup.bat` ở lần đầu, sau đó chạy `run.bat`. Hai dịch vụ backend/frontend được mở trong cùng một cửa sổ PowerShell quản lý; đóng cửa sổ để dừng.
+1. Chạy `setup.bat` ở lần đầu.
+2. Chạy `build_app.bat` để tạo `dist\SignalLab\SignalLab.exe`.
+3. Chạy `run.bat` hoặc mở trực tiếp file EXE.
 
-Yêu cầu tối thiểu: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạy `setup.bat` đầu tiên cần Internet để tải thư viện.
+Bản desktop chỉ mở một cửa sổ SignalLab, không cần Node.js/Vite khi sử dụng và không mở terminal. Khi sao chép sang máy khác, phải sao chép cả thư mục `dist\SignalLab`, bao gồm `_internal`; không chỉ sao chép riêng EXE. Máy Windows đích cần Microsoft Edge WebView2 Runtime, vốn có sẵn trên Windows 10/11 được cập nhật.
+
+`run_dev.bat` chỉ dành cho lập trình viên. Nó chạy Vite tại port 5173, nên nếu đóng cửa sổ dev server thì trình duyệt sẽ báo WebSocket mất kết nối và `ERR_CONNECTION_REFUSED`. Đây không phải cơ chế chạy của bản EXE.
+
+Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạy `setup.bat`/`build_app.bat` đầu tiên cần Internet để tải thư viện. Máy chỉ chạy thư mục release không cần Python hoặc Node.js.
 
 ## Tạo mô phỏng
 

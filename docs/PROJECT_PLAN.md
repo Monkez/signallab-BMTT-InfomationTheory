@@ -14,6 +14,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 - Chế độ `auto`, `cpu`, `gpu`; tự phát hiện CuPy/CUDA và tự hạ cấp an toàn về CPU.
 - Dashboard tiến độ, BER, số lỗi bit, throughput, thời gian và cảnh báo.
 - Script Windows một lần bấm cho cài đặt, chạy và build.
+- Bản desktop Windows có `SignalLab.exe`, chứa frontend production và backend local, không cần Vite khi sử dụng.
 
 ## 3. Các giai đoạn tiếp theo
 
@@ -50,4 +51,3 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 - Python tùy biến là mã tin cậy trong bản local; triển khai nhiều người dùng phải cô lập tiến trình/container.
 - Không phải thuật toán NumPy nào cũng tự chạy GPU. Quy ước `context.xp` giúp code portable; khối không tương thích sẽ chạy CPU.
 - Overhead đa tiến trình có thể lớn với trial quá nhỏ; chế độ `auto` chỉ bật song song khi đủ workload.
-

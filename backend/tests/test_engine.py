@@ -1,6 +1,11 @@
 import base64
 
+import pytest
+
 from backend.app.blocks import PROCESSORS, make_context, python_block
+from backend.app.block_registry import SPEC_BY_TYPE
+from backend.app.contracts import BlockExecutionError
+from backend.app.contracts import validate_inputs, validate_outputs
 from backend.app.engine import execute_trial, run_once, run_simulation, validate_graph
 from backend.app.models import Edge, Graph, SimulationConfig
 import numpy as np
@@ -63,6 +68,77 @@ def test_run_once_captures_input_and_output_port_samples():
     assert source["shape"] == [400]
     assert len(source["sample"]) == 8
     assert decoder_input["size"] == 700
+
+
+def test_hamming_rejects_input_that_would_be_silently_padded():
+    graph = sample_graph()
+    graph.nodes[0].params["length"] = 402
+    with pytest.raises(BlockExecutionError) as captured:
+        run_once(graph, SimulationConfig(seed=42, device="cpu"))
+    assert captured.value.node_id == "1"
+    assert "multiple of 4" in captured.value.reason
+
+    with pytest.raises(BlockExecutionError) as parallel_capture:
+        run_simulation(graph, SimulationConfig(max_frames=4, min_frames=1, min_errors=0, snr_db_start=0, snr_db_stop=0, workers=2, chunk_size=2, device="cpu"))
+    assert parallel_capture.value.node_id == "1"
+
+
+def test_ber_requires_reference_and_estimate_to_match_exactly():
+    graph = Graph(nodes=[
+        {"id": "reference", "type": "bit_source", "label": "Reference", "params": {"length": 8}},
+        {"id": "estimate", "type": "bit_source", "label": "Estimate", "params": {"length": 7}},
+        {"id": "meter", "type": "ber", "label": "BER meter", "params": {}},
+    ], edges=[
+        {"id": "ref", "source": "reference", "target": "meter", "source_handle": "out", "target_handle": "reference"},
+        {"id": "est", "source": "estimate", "target": "meter", "source_handle": "out", "target_handle": "estimate"},
+    ])
+    with pytest.raises(BlockExecutionError) as captured:
+        execute_trial(graph.model_dump(), 0, 42)
+    assert captured.value.node_id == "meter"
+    assert "reference has 8 values, estimate has 7" in captured.value.reason
+
+
+def test_python_block_defaults_to_same_input_and_output_size():
+    graph = Graph(nodes=[
+        {"id": "source", "type": "bit_source", "label": "Source", "params": {"length": 8}},
+        {"id": "custom", "type": "python", "label": "Custom", "params": {"output_size": "same"}, "code": "def process(signal, params):\n    return signal[:-1]"},
+    ], edges=[{"id": "edge", "source": "source", "target": "custom"}])
+    with pytest.raises(BlockExecutionError) as captured:
+        execute_trial(graph.model_dump(), 0, 42)
+    assert captured.value.node_id == "custom"
+    assert "expected 8, received 7" in captured.value.reason
+
+
+def test_static_validation_marks_duplicate_input_connection():
+    graph = sample_graph()
+    graph.edges.append(Edge(id="duplicate", source="0", target="1", target_handle="in"))
+    validation = validate_graph(graph)
+    assert not validation.valid
+    assert "1" in validation.node_errors
+    assert "more than one connection" in validation.node_errors["1"][0]
+
+
+@pytest.mark.parametrize(("block_type", "signal", "expected_size"), [
+    ("differential_encode", np.array([0, 1, 1, 0], dtype=np.int8), 4),
+    ("differential_decode", np.array([0, 1, 0, 0], dtype=np.int8), 4),
+    ("hamming74_encode", np.zeros(8, dtype=np.int8), 14),
+    ("hamming74_decode", np.zeros(14, dtype=np.int8), 8),
+    ("repetition3_encode", np.zeros(4, dtype=np.int8), 12),
+    ("repetition3_decode", np.zeros(12, dtype=np.int8), 4),
+    ("bpsk_mod", np.zeros(8, dtype=np.int8), 8),
+    ("qpsk_mod", np.zeros(8, dtype=np.int8), 4),
+    ("awgn", np.ones(8, dtype=np.float32), 8),
+    ("rayleigh", np.ones(8, dtype=np.float32), 8),
+    ("bpsk_demod", np.ones(8, dtype=np.float32), 8),
+    ("qpsk_demod", np.ones(4, dtype=np.complex64), 8),
+])
+def test_builtin_signal_processors_obey_declared_size_contract(block_type, signal, expected_size):
+    context = make_context(np, np.random.default_rng(7), 0, 7, "cpu", 4.0)
+    inputs = {"in": signal}
+    validate_inputs(block_type, inputs, {})
+    outputs = PROCESSORS[block_type](inputs, {}, context)
+    validate_outputs(block_type, inputs, outputs, SPEC_BY_TYPE[block_type].outputs, {})
+    assert outputs["out"].size == expected_size
 
 
 def test_cycle_is_rejected():

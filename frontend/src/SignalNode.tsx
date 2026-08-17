@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Handle, Position, useUpdateNodeInternals, type NodeProps } from '@xyflow/react'
-import { Binary, Braces, Radio, Waves, Gauge, Box } from 'lucide-react'
+import { AlertTriangle, Binary, Braces, Radio, Waves, Gauge, Box } from 'lucide-react'
 import type { FlowNode, PortPreview } from './types'
 
 const icons: Record<string, typeof Box> = {
@@ -36,8 +36,9 @@ export function SignalNode({ id, data, selected }: NodeProps<FlowNode>) {
   }, [id, reversed, updateNodeInternals])
 
   return (
-    <div className={`signal-node ${selected ? 'selected' : ''} ${reversed ? 'ports-reversed' : ''}`}>
+    <div className={`signal-node ${selected ? 'selected' : ''} ${reversed ? 'ports-reversed' : ''} ${data.runtimeError ? 'invalid' : ''}`} aria-invalid={Boolean(data.runtimeError)}>
       <div className="node-glow" />
+      {data.runtimeError && <div className="node-error-badge" title={data.runtimeError}><AlertTriangle size={13} /> Contract error</div>}
       <div className="node-header"><span className="node-icon"><Icon size={15} /></span><span>{data.label}</span></div>
       <div className="node-type">{data.blockType.replaceAll('_', ' ')}</div>
       {data.inputs.map((port, index) => (

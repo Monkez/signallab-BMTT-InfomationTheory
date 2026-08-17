@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from .contracts import BlockExecutionError
 from .engine import run_simulation
 from .models import SimulationRequest
 
@@ -46,7 +47,12 @@ class JobManager:
             result = run_simulation(request.graph, request.config, progress, event.is_set)
             self._update(job_id, status="cancelled" if result["cancelled"] else "completed", progress=1 if not result["cancelled"] else self.jobs[job_id]["progress"], result=result)
         except Exception as exc:
-            self._update(job_id, status="failed", error=str(exc), detail=traceback.format_exc(limit=4))
+            block_fields = {
+                "error_block_id": exc.node_id,
+                "error_block_label": exc.node_label,
+                "node_errors": {exc.node_id: [exc.reason]},
+            } if isinstance(exc, BlockExecutionError) else {}
+            self._update(job_id, status="failed", error=str(exc), detail=traceback.format_exc(limit=4), **block_fields)
 
     def _update(self, job_id: str, **values):
         with self.lock:

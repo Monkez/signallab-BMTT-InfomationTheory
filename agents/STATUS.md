@@ -39,3 +39,7 @@
 - Experiment có **Run once** ở đầu tab để chạy một frame qua chính DAG runtime; nút sweep Monte-Carlo đã đổi thành **Run Benchmark**.
 - Backend thu bản tóm tắt input/output theo từng port (dtype, shape, size, min/mean/max, tối đa 8 mẫu) sau Run once và một frame đại diện sau Benchmark. Frontend hiển thị tooltip sáng khi hover/focus port và tự xóa preview khi graph/tham số thay đổi.
 - Xác minh 2026-08-18: backend 7/7 pass, frontend production build pass; kiểm thử UI xác nhận Run once và tooltip dữ liệu hoạt động trên graph mẫu.
+- Rà soát block 2026-08-18: thêm `contracts.py` kiểm tra tham số, signal 1-D không rỗng, bội số/tỷ lệ kích thước cho Hamming, Repetition, QPSK, codec header, các block bảo toàn size và BER exact-size. Python Block có `output_size=same|any|N`.
+- Lỗi validation/runtime mang `node_id` qua cả REST Run once và worker Benchmark; frontend tô đỏ block, hiện badge Contract error, chi tiết trong inspector và ghi tên block/kích thước vào Console. Sửa topology hoặc tham số tự xóa diagnostic cũ.
+- Xác minh mới nhất: backend 23/23 pass (gồm bảng contract của 12 processor), frontend production build pass; browser E2E xác nhận lỗi tĩnh `length=0`, lỗi runtime Hamming `402 % 4`, Benchmark đa process, Console và clear-on-edit.
+- `build_app.bat` đã đóng gói thành công và smoke test xác nhận EXE mới duy trì tiến trình ổn định.

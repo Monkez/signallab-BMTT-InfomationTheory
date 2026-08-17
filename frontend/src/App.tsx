@@ -9,7 +9,7 @@ import {
   Layers3, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Search, Terminal, Trash2, Upload, X,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
-import { cancelJob, createJob, getJob, graphPayload, runGraphOnce } from './api'
+import { cancelJob, createJob, getJob, graphPayload, GraphApiError, runGraphOnce } from './api'
 import { initialEdges, initialNodes, pythonTemplate } from './sample'
 import type { BlockSpec, FlowNode, Job, PortPreviewMap, SimulationConfig } from './types'
 import { BerChart } from './SinkChart'
@@ -47,6 +47,7 @@ function App() {
   const consoleResizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
   const resizeRef = useRef<{ side: 'left' | 'right'; startX: number; startWidth: number } | null>(null)
   const selected = nodes.find(n => n.id === selectedId)
+  const selectedSpec = selected ? specs.find(spec => spec.type === selected.data.blockType) : undefined
   const jobActive = job?.status === 'queued' || job?.status === 'running'
   const executionActive = jobActive || runOnceActive
   const configIssue = validateSimulationConfig(config)
@@ -62,11 +63,21 @@ function App() {
   const applyPortPreviews = useCallback((previews: PortPreviewMap) => {
     setNodes(items => items.map(node => ({ ...node, data: { ...node.data, portPreviews: previews[node.id] } })))
   }, [setNodes])
-  const clearPortPreviews = useCallback(() => {
-    setNodes(items => items.map(node => node.data.portPreviews ? { ...node, data: { ...node.data, portPreviews: undefined } } : node))
+  const clearDiagnostics = useCallback(() => {
+    setNodes(items => items.map(node => node.data.portPreviews || node.data.runtimeError ? { ...node, data: { ...node.data, portPreviews: undefined, runtimeError: undefined } } : node))
   }, [setNodes])
+  const applyNodeErrors = useCallback((errors: Record<string, string[]>) => {
+    setNodes(items => items.map(node => ({ ...node, data: { ...node.data, runtimeError: errors[node.id]?.join(' · ') } })))
+  }, [setNodes])
+  const executionError = useCallback((cause: unknown) => {
+    const issue = cause as Error
+    if (cause instanceof GraphApiError) applyNodeErrors(cause.nodeErrors)
+    const message = issue.message || 'Graph execution failed'
+    setError(message)
+    appendLog('error', message)
+  }, [appendLog, applyNodeErrors])
 
-  useEffect(() => { clearPortPreviews() }, [clearPortPreviews, config])
+  useEffect(() => { clearDiagnostics() }, [clearDiagnostics, config])
 
   useEffect(() => {
     if (bootLoggedRef.current) return
@@ -79,7 +90,7 @@ function App() {
       if (event.key !== 'Delete' || !selectedId) return
       const target = event.target as HTMLElement | null
       if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
-      setNodes(items => items.filter(node => node.id !== selectedId).map(node => ({ ...node, data: { ...node.data, portPreviews: undefined } })))
+      setNodes(items => items.filter(node => node.id !== selectedId).map(node => ({ ...node, data: { ...node.data, portPreviews: undefined, runtimeError: undefined } })))
       setEdges(items => items.filter(edge => edge.source !== selectedId && edge.target !== selectedId))
       setSelectedId(null)
       setRightTab('run')
@@ -99,9 +110,13 @@ function App() {
       applyPortPreviews(job.result.port_previews || {})
       appendLog('success', `Benchmark completed · BER ${job.result.ber === null ? 'n/a' : job.result.ber.toExponential(3)} · ${job.result.snr_points.length} SNR points.`)
     }
-    if (job?.status === 'failed' && job.error) appendLog('error', job.error)
+    if (job?.status === 'failed' && job.error) {
+      applyNodeErrors(job.node_errors || {})
+      setError(job.error)
+      appendLog('error', job.error)
+    }
     if (job?.status === 'cancelled') appendLog('warning', 'Benchmark cancelled by the user.')
-  }, [appendLog, applyPortPreviews, job?.status])
+  }, [appendLog, applyNodeErrors, applyPortPreviews, job?.status])
   useEffect(() => {
     if (job?.status !== 'completed') return
     window.setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
@@ -113,14 +128,14 @@ function App() {
     appendLog('info', `SNR ${job.snr_db.toFixed(2)} dB · point ${(job.snr_index ?? 0) + 1}/${job.snr_count ?? '?'}`)
   }, [appendLog, job?.snr_count, job?.snr_db, job?.snr_index, job?.status])
 
-  const onConnect = useCallback((connection: Connection) => { clearPortPreviews(); setEdges(eds => addEdge({ ...connection, markerEnd: { type: MarkerType.ArrowClosed }, animated: true }, eds)) }, [clearPortPreviews, setEdges])
+  const onConnect = useCallback((connection: Connection) => { clearDiagnostics(); setEdges(eds => addEdge({ ...connection, markerEnd: { type: MarkerType.ArrowClosed }, animated: true }, eds)) }, [clearDiagnostics, setEdges])
   const onEdgesChangeWithPreview = useCallback((changes: EdgeChange[]) => {
-    if (changes.some(change => change.type === 'remove')) clearPortPreviews()
+    if (changes.some(change => change.type === 'remove')) clearDiagnostics()
     onEdgesChange(changes)
-  }, [clearPortPreviews, onEdgesChange])
+  }, [clearDiagnostics, onEdgesChange])
   const onNodeClick: NodeMouseHandler<FlowNode> = (_, node) => { setSelectedId(node.id); setRightTab('block') }
   const onNodeDragStart: OnNodeDrag<FlowNode> = (_, node) => { setSelectedId(node.id); setRightTab('block') }
-  const updateSelected = (patch: Partial<FlowNode['data']>) => setNodes(items => items.map(n => ({ ...n, data: { ...n.data, ...(n.id === selectedId ? patch : {}), portPreviews: undefined } })))
+  const updateSelected = (patch: Partial<FlowNode['data']>) => setNodes(items => items.map(n => ({ ...n, data: { ...n.data, ...(n.id === selectedId ? patch : {}), portPreviews: undefined, runtimeError: undefined } })))
   const loadSourceFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || !selected) return
@@ -158,7 +173,7 @@ function App() {
   }
 
   const addBlock = (spec: BlockSpec) => {
-    clearPortPreviews()
+    clearDiagnostics()
     const id = `${spec.type}-${Date.now()}`
     const node: FlowNode = {
       id, type: 'signal', position: { x: 300 + Math.random() * 300, y: 140 + Math.random() * 300 },
@@ -169,28 +184,27 @@ function App() {
 
   const runOnce = async () => {
     if (configIssue) { setError(configIssue); return }
+    clearDiagnostics()
     setError(''); setRightTab('run'); setRunOnceActive(true)
     appendLog('info', `Running one frame at ${config.snr_db_start} dB…`)
     try {
       const snapshot = await runGraphOnce(nodes, edges, config)
       applyPortPreviews(snapshot.port_previews)
       appendLog('success', `Run once completed in ${(snapshot.elapsed_seconds * 1000).toFixed(1)} ms on ${snapshot.device.toUpperCase()} · hover any port to inspect data.`)
-    } catch (e) {
-      const message = (e as Error).message; setError(message); appendLog('error', message)
-    } finally { setRunOnceActive(false) }
+    } catch (e) { executionError(e) } finally { setRunOnceActive(false) }
   }
 
   const runBenchmark = async () => {
     if (configIssue) { setError(configIssue); return }
     setError(''); setRightTab('run'); lastSnrRef.current = null
-    clearPortPreviews()
+    clearDiagnostics()
     appendLog('info', `Starting Monte-Carlo benchmark ${config.snr_db_start}…${config.snr_db_stop} dB.`)
     try {
       const id = await createJob(nodes, edges, config)
       const totalTrials = snrPointCount(config) * config.max_frames
       setJob({ id, status: 'queued', progress: 0, completed_trials: 0, trials: totalTrials })
       appendLog('info', `Job ${id.slice(0, 8)} queued · ${config.max_frames} max frames × ${snrPointCount(config)} SNR points.`)
-    } catch (e) { const message = (e as Error).message; setError(message); appendLog('error', message) }
+    } catch (e) { executionError(e) }
   }
 
   const exportProject = () => {
@@ -256,7 +270,9 @@ function App() {
       <aside className={`inspector ${rightOpen ? '' : 'collapsed'}`}>
         <div className="tabs"><button className={rightTab === 'run' ? 'active' : ''} onClick={() => setRightTab('run')}>Experiment</button><button className={rightTab === 'block' ? 'active' : ''} onClick={() => setRightTab('block')}>Block</button></div>
         {rightTab === 'block' ? selected ? <div className="inspector-content">
-          <div className="selection-heading"><span className="large-icon">{selected.data.blockType === 'python' ? <Braces /> : <Box />}</span><div><small>SELECTED BLOCK</small><h3>{selected.data.label}</h3></div><button className="icon-danger" onClick={() => { setNodes(ns => ns.filter(n => n.id !== selected.id).map(n => ({ ...n, data: { ...n.data, portPreviews: undefined } }))); setEdges(es => es.filter(e => e.source !== selected.id && e.target !== selected.id)); setSelectedId(null) }}><X size={16} /></button></div>
+          <div className="selection-heading"><span className="large-icon">{selected.data.blockType === 'python' ? <Braces /> : <Box />}</span><div><small>SELECTED BLOCK</small><h3>{selected.data.label}</h3></div><button className="icon-danger" onClick={() => { setNodes(ns => ns.filter(n => n.id !== selected.id).map(n => ({ ...n, data: { ...n.data, portPreviews: undefined, runtimeError: undefined } }))); setEdges(es => es.filter(e => e.source !== selected.id && e.target !== selected.id)); setSelectedId(null) }}><X size={16} /></button></div>
+          {selected.data.runtimeError && <div className="error-box"><strong>Signal size contract failed</strong><br />{selected.data.runtimeError}</div>}
+          {selectedSpec?.size_contract && <div className="signal-contract"><strong>Signal size contract</strong><span>{selectedSpec.size_contract}</span></div>}
           <label>Display name<input value={selected.data.label} onChange={e => updateSelected({ label: e.target.value })} /></label>
            <div className="port-layout-control"><div><span>Port layout</span><small>{selected.data.portOrientation === 'reversed' ? 'Input right · Output left' : 'Input left · Output right'}</small></div><button className={`port-toggle ${selected.data.portOrientation === 'reversed' ? 'active' : ''}`} onClick={() => updateSelected({ portOrientation: selected.data.portOrientation === 'reversed' ? 'standard' : 'reversed' })}><ArrowLeftRight size={15} /> {selected.data.portOrientation === 'reversed' ? 'Reversed' : 'Standard'}</button></div>
            <div className="section-rule"><span>PARAMETERS</span></div>
@@ -269,7 +285,7 @@ function App() {
           {result?.sink_metrics && selected.data.blockType === 'power_meter' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean power</span><strong>{result.sink_metrics.power_mean?.toExponential(3) ?? '—'}</strong></div></div></>}
           {result?.sink_metrics && selected.data.blockType === 'scope' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean amplitude</span><strong>{result.sink_metrics.scope_mean_amplitude?.toFixed(4) ?? '—'}</strong></div><div><span>Peak</span><strong>{result.sink_metrics.scope_peak_amplitude?.toFixed(4) ?? '—'}</strong></div></div></>}
           {result?.sink_metrics && selected.data.blockType === 'constellation' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean I / Q</span><strong>{`${result.sink_metrics.constellation_mean_i?.toFixed(3) ?? '—'} / ${result.sink_metrics.constellation_mean_q?.toFixed(3) ?? '—'}`}</strong></div><div><span>Mean |x|</span><strong>{result.sink_metrics.constellation_mean_power?.toFixed(4) ?? '—'}</strong></div></div></>}
-          {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><textarea className="code-editor" spellCheck={false} value={selected.data.code || pythonTemplate} onChange={e => updateSelected({ code: e.target.value })} /><p className="code-hint">Write <code>process(signal, params)</code> and return a NumPy array. SignalLab automatically runs independent Monte-Carlo trials in parallel.</p></>}
+          {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><textarea className="code-editor" spellCheck={false} value={selected.data.code || pythonTemplate} onChange={e => updateSelected({ code: e.target.value })} /><p className="code-hint">Write <code>process(signal, params)</code> and return a 1-D NumPy array. Keep <code>output_size=same</code> for normal processing, use a positive length or <code>any</code> only for an intentional size change. SignalLab runs independent Monte-Carlo trials in parallel.</p></>}
         </div> : <div className="empty-state"><Box size={32} /><h3>No block selected</h3><p>Select a block on the canvas to edit its parameters and Python code.</p></div> :
         <div className="inspector-content">
           <div className="experiment-title"><div><small>MONTE-CARLO</small><h2>Experiment</h2></div><button className="run-once" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} title="Execute one frame and capture data at every port"><Play size={13} fill="currentColor" />{runOnceActive ? 'Running…' : 'Run once'}</button></div>

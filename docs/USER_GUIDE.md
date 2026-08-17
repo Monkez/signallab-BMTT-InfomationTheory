@@ -33,6 +33,7 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 - Trong panel **Block**, dùng **Port layout** để đổi giữa `Input left · Output right` và `Input right · Output left`. Cấu hình được lưu cùng file Export.
 - Sau khi đổi layout, các đường nối hiện tại tự động được đo lại và bám theo handle mới.
 - **Run once** hữu ích để kiểm tra nhanh luồng dữ liệu trước khi benchmark. Sau **Run once** hoặc **Run Benchmark**, hover hay focus bằng bàn phím vào từng port để xem bản tóm tắt dữ liệu mới nhất. Khi sửa graph/tham số, preview cũ tự bị xóa để tránh hiểu nhầm.
+- Mỗi block có ô **Signal size contract** trong inspector. Nếu tham số, input hoặc output vi phạm hợp đồng, quá trình dừng tại đúng block đó: node có viền đỏ và badge **Contract error**, còn Console ghi tên block, kích thước mong đợi và kích thước thực tế. Sửa graph/tham số sẽ xóa trạng thái lỗi cũ để có thể kiểm tra lại.
 - Dùng các nút panel trên thanh trên để ẩn/hiện **Block library**, **Inspector** hoặc **Console**. Kéo mép sidebar/console để đổi kích thước. Console giữ nguyên trạng thái ẩn/hiện khi chạy mô phỏng.
 
 ## Cấu hình Monte-Carlo
@@ -50,6 +51,20 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 - Trên biểu đồ BER, chọn **Copy** để copy ảnh PNG hoặc **PNG** để tải ảnh. Bảng **Results by SNR** hỗ trợ **Copy** (TSV), **CSV** và **PNG**, thuận tiện đưa vào báo cáo.
 - Thư viện có thêm Text Source, Text File Source, Image File Source, Differential Encoder/Decoder, Huffman, Shannon-Fano, Run-Length, ZIP/DEFLATE, Repetition-3, QPSK, Rayleigh Fading, Signal Scope, Constellation Sink và Power Meter. File Source cho phép chọn file trực tiếp trong panel Block; dữ liệu được lưu trong project dưới dạng base64 để chạy được cả desktop và dev server.
 - Các codec nguồn kinh điển làm việc trên stream bit: Encoder có cổng `reference` để nối vào BER, Decoder dùng cùng tham số codebook/codec để khôi phục stream. Huffman và Shannon-Fano dùng nhóm symbol 2-bit với trọng số có thể chỉnh; RLE dùng cặp count/value; ZIP dùng DEFLATE chuẩn.
+
+## Hợp đồng kích thước tín hiệu
+
+Mọi port phải mang mảng một chiều, không rỗng. Runtime không còn tự cắt phần dư hoặc để BER so sánh theo nhánh ngắn hơn:
+
+- Hamming (7,4): encoder yêu cầu input chia hết cho 4 và tạo `7/4` số phần tử; decoder yêu cầu input chia hết cho 7 và tạo `4/7` số phần tử.
+- Repetition-3: encoder tạo kích thước gấp 3; decoder yêu cầu input chia hết cho 3.
+- QPSK: modulator yêu cầu số bit chẵn và tạo một symbol trên hai bit; demodulator khôi phục hai bit trên một symbol.
+- Differential, BPSK, AWGN và Rayleigh phải bảo toàn chính xác kích thước input/output.
+- Huffman, Shannon-Fano, RLE và ZIP kiểm tra output decoder theo header/count trong stream; dữ liệu lỗi hoặc thiếu không được âm thầm chấp nhận.
+- BER Meter yêu cầu `reference` và `estimate` có kích thước hoàn toàn bằng nhau.
+- Python Block mặc định `output_size = same`. Chỉ đặt một số nguyên dương hoặc `any` khi block được chủ ý thiết kế để thay đổi kích thước.
+
+Các tham số `length`, `repeat`, `weights`, SNR và `output_size` được kiểm tra trước khi chạy; input trùng kết nối, port không tồn tại và output khai báo thiếu/thừa cũng bị từ chối.
 
 ## Lưu dự án
 

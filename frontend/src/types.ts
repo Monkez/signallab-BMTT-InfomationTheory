@@ -10,6 +10,7 @@ export type BlockData = {
   outputs: string[]
   portOrientation?: 'standard' | 'reversed'
   portPreviews?: NodePortPreviews
+  runtimeError?: string
   [key: string]: unknown
 }
 
@@ -52,6 +53,7 @@ export type BlockSpec = {
   inputs: string[]
   outputs: string[]
   gpu_compatible: boolean
+  size_contract?: string
 }
 
 export type SimulationConfig = {
@@ -75,6 +77,9 @@ export type Job = {
   completed_trials: number
   trials: number
   error?: string
+  error_block_id?: string
+  error_block_label?: string
+  node_errors?: Record<string, string[]>
   device?: string
   workers?: number
   snr_db?: number

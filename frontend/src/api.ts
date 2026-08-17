@@ -1,5 +1,24 @@
 import type { FlowEdge, FlowNode, Job, RunOnceResult, SimulationConfig } from './types'
 
+export class GraphApiError extends Error {
+  nodeErrors: Record<string, string[]>
+
+  constructor(message: string, nodeErrors: Record<string, string[]> = {}) {
+    super(message)
+    this.name = 'GraphApiError'
+    this.nodeErrors = nodeErrors
+  }
+}
+
+async function graphError(response: Response, fallback: string) {
+  const body = await response.json().catch(() => ({}))
+  const detail = body.detail
+  if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+    return new GraphApiError(detail.message || fallback, detail.node_errors || {})
+  }
+  return new GraphApiError(Array.isArray(detail) ? detail.join(' · ') : detail || fallback)
+}
+
 const graphPayload = (nodes: FlowNode[], edges: FlowEdge[]) => ({
   version: '1.0',
   nodes: nodes.map(n => ({
@@ -19,8 +38,7 @@ export async function createJob(nodes: FlowNode[], edges: FlowEdge[], config: Si
     body: JSON.stringify({ graph: graphPayload(nodes, edges), config }),
   })
   if (!response.ok) {
-    const body = await response.json()
-    throw new Error(Array.isArray(body.detail) ? body.detail.join(' · ') : body.detail || 'Could not start simulation')
+    throw await graphError(response, 'Could not create benchmark job')
   }
   return (await response.json()).job_id as string
 }
@@ -31,8 +49,7 @@ export async function runGraphOnce(nodes: FlowNode[], edges: FlowEdge[], config:
     body: JSON.stringify({ graph: graphPayload(nodes, edges), config }),
   })
   if (!response.ok) {
-    const body = await response.json()
-    throw new Error(Array.isArray(body.detail) ? body.detail.join(' · ') : body.detail || 'Could not run the graph')
+    throw await graphError(response, 'Could not run the graph')
   }
   return response.json()
 }

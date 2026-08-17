@@ -10,6 +10,7 @@ import numpy as np
 
 from .block_registry import SPEC_BY_TYPE
 from .blocks import PROCESSORS, make_context, python_block, to_numpy
+from .contracts import BlockExecutionError, validate_inputs, validate_outputs, validate_parameters
 from .models import Graph, SimulationConfig, ValidationResult
 
 
@@ -30,18 +31,38 @@ def gpu_status() -> dict[str, Any]:
 def validate_graph(graph: Graph) -> ValidationResult:
     errors: list[str] = []
     warnings: list[str] = []
+    node_errors: dict[str, list[str]] = {}
     node_map = {node.id: node for node in graph.nodes}
+
+    def block_error(node_id: str, message: str) -> None:
+        node = node_map.get(node_id)
+        errors.append(f"Block '{node.label if node else node_id}': {message}")
+        node_errors.setdefault(node_id, []).append(message)
+
     if not graph.nodes:
         errors.append("Graph has no blocks")
     for node in graph.nodes:
         if node.type not in SPEC_BY_TYPE:
-            errors.append(f"Block '{node.label}' has unknown type '{node.type}'")
+            block_error(node.id, f"unknown type '{node.type}'")
+        for message in validate_parameters(node.type, node.params):
+            block_error(node.id, message)
     incoming: dict[str, set[str]] = {node.id: set() for node in graph.nodes}
     adjacency: dict[str, list[str]] = {node.id: [] for node in graph.nodes}
     indegree = {node.id: 0 for node in graph.nodes}
     for edge in graph.edges:
         if edge.source not in node_map or edge.target not in node_map:
             errors.append(f"Edge '{edge.id}' references a missing block")
+            continue
+        source_spec = SPEC_BY_TYPE.get(node_map[edge.source].type)
+        target_spec = SPEC_BY_TYPE.get(node_map[edge.target].type)
+        if source_spec and edge.source_handle not in source_spec.outputs:
+            block_error(edge.source, f"edge '{edge.id}' uses unknown output port '{edge.source_handle}'")
+            continue
+        if target_spec and edge.target_handle not in target_spec.inputs:
+            block_error(edge.target, f"edge '{edge.id}' uses unknown input port '{edge.target_handle}'")
+            continue
+        if edge.target_handle in incoming[edge.target]:
+            block_error(edge.target, f"input '{edge.target_handle}' has more than one connection")
             continue
         incoming[edge.target].add(edge.target_handle)
         adjacency[edge.source].append(edge.target)
@@ -51,7 +72,7 @@ def validate_graph(graph: Graph) -> ValidationResult:
         if spec:
             for port in spec.inputs:
                 if port not in incoming[node.id]:
-                    errors.append(f"Block '{node.label}' is missing input '{port}'")
+                    block_error(node.id, f"missing input '{port}'")
     queue = [node_id for node_id, degree in indegree.items() if degree == 0]
     visited = 0
     while queue:
@@ -63,9 +84,12 @@ def validate_graph(graph: Graph) -> ValidationResult:
                 queue.append(target)
     if visited != len(graph.nodes):
         errors.append("Graph must be acyclic")
+        for node_id, degree in indegree.items():
+            if degree > 0:
+                block_error(node_id, "participates in a cycle")
     if not any(node.type == "ber" for node in graph.nodes):
         warnings.append("Graph has no BER Meter, so no BER metric will be produced")
-    return ValidationResult(valid=not errors, errors=errors, warnings=warnings)
+    return ValidationResult(valid=not errors, errors=errors, warnings=warnings, node_errors=node_errors)
 
 
 def topological_order(graph_dict: dict[str, Any]) -> list[str]:
@@ -151,6 +175,7 @@ def execute_trial(
     order = graph_dict.get("_execution_order") or topological_order(graph_dict)
     for node_id in order:
         node = nodes[node_id]
+        spec = SPEC_BY_TYPE[node["type"]]
         node_inputs = {}
         for edge in incoming[node_id]:
             node_inputs[edge.get("target_handle", "in")] = outputs[edge["source"]][edge.get("source_handle", "out")]
@@ -159,10 +184,19 @@ def execute_trial(
                 "inputs": {name: _preview_value(value) for name, value in node_inputs.items()},
                 "outputs": {},
             }
-        if node["type"] == "python":
-            result = python_block(node_inputs, node.get("params", {}), context, node.get("code"))
-        else:
-            result = PROCESSORS[node["type"]](node_inputs, node.get("params", {}), context)
+        try:
+            validate_inputs(node["type"], node_inputs, node.get("params", {}))
+            if node["type"] == "python":
+                result = python_block(node_inputs, node.get("params", {}), context, node.get("code"))
+            else:
+                result = PROCESSORS[node["type"]](node_inputs, node.get("params", {}), context)
+            if not isinstance(result, dict):
+                raise ValueError("processor must return a dictionary of output ports")
+            validate_outputs(node["type"], node_inputs, result, spec.outputs, node.get("params", {}))
+        except BlockExecutionError:
+            raise
+        except Exception as exc:
+            raise BlockExecutionError(node_id, node.get("label", node["type"]), str(exc)) from exc
         node_metrics = result.pop("__metrics__", None)
         if node_metrics:
             for key, value in node_metrics.items():

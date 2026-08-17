@@ -41,6 +41,8 @@ frontend/src/
 
 Backend tách hợp đồng block khỏi thuật toán xử lý: `block_registry.py` chứa `BlockSpec`, catalog và khả năng GPU; `blocks.py` chỉ chứa processor; `engine.py` biên dịch/thực thi DAG; `jobs.py` quản lý vòng đời job; `main.py` chỉ là lớp HTTP. Nhờ vậy đổi nhãn/port/default không đụng thuật toán, còn thêm processor không làm phình API layer.
 
+`contracts.py` là lớp kiểm soát tín hiệu tập trung. Nó kiểm tra tham số tĩnh, mảng 1-D không rỗng, bội số đầu vào, tỷ lệ kích thước đầu ra, port khai báo và các header độ dài của codec. `engine.execute_trial` chạy validation trước và sau từng processor rồi bọc lỗi thành `BlockExecutionError(node_id, node_label, reason)`. Cùng cấu trúc lỗi đi qua API đồng bộ và job đa process, giúp frontend đánh dấu đúng node thay vì chỉ nhận chuỗi traceback chung.
+
 `SinkChart.tsx` hiện là component điều phối trạng thái BER và dùng các module feature trên. Mọi plot đều đi qua `BerPlot`, nên preview, report, đường reference, marker và quy tắc điểm BER bằng 0 có một nguồn logic duy nhất.
 
 ## Bản desktop Windows
@@ -98,5 +100,7 @@ Console dock là lớp hiển thị phía frontend, nhận sự kiện khi nạp
 ## Quy trình mở rộng
 
 Khi thêm block built-in: thêm `BlockSpec` vào `backend/app/block_registry.py`, thêm processor và đăng ký trong `PROCESSORS` tại `backend/app/blocks.py`, rồi thêm catalog dự phòng ở `frontend/src/features/blocks/catalog.ts`. Catalog backend là nguồn chính khi app đã kết nối; catalog frontend chỉ giúp UI dùng được trong thời gian backend khởi động. Cuối cùng thêm round-trip/validation test trong `backend/tests`.
+
+Mỗi block mới đồng thời phải khai báo mô tả `SIZE_CONTRACTS` và thêm quy tắc input/output tương ứng trong `contracts.py`. Không được padding, truncate hoặc lấy `min(input sizes)` ngầm trong processor; mọi thay đổi kích thước phải là một tỷ lệ/header rõ ràng hoặc tham số chủ ý như `Python Block.output_size`.
 
 Khi thêm kiểu Sink/đồ thị: tạo feature riêng trong `frontend/src/features`, định nghĩa type và hàm biến đổi dữ liệu thuần trước, sau đó mới viết component SVG/UI. Không sao chép phép chiếu đồ thị giữa preview và report.

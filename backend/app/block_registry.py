@@ -4,6 +4,39 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 
+SIZE_CONTRACTS = {
+    "bit_source": "out = length values",
+    "text_source": "out = reference = UTF-8 bits × repeat",
+    "text_file_source": "out = reference = file bits × repeat",
+    "image_file_source": "out = reference = pixel bits",
+    "differential_encode": "out = in",
+    "differential_decode": "out = in",
+    "huffman_encode": "reference = in; out is variable-length with a 32-bit size header",
+    "huffman_decode": "out must match the size declared by the input header",
+    "shannon_fano_encode": "reference = in; out is variable-length with a 32-bit size header",
+    "shannon_fano_decode": "out must match the size declared by the input header",
+    "rle_encode": "reference = in; out contains complete 9-bit count/value groups",
+    "rle_decode": "in must be divisible by 9; out must match the encoded run counts",
+    "zip_encode": "reference = in; out contains a 32-bit size header and DEFLATE payload",
+    "zip_decode": "out must match the size declared by the input header",
+    "hamming74_encode": "in must be divisible by 4; out = in × 7/4; reference = in",
+    "hamming74_decode": "in must be divisible by 7; out = in × 4/7",
+    "repetition3_encode": "out = in × 3; reference = in",
+    "repetition3_decode": "in must be divisible by 3; out = in / 3",
+    "bpsk_mod": "out = in",
+    "qpsk_mod": "in must be even; out = in / 2 complex symbols",
+    "awgn": "out = in",
+    "rayleigh": "out = in",
+    "bpsk_demod": "out = in",
+    "qpsk_demod": "out = in × 2 bits",
+    "scope": "in must be a non-empty 1-D signal",
+    "constellation": "in must be a non-empty 1-D signal",
+    "power_meter": "in must be a non-empty 1-D signal",
+    "ber": "reference and estimate must have exactly the same size",
+    "python": "out follows output_size: same (default), any, or an exact positive length",
+}
+
+
 @dataclass(frozen=True)
 class BlockSpec:
     type: str
@@ -16,7 +49,7 @@ class BlockSpec:
     gpu_compatible: bool = True
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        return {**asdict(self), "size_contract": SIZE_CONTRACTS.get(self.type, "All ports must be non-empty 1-D signals")}
 
 
 SPECS = [
@@ -48,7 +81,7 @@ SPECS = [
     BlockSpec("constellation", "Constellation Sink", "Sinks", "Summarize I/Q samples for constellation inspection.", {}, ["in"], []),
     BlockSpec("power_meter", "Power Meter", "Sinks", "Measure mean signal power.", {}, ["in"], []),
     BlockSpec("ber", "BER Meter", "Sinks", "Compare received bits with a reference stream.", {}, ["reference", "estimate"], []),
-    BlockSpec("python", "Python Block", "Custom", "Write process(signal, params); the runtime handles trial parallelism.", {"gain": 1.0}, ["in"], ["out"], False),
+    BlockSpec("python", "Python Block", "Custom", "Write process(signal, params); the runtime handles trial parallelism.", {"gain": 1.0, "output_size": "same"}, ["in"], ["out"], False),
 ]
 
 SPEC_BY_TYPE = {spec.type: spec for spec in SPECS}

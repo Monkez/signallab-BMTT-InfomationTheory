@@ -33,3 +33,6 @@
 - Frontend đã tách block catalog, MiniMap renderer và experiment config khỏi `App.tsx`; backend đã tách `BlockSpec`/catalog sang `block_registry.py`, độc lập processor và engine. Tài liệu kiến trúc có sơ đồ module và quy trình mở rộng.
 - Xác minh sau refactor: backend 6/6 pass, frontend production build pass.
 - `build_app.bat` đã đóng gói lại thành công bản refactor; EXE mới ở `dist\\SignalLab\\SignalLab.exe`.
+- Rà soát UX 2026-08-17: legend BER chuyển vào trong SVG ở góc trên phải cho cả preview/report và xuất ảnh; bỏ tiêu đề BER lặp; kết quả tự cuộn vào vùng nhìn sau khi job hoàn tất.
+- Experiment kiểm tra quan hệ Start/Stop/Step/Min/Max/Chunk trước khi chạy, khóa tham số trong lúc job hoạt động và diễn đạt tiến độ theo frame thực thi/max thay vì gây hiểu nhầm là luôn chạy đủ trials.
+- Sửa `run_dev.bat`/`scripts/run.ps1` không còn tự dừng vì log stderr bình thường của Uvicorn; inspector chặn horizontal overflow và các vùng cuộn có min-height rõ ràng.

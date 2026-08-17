@@ -2,6 +2,7 @@ import { forwardRef, type CSSProperties } from 'react'
 import { curveDomain, styleDash } from './chartMath'
 import { previewChart, reportChart } from './constants'
 import type { BerCurve } from './types'
+import { BerLegend } from './BerLegend'
 
 type BerPlotProps = {
   curves: BerCurve[]
@@ -51,6 +52,13 @@ export const BerPlot = forwardRef<SVGSVGElement, BerPlotProps>(function BerPlot(
       {lineFor(curve) && <polyline points={lineFor(curve)} fill="none" stroke={curve.color} strokeWidth={isReport ? (curveIndex === 0 ? 3.2 : 2.6) : (curveIndex === 0 ? 2.5 : 2)} strokeDasharray={styleDash(curve.style)} strokeLinecap="round" strokeLinejoin="round" opacity={curveIndex === 0 ? 1 : 0.86} />}
       {curve.plotted.filter(point => point.ber !== 0).map(point => <circle key={`${curve.id}-${point.snr_db}-${point.frames}`} cx={x(point.snr_db)} cy={y(Number(point.ber ?? 0))} r={isReport ? (curveIndex === 0 ? 5.5 : 4.6) : (curveIndex === 0 ? 3.5 : 3)} fill={curve.color} stroke="#fff" strokeWidth={isReport ? 2 : 1.5}><title>{`${curve.name} · ${point.snr_db} dB: BER ${point.ber ?? 0}`}</title></circle>)}
     </g>)}
+    <BerLegend
+      curves={curves}
+      report={isReport}
+      width={isReport ? 230 : 126}
+      x={geometry.width - geometry.right - (isReport ? 230 : 126) - (isReport ? 12 : 6)}
+      y={geometry.top + (isReport ? 12 : 6)}
+    />
     <text x={geometry.width / 2} y={geometry.height - (isReport ? 8 : 5)} textAnchor="middle" style={{ ...labelStyle, fontSize: isReport ? 16 : 9 }}>SNR (dB)</text>
     <text x={isReport ? 22 : 11} y={geometry.height / 2} textAnchor="middle" transform={`rotate(-90 ${isReport ? 22 : 11} ${geometry.height / 2})`} style={{ ...labelStyle, fontSize: isReport ? 16 : 9 }}>BER (log)</text>
   </svg>

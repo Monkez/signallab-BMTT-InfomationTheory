@@ -16,7 +16,7 @@ import { BerChart } from './SinkChart'
 import { ResultsTable } from './ResultsTable'
 import { FlowMiniMapNode } from './components/FlowMiniMapNode'
 import { fallbackSpecs, iconFor, miniMapColor } from './features/blocks/catalog'
-import { defaultSimulationConfig, snrPointCount } from './features/experiment/config'
+import { defaultSimulationConfig, snrPointCount, validateSimulationConfig } from './features/experiment/config'
 
 const formatNumber = (n: number) => new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(n)
 type ConsoleLevel = 'info' | 'success' | 'warning' | 'error'
@@ -40,11 +40,14 @@ function App() {
   const [consoleHeight, setConsoleHeight] = useState(156)
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
+  const resultsRef = useRef<HTMLDivElement>(null)
   const bootLoggedRef = useRef(false)
   const lastSnrRef = useRef<number | null>(null)
   const consoleResizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
   const resizeRef = useRef<{ side: 'left' | 'right'; startX: number; startWidth: number } | null>(null)
   const selected = nodes.find(n => n.id === selectedId)
+  const jobActive = job?.status === 'queued' || job?.status === 'running'
+  const configIssue = validateSimulationConfig(config)
   const visibleParams = selected ? Object.entries(selected.data.params).filter(([key]) => {
     if (key === 'data_base64' || key === 'file_name') return false
     if (selected.data.blockType === 'awgn' && (key === 'snr_mode' || key === 'ebn0_db')) return false
@@ -86,6 +89,10 @@ function App() {
     if (job?.status === 'failed' && job.error) appendLog('error', job.error)
     if (job?.status === 'cancelled') appendLog('warning', 'Simulation cancelled by the user.')
   }, [appendLog, job?.status])
+  useEffect(() => {
+    if (job?.status !== 'completed') return
+    window.setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+  }, [job?.status])
   useEffect(() => {
     if (job?.status !== 'running' || typeof job.snr_db !== 'number') return
     if (lastSnrRef.current === job.snr_db) return
@@ -143,6 +150,7 @@ function App() {
   }
 
   const run = async () => {
+    if (configIssue) { setError(configIssue); return }
     setError(''); setRightTab('run'); lastSnrRef.current = null
     appendLog('info', `Starting Monte-Carlo sweep ${config.snr_db_start}…${config.snr_db_stop} dB.`)
     try {
@@ -234,20 +242,21 @@ function App() {
         <div className="inspector-content">
           <div className="experiment-title"><div><small>MONTE-CARLO</small><h2>Experiment</h2></div></div>
           <div className="section-rule"><span>SNR SWEEP (dB)</span></div>
-          <div className="form-grid"><label>Start<input type="number" step="any" value={config.snr_db_start} onChange={e => setConfig({ ...config, snr_db_start: Number(e.target.value) })} /></label><label>Stop<input type="number" step="any" value={config.snr_db_stop} onChange={e => setConfig({ ...config, snr_db_stop: Number(e.target.value) })} /></label></div>
-          <div className="form-grid"><label>Step<input type="number" min="0.01" step="any" value={config.snr_db_step} onChange={e => setConfig({ ...config, snr_db_step: Number(e.target.value) })} /></label><label>Max frames / SNR<input type="number" min="1" value={config.max_frames} onChange={e => { const value = Number(e.target.value); setConfig({ ...config, max_frames: value, trials: value }) }} /></label></div>
-          <div className="form-grid"><label>Min frames / SNR<input type="number" min="1" value={config.min_frames} onChange={e => setConfig({ ...config, min_frames: Number(e.target.value) })} /></label><label>Min errors / SNR<input type="number" min="0" value={config.min_errors} onChange={e => setConfig({ ...config, min_errors: Number(e.target.value) })} /></label></div>
+          <div className="form-grid"><label>Start<input disabled={jobActive} type="number" step="any" value={config.snr_db_start} onChange={e => setConfig({ ...config, snr_db_start: Number(e.target.value) })} /></label><label>Stop<input disabled={jobActive} type="number" step="any" value={config.snr_db_stop} onChange={e => setConfig({ ...config, snr_db_stop: Number(e.target.value) })} /></label></div>
+          <div className="form-grid"><label>Step<input disabled={jobActive} type="number" min="0.01" step="any" value={config.snr_db_step} onChange={e => setConfig({ ...config, snr_db_step: Number(e.target.value) })} /></label><label>Max frames / SNR<input disabled={jobActive} type="number" min="1" value={config.max_frames} onChange={e => { const value = Number(e.target.value); setConfig({ ...config, max_frames: value, trials: value }) }} /></label></div>
+          <div className="form-grid"><label>Min frames / SNR<input disabled={jobActive} type="number" min="1" value={config.min_frames} onChange={e => setConfig({ ...config, min_frames: Number(e.target.value) })} /></label><label>Min errors / SNR<input disabled={jobActive} type="number" min="0" value={config.min_errors} onChange={e => setConfig({ ...config, min_errors: Number(e.target.value) })} /></label></div>
           <div className="section-rule"><span>RUNTIME</span></div>
-          <div className="form-grid"><label>Workers<input type="number" min="0" value={config.workers} onChange={e => setConfig({ ...config, workers: Number(e.target.value) })} /><small>0 = auto</small></label><label>Seed<input type="number" value={config.seed} onChange={e => setConfig({ ...config, seed: Number(e.target.value) })} /></label></div>
-          <label>Chunk size<input type="number" min="1" value={config.chunk_size} onChange={e => setConfig({ ...config, chunk_size: Number(e.target.value) })} /></label>
-          <label>Compute device<select value={config.device} onChange={e => setConfig({ ...config, device: e.target.value as SimulationConfig['device'] })}><option value="auto">Auto · best available</option><option value="cpu">CPU · multiprocessing</option><option value="gpu">GPU · CUDA/CuPy</option></select></label>
-          <button className="run-wide" onClick={run} disabled={job?.status === 'running'}><Play size={16} fill="currentColor" /> {job?.status === 'running' ? 'Simulation running…' : 'Run simulation'}</button>
-          {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} / {job.trials} trials</span><span>{job.device || result?.device || 'preparing'}</span></div>{job.status === 'running' && <button className="cancel" onClick={() => cancelJob(job.id)}><CircleStop size={14} /> Cancel</button>}</div>}
+          <div className="form-grid"><label>Workers<input disabled={jobActive} type="number" min="0" value={config.workers} onChange={e => setConfig({ ...config, workers: Number(e.target.value) })} /><small>0 = auto</small></label><label>Seed<input disabled={jobActive} type="number" value={config.seed} onChange={e => setConfig({ ...config, seed: Number(e.target.value) })} /></label></div>
+          <label>Chunk size<input disabled={jobActive} type="number" min="1" value={config.chunk_size} onChange={e => setConfig({ ...config, chunk_size: Number(e.target.value) })} /></label>
+          <label>Compute device<select disabled={jobActive} value={config.device} onChange={e => setConfig({ ...config, device: e.target.value as SimulationConfig['device'] })}><option value="auto">Auto · best available</option><option value="cpu">CPU · multiprocessing</option><option value="gpu">GPU · CUDA/CuPy</option></select></label>
+          {configIssue && <div className="config-issue" role="alert">{configIssue}</div>}
+          <button className="run-wide" onClick={run} disabled={jobActive || Boolean(configIssue)} title={configIssue || undefined}><Play size={16} fill="currentColor" /> {jobActive ? 'Simulation running…' : 'Run simulation'}</button>
+          {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} frames processed · {job.trials} max</span><span>{job.device || result?.device || 'preparing'}</span></div>{job.status === 'running' && <button className="cancel" onClick={() => cancelJob(job.id)}><CircleStop size={14} /> Cancel</button>}</div>}
           {error && <div className="error-box">{error}</div>}
-          {(result || livePoints.length > 0) && <div className="results">
+          {(result || livePoints.length > 0) && <div className="results" ref={resultsRef}>
             <div className="section-rule"><span>{job?.status === 'running' ? 'LIVE RESULTS' : 'RESULTS'}</span></div>
             {result && <div className="overall-ber-card"><div><span>OVERALL BIT ERROR RATE</span><small>Aggregate across the complete experiment</small></div><strong>{result.ber === null ? '—' : result.ber.toExponential(3)}</strong></div>}
-            <div className="ber-plot-section"><div className="section-rule"><span>BER VS SNR</span></div><BerChart points={livePoints} live={job?.status === 'running'} /></div>
+            <div className="ber-plot-section"><BerChart points={livePoints} live={job?.status === 'running'} /></div>
             <ResultsTable points={livePoints} />
             {result && <><div className="metric-row"><div className="metric"><span>Bit errors</span><strong>{formatNumber(result.bit_errors)}</strong></div><div className="metric"><span>Total bits</span><strong>{formatNumber(result.total_bits)}</strong></div></div><div className="metric-row"><div className="metric"><span>Elapsed</span><strong>{result.elapsed_seconds.toFixed(2)} s</strong></div><div className="metric"><span>Throughput</span><strong>{formatNumber(result.throughput_bps / 1000)} kb/s</strong></div></div>{result.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}</>}
           </div>}

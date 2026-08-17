@@ -21,10 +21,12 @@ try {
     Start-Process 'http://127.0.0.1:5173'
     Write-Host 'SignalLab is ready. Press Ctrl+C to stop both services.' -ForegroundColor Green
     while ($true) {
-        Receive-Job -Job $ApiJob, $UiJob
+        # Uvicorn writes normal startup/access logs to stderr. PowerShell remotes
+        # those records as non-terminating errors, so they must not stop dev mode.
+        Receive-Job -Job $ApiJob, $UiJob -ErrorAction SilentlyContinue
         if ($ApiJob.State -in @('Failed', 'Stopped', 'Completed') -or $UiJob.State -in @('Failed', 'Stopped', 'Completed')) {
             Write-Host 'A SignalLab service stopped unexpectedly.' -ForegroundColor Red
-            Receive-Job -Job $ApiJob, $UiJob
+            Receive-Job -Job $ApiJob, $UiJob -ErrorAction SilentlyContinue
             break
         }
         Start-Sleep -Milliseconds 500
@@ -35,4 +37,3 @@ finally {
     Remove-Job -Job $ApiJob, $UiJob -Force -ErrorAction SilentlyContinue
     Write-Host 'SignalLab stopped.'
 }
-

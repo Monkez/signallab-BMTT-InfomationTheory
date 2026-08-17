@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { BerLegend } from './features/ber/BerLegend'
 import { BerPlot } from './features/ber/BerPlot'
 import { plottedPoints } from './features/ber/chartMath'
 import { lineStyles } from './features/ber/constants'
@@ -168,16 +167,16 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
         <button className="ber-load" onClick={() => referenceFileRef.current?.click()} title="Browse for a BER reference JSON file" aria-label="Browse BER reference file">Browse file</button>
         <input ref={referenceFileRef} type="file" accept=".json,.ber.json,application/json" hidden onChange={event => { void loadReferenceFile(event.target.files?.[0]); event.target.value = '' }} />
       </div>
+      {selectedReference && <div className="ber-reference-actions"><button onClick={() => removeReference(selectedReference.id)}>Hide selected reference</button><button className="danger" onClick={() => deleteReference(selectedReference.id)}>Delete reference</button></div>}
     </div>
     <BerPlot ref={svgRef} curves={curves} />
-    <BerLegend curves={curves} onHide={removeReference} onDelete={deleteReference} />
     {notice && <div className="chart-notice">{notice}</div>}
     <div className="sink-chart-label">{current.plotted.length} SNR points plotted · {current.plotted[current.plotted.length - 1]?.frames ?? 0} frames at last point</div>
     {detailsOpen && createPortal(<div className="ber-report-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDetailsOpen(false) }}>
       <div className="ber-report" role="dialog" aria-modal="true" aria-label="BER details report">
         <div className="ber-report-header"><div><small>BER REPORT</small><h2>BER vs SNR details</h2></div><button className="ber-report-close" onClick={() => setDetailsOpen(false)} aria-label="Close report">×</button></div>
         <div className="ber-report-tabs"><button className={detailsTab === 'chart' ? 'active' : ''} onClick={() => setDetailsTab('chart')}>Chart</button><button className={detailsTab === 'edit' ? 'active' : ''} onClick={() => setDetailsTab('edit')}>Edit &amp; Data</button></div>
-        {detailsTab === 'chart' ? <div className="ber-report-chart-wrap primary"><div className="ber-report-chart-title"><strong>BER vs SNR</strong><span>{curves.length} curve{curves.length === 1 ? '' : 's'} · {allValid.length} measured points</span></div><BerLegend curves={curves} variant="report" /><BerPlot ref={reportSvgRef} curves={curves} variant="report" /></div> :
+        {detailsTab === 'chart' ? <div className="ber-report-chart-wrap primary"><div className="ber-report-chart-title"><strong>BER vs SNR</strong><span>{curves.length} curve{curves.length === 1 ? '' : 's'} · {allValid.length} measured points</span></div><BerPlot ref={reportSvgRef} curves={curves} variant="report" /></div> :
         <div className="ber-report-layout">
           <aside className="ber-report-curves"><div className="ber-report-section-title">CURVES</div><button className={`ber-report-curve ${selectedCurveId === 'current' ? 'active' : ''}`} onClick={() => setSelectedCurveId('current')}><span className="ber-report-dot" style={{ background: curveColor }} />{curveName || 'Current run'}</button>{references.map(reference => <button key={reference.id} className={`ber-report-curve ${selectedCurveId === reference.id ? 'active' : ''}`} onClick={() => { setSelectedCurveId(reference.id); setVisibleReferenceIds(ids => ids.includes(reference.id) ? ids : [...ids, reference.id]) }}><span className="ber-report-dot" style={{ background: reference.color }} />{reference.name}</button>)}</aside>
           <section className="ber-report-editor">

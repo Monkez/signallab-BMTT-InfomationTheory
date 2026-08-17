@@ -19,7 +19,7 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 3. Chọn khối để sửa tên và tham số. Với Python Block, sửa hàm `process` theo mẫu.
 4. Trong tab **Experiment**, chọn SNR Start/Stop/Step, frame tối đa/tối thiểu và lỗi tối thiểu cho mỗi điểm. Chọn worker, seed và thiết bị.
 5. Nhấn **Run simulation**. Kết quả cập nhật trong panel bên phải.
-6. Theo dõi **Console** ở phía dưới vùng canvas để xem job, cảnh báo và lỗi. Console dùng theme sáng, có cùng chiều rộng với view trung tâm và không phủ lên hai sidebar; hai sidebar kéo dài liên tục qua cả vùng View và Console nên không còn khoảng trống phía dưới. Có thể kéo mép trên để đổi chiều cao hoặc ẩn bằng nút Console trên thanh công cụ. Khi job đang chạy, phần **LIVE RESULTS** cập nhật BER theo từng batch.
+6. Theo dõi **Console** ở phía dưới vùng canvas để xem job, cảnh báo và lỗi. Graph luôn nằm ở cột trung tâm làm vùng làm việc chính; Experiment/Block nằm ở inspector bên phải, còn Console dùng theme sáng và cùng chiều rộng với graph, không phủ lên hai sidebar. Hai sidebar kéo dài liên tục qua cả vùng View và Console nên không còn khoảng trống phía dưới. Có thể kéo mép trên để đổi chiều cao hoặc ẩn bằng nút Console trên thanh công cụ. Khi job đang chạy, phần **LIVE RESULTS** cập nhật BER theo từng batch.
 7. Trong biểu đồ **BER vs SNR**, nhập tên đường, chọn màu và kiểu nét rồi bấm **Save reference** để lưu đường hiện tại. Dùng **Load reference…** để nạp các đường đã lưu và so sánh; legend cho phép ẩn hoặc xóa từng reference. Các đường được lưu trong trình duyệt của máy và vẫn có thể dùng sau khi mở lại app.
 
 ## Thao tác canvas

@@ -19,6 +19,7 @@
 - Sửa biểu đồ BER: khi điểm đo có BER đúng bằng 0, chỉ giữ điểm zero đầu tiên; các SNR đo sau đó không vẽ marker/đường nữa. Marker zero cũng được ẩn hoàn toàn; đoạn cuối chỉ rơi thẳng đứng xuống sàn log-scale.
 - Console dock đã chuyển sang theme sáng và chỉ chiếm cột canvas trung tâm của CSS grid; không còn tràn qua block library/inspector hai bên.
 - Block library và inspector đã span cả hai hàng View + Console, giữ nền sidebar liên tục tới đáy cửa sổ và loại bỏ vùng trống phía dưới hai bên.
+- Grid layout đã đặt tường minh library ở cột trái, graph + console ở cột trung tâm, inspector ở cột phải để graph luôn là trọng tâm kể cả khi resize/ẩn panel.
 - Biểu đồ BER hỗ trợ đặt tên đường, màu/kiểu nét, legend, lưu reference vào localStorage và load/ẩn/xóa reference để so sánh nhiều đường BER.
 - MiniMap đã thu nhỏ còn 150×92px, dùng node renderer có stripe/viền và màu theo nhóm block, mask sáng tương phản; vẫn hỗ trợ pan/zoom.
 - Bổ sung Text File Source và Image File Source có file picker/base64; thêm Huffman, Shannon-Fano, RLE và ZIP/DEFLATE Encoder/Decoder. Backend round-trip tests đã nâng lên 6/6 pass, frontend build pass.

@@ -25,6 +25,8 @@ button { color: inherit; border: 0; cursor: pointer; }
 .run-wide:hover { background: #1d4ed8; }
 .run-wide:disabled { opacity: .55; cursor: default; }
 .library, .inspector { grid-row: 2 / 4; background: var(--panel); min-height: 0; z-index: 5; position: relative; transition: opacity .15s ease; }
+.library { grid-column: 1; }
+.inspector { grid-column: 3; }
 .library.collapsed, .inspector.collapsed { overflow: hidden; visibility: hidden; pointer-events: none; opacity: 0; }
 .library { border-right: 1px solid var(--line); display: flex; flex-direction: column; }
 .sidebar-resizer { position: absolute; top: 0; bottom: 0; width: 8px; z-index: 20; cursor: col-resize; }
@@ -47,7 +49,7 @@ button { color: inherit; border: 0; cursor: pointer; }
 .compute-card { margin: auto 12px 12px; padding: 11px; border: 1px solid var(--line); border-radius: 7px; background: #f7f8fa; display: flex; gap: 9px; color: #3c4858; }
 .compute-card b { display: block; color: #3b4656; font-size: 9px; }
 .compute-card small { color: #7b8694; display: block; font-size: 8px; line-height: 1.4; margin-top: 2px; }
-.canvas-wrap { min-width: 0; min-height: 0; position: relative; background: #f5f7f9; }
+.canvas-wrap { grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; position: relative; background: #f5f7f9; }
 .canvas-label { position: absolute; z-index: 4; left: 16px; top: 13px; display: flex; gap: 8px; font-family: Consolas, monospace; font-size: 8px; color: #8893a1; }
 .canvas-label span:first-child { color: #596575; }
 .react-flow__attribution { display: none; }
@@ -164,7 +166,7 @@ input:focus, select:focus, textarea:focus { border-color: #4d78cb; box-shadow: 0
 .sink-result span, .sink-result strong { display: block; }
 .sink-result span { color: #6880a4; font-size: 10px; }
 .sink-result strong { margin-top: 4px; color: #1f57ba; font: 600 13px Consolas, monospace; white-space: nowrap; }
-.console-dock { grid-column: 2; min-width: 0; min-height: 0; width: 100%; position: relative; z-index: 8; display: flex; flex-direction: column; border: 1px solid var(--line-strong); border-bottom: 0; background: var(--panel); color: #263140; overflow: hidden; }
+.console-dock { grid-column: 2; grid-row: 3; min-width: 0; min-height: 0; width: 100%; position: relative; z-index: 8; display: flex; flex-direction: column; border: 1px solid var(--line-strong); border-bottom: 0; background: var(--panel); color: #263140; overflow: hidden; }
 .console-resizer { position: absolute; left: 0; right: 0; top: -5px; height: 9px; cursor: row-resize; z-index: 2; }
 .console-resizer:hover { background: rgba(93, 151, 235, .35); }
 .console-header { height: 36px; flex: 0 0 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--line); background: #fff; }

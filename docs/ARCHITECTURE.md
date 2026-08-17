@@ -43,6 +43,8 @@ Backend tách hợp đồng block khỏi thuật toán xử lý: `block_registry
 
 `contracts.py` là lớp kiểm soát tín hiệu tập trung. Nó kiểm tra tham số tĩnh, mảng 1-D không rỗng, bội số đầu vào, tỷ lệ kích thước đầu ra, port khai báo và các header độ dài của codec. `engine.execute_trial` chạy validation trước và sau từng processor rồi bọc lỗi thành `BlockExecutionError(node_id, node_label, reason)`. Cùng cấu trúc lỗi đi qua API đồng bộ và job đa process, giúp frontend đánh dấu đúng node thay vì chỉ nhận chuỗi traceback chung.
 
+`snapshots.py` giữ tối đa bốn frame đại diện gần nhất bằng LRU trong RAM. Kết quả Run once/Benchmark chỉ trả `snapshot_id` và summary nhỏ; tab Block gọi API port theo trang 128 phần tử, còn Copy all đọc tuần tự theo chunk 4096. Vì vậy polling job không mang buffer lớn lặp lại, block ảnh không khiến DOM render hàng triệu dòng cùng lúc, nhưng người dùng vẫn truy cập được mọi phần tử. Mỗi output chỉ được đóng băng/copy về host một lần; input downstream tham chiếu lại snapshot output upstream nên không nhân đôi buffer trên từng cạnh.
+
 `SinkChart.tsx` hiện là component điều phối trạng thái BER và dùng các module feature trên. Mọi plot đều đi qua `BerPlot`, nên preview, report, đường reference, marker và quy tắc điểm BER bằng 0 có một nguồn logic duy nhất.
 
 ## Bản desktop Windows
@@ -53,9 +55,9 @@ PyWebView tạo cửa sổ native dùng WebView2. Một tiến trình Uvicorn n�
 
 Mỗi node nhận `inputs`, `params`, `context` và trả về dictionary các output. Graph được topological-sort một lần. Mỗi trial có seed sinh từ `SeedSequence`, vì vậy lịch worker thay đổi không làm mất khả năng tái lập. Metric của sink được giảm theo phép cộng; BER cuối cùng là tổng bit lỗi chia tổng bit đã so sánh, không phải trung bình BER từng trial.
 
-`POST /api/run-once` dùng cùng DAG runtime nhưng chỉ chạy một frame đồng bộ tại `snr_db_start`. Khi bật `capture_ports`, engine tóm tắt input/output của từng node thành dtype, shape, size, min/mean/max và tối đa 8 mẫu dạng JSON-safe. Frontend gắn các summary này vào node để tooltip port đọc trực tiếp; không truyền toàn bộ buffer tín hiệu qua REST.
+`POST /api/run-once` dùng cùng DAG runtime nhưng chỉ chạy một frame đồng bộ tại `snr_db_start`. Khi bật `capture_ports`, engine tóm tắt input/output của từng node thành dtype, shape, size, min/mean/max và tối đa 8 mẫu dạng JSON-safe. Frontend gắn summary vào node để tooltip đọc trực tiếp; dữ liệu đầy đủ được giữ sau `snapshot_id` và chỉ truyền từng trang khi tab Block yêu cầu.
 
-Job **Run Benchmark** vẫn chạy Monte-Carlo bất đồng bộ qua polling. Khi hoàn tất, engine chạy thêm một frame đại diện xác định bằng seed cấu hình tại SNR đầu tiên để trả `port_previews`. Preview này phục vụ quan sát luồng dữ liệu, không tham gia phép cộng metric và không làm thay đổi BER benchmark. Mọi chỉnh sửa topology hoặc tham số đều xóa preview phía frontend để tránh hiển thị dữ liệu hết hạn.
+Job **Run Benchmark** vẫn chạy Monte-Carlo bất đồng bộ qua polling. Khi hoàn tất, engine chạy thêm một frame đại diện xác định bằng seed cấu hình tại SNR đầu tiên để trả `port_previews` và đăng ký snapshot đầy đủ. Frame này phục vụ quan sát luồng dữ liệu, không tham gia phép cộng metric và không làm thay đổi BER benchmark. Mọi chỉnh sửa topology hoặc tham số đều xóa preview/snapshot phía frontend để tránh hiển thị dữ liệu hết hạn.
 
 ## Song song CPU/GPU
 

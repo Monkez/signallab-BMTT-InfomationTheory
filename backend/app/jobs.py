@@ -10,6 +10,7 @@ from typing import Any
 from .contracts import BlockExecutionError
 from .engine import run_simulation
 from .models import SimulationRequest
+from .snapshots import store as snapshot_store
 
 
 class JobManager:
@@ -45,6 +46,8 @@ class JobManager:
 
         try:
             result = run_simulation(request.graph, request.config, progress, event.is_set)
+            port_values = result.pop("_port_values", {})
+            result["snapshot_id"] = snapshot_store.register(port_values) if port_values else None
             self._update(job_id, status="cancelled" if result["cancelled"] else "completed", progress=1 if not result["cancelled"] else self.jobs[job_id]["progress"], result=result)
         except Exception as exc:
             block_fields = {

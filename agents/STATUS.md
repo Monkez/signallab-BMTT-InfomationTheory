@@ -43,3 +43,7 @@
 - Lỗi validation/runtime mang `node_id` qua cả REST Run once và worker Benchmark; frontend tô đỏ block, hiện badge Contract error, chi tiết trong inspector và ghi tên block/kích thước vào Console. Sửa topology hoặc tham số tự xóa diagnostic cũ.
 - Xác minh mới nhất: backend 23/23 pass (gồm bảng contract của 12 processor), frontend production build pass; browser E2E xác nhận lỗi tĩnh `length=0`, lỗi runtime Hamming `402 % 4`, Benchmark đa process, Console và clear-on-edit.
 - `build_app.bat` đã đóng gói thành công và smoke test xác nhận EXE mới duy trì tiến trình ổn định.
+- Tab Block có **Current port data**: hiển thị tất cả input/output của block đang chọn, metadata và từng giá trị có index; phân trang 128 phần tử, Previous/Next và Copy all theo chunk 4096.
+- Backend thêm LRU snapshot store (4 frame) và API đọc port lazy; Run once/Benchmark trả `snapshot_id`, polling vẫn chỉ mang summary nên không phình payload. GPU chỉ copy representative frame về CPU một lần.
+- Xác minh: backend 24/24 pass; frontend production build pass; browser E2E kiểm tra Hamming 3 port, chuyển trang 0→128, AWGN input/output 7.168 phần tử, Copy all và snapshot từ cả Run once lẫn Benchmark.
+- EXE chứa port-data inspector đã được build lại và smoke test thành công tại `dist\SignalLab\SignalLab.exe`.

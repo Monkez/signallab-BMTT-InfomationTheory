@@ -144,6 +144,11 @@ def _preview_value(value: Any, sample_limit: int = 8) -> dict[str, Any]:
     return preview
 
 
+def _capture_value(value: Any) -> np.ndarray:
+    """Keep the representative frame for lazy inspection; move GPU data once."""
+    return np.array(to_numpy(value), copy=True)
+
+
 def execute_trial(
     graph_dict: dict[str, Any],
     trial_index: int,
@@ -166,6 +171,7 @@ def execute_trial(
     nodes = graph_dict.get("_node_map") or {node["id"]: node for node in graph_dict["nodes"]}
     outputs: dict[str, dict[str, Any]] = {}
     port_previews: dict[str, dict[str, dict[str, Any]]] = {}
+    port_values: dict[str, dict[str, dict[str, np.ndarray]]] = {}
     metrics: dict[str, float] = {"bit_errors": 0, "total_bits": 0}
     incoming = graph_dict.get("_incoming_edges")
     if incoming is None:
@@ -180,8 +186,16 @@ def execute_trial(
         for edge in incoming[node_id]:
             node_inputs[edge.get("target_handle", "in")] = outputs[edge["source"]][edge.get("source_handle", "out")]
         if capture_ports:
+            captured_inputs = {
+                edge.get("target_handle", "in"): port_values[edge["source"]]["outputs"][edge.get("source_handle", "out")]
+                for edge in incoming[node_id]
+            }
             port_previews[node_id] = {
-                "inputs": {name: _preview_value(value) for name, value in node_inputs.items()},
+                "inputs": {name: _preview_value(value) for name, value in captured_inputs.items()},
+                "outputs": {},
+            }
+            port_values[node_id] = {
+                "inputs": captured_inputs,
                 "outputs": {},
             }
         try:
@@ -203,8 +217,10 @@ def execute_trial(
                 metrics[key] = metrics.get(key, 0) + float(value)
         outputs[node_id] = result
         if capture_ports:
-            port_previews[node_id]["outputs"] = {name: _preview_value(value) for name, value in result.items()}
-    return {"metrics": metrics, "port_previews": port_previews} if capture_ports else metrics
+            captured_outputs = {name: _capture_value(value) for name, value in result.items()}
+            port_values[node_id]["outputs"] = captured_outputs
+            port_previews[node_id]["outputs"] = {name: _preview_value(value) for name, value in captured_outputs.items()}
+    return {"metrics": metrics, "port_previews": port_previews, "_port_values": port_values} if capture_ports else metrics
 
 
 def _execution_device(graph: Graph, requested: str) -> tuple[str, list[str]]:
@@ -230,6 +246,7 @@ def run_once(graph: Graph, config: SimulationConfig) -> dict[str, Any]:
         "elapsed_seconds": time.perf_counter() - started,
         "metrics": captured["metrics"],
         "port_previews": captured["port_previews"],
+        "_port_values": captured["_port_values"],
         "warnings": validation.warnings + device_warnings,
     }
 
@@ -386,7 +403,7 @@ def run_simulation(
         sink_metrics["constellation_mean_i"] = aggregate.get("constellation_i_sum", 0) / count
         sink_metrics["constellation_mean_q"] = aggregate.get("constellation_q_sum", 0) / count
         sink_metrics["constellation_mean_power"] = aggregate.get("constellation_power_sum", 0) / count
-    preview_capture = execute_trial(graph_dict, 0, config.seed, device, snr_values[0], capture_ports=True) if not was_cancelled else {"port_previews": {}}
+    preview_capture = execute_trial(graph_dict, 0, config.seed, device, snr_values[0], capture_ports=True) if not was_cancelled else {"port_previews": {}, "_port_values": {}}
     return {
         **aggregate,
         "ber": aggregate["bit_errors"] / bits if bits else None,
@@ -398,5 +415,6 @@ def run_simulation(
         "snr_points": point_results,
         "sink_metrics": sink_metrics,
         "port_previews": preview_capture["port_previews"],
+        "_port_values": preview_capture["_port_values"],
         "warnings": validation.warnings + device_warnings,
     }

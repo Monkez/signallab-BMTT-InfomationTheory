@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from typing import Literal
+
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from .block_registry import SPECS
@@ -6,6 +8,7 @@ from .contracts import BlockExecutionError
 from .engine import gpu_status, run_once, validate_graph
 from .jobs import manager
 from .models import Graph, SimulationRequest
+from .snapshots import store as snapshot_store
 
 app = FastAPI(title="SignalLab API", version="0.1.0")
 app.add_middleware(
@@ -46,7 +49,10 @@ def execute_once(request: SimulationRequest):
     if not validation.valid:
         raise HTTPException(422, detail={"message": "; ".join(validation.errors), "node_errors": validation.node_errors})
     try:
-        return run_once(request.graph, request.config)
+        result = run_once(request.graph, request.config)
+        port_values = result.pop("_port_values")
+        result["snapshot_id"] = snapshot_store.register(port_values)
+        return result
     except BlockExecutionError as exc:
         raise HTTPException(422, detail={
             "message": str(exc),
@@ -56,6 +62,21 @@ def execute_once(request: SimulationRequest):
         }) from exc
     except ValueError as exc:
         raise HTTPException(422, detail=str(exc)) from exc
+
+
+@app.get("/api/snapshots/{snapshot_id}/nodes/{node_id}/ports/{direction}/{port}")
+def snapshot_port(
+    snapshot_id: str,
+    node_id: str,
+    direction: Literal["inputs", "outputs"],
+    port: str,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=128, ge=1, le=4096),
+):
+    page = snapshot_store.page(snapshot_id, node_id, direction, port, offset, limit)
+    if page is None:
+        raise HTTPException(404, detail="Snapshot or port data was not found; run the graph again")
+    return page
 
 
 @app.get("/api/jobs/{job_id}")

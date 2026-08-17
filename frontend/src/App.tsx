@@ -16,6 +16,7 @@ import { BerChart } from './SinkChart'
 import { ResultsTable } from './ResultsTable'
 import { FlowMiniMapNode } from './components/FlowMiniMapNode'
 import { fallbackSpecs, iconFor, miniMapColor } from './features/blocks/catalog'
+import { PortDataInspector } from './features/blocks/PortDataInspector'
 import { defaultSimulationConfig, snrPointCount, validateSimulationConfig } from './features/experiment/config'
 
 const formatNumber = (n: number) => new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(n)
@@ -31,6 +32,7 @@ function App() {
   const [config, setConfig] = useState<SimulationConfig>(defaultSimulationConfig)
   const [job, setJob] = useState<Job | null>(null)
   const [runOnceActive, setRunOnceActive] = useState(false)
+  const [snapshotId, setSnapshotId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [rightTab, setRightTab] = useState<'block' | 'run'>('run')
   const [leftOpen, setLeftOpen] = useState(true)
@@ -64,6 +66,7 @@ function App() {
     setNodes(items => items.map(node => ({ ...node, data: { ...node.data, portPreviews: previews[node.id] } })))
   }, [setNodes])
   const clearDiagnostics = useCallback(() => {
+    setSnapshotId(null)
     setNodes(items => items.map(node => node.data.portPreviews || node.data.runtimeError ? { ...node, data: { ...node.data, portPreviews: undefined, runtimeError: undefined } } : node))
   }, [setNodes])
   const applyNodeErrors = useCallback((errors: Record<string, string[]>) => {
@@ -108,6 +111,7 @@ function App() {
   useEffect(() => {
     if (job?.status === 'completed' && job.result) {
       applyPortPreviews(job.result.port_previews || {})
+      setSnapshotId(job.result.snapshot_id || null)
       appendLog('success', `Benchmark completed · BER ${job.result.ber === null ? 'n/a' : job.result.ber.toExponential(3)} · ${job.result.snr_points.length} SNR points.`)
     }
     if (job?.status === 'failed' && job.error) {
@@ -190,6 +194,7 @@ function App() {
     try {
       const snapshot = await runGraphOnce(nodes, edges, config)
       applyPortPreviews(snapshot.port_previews)
+      setSnapshotId(snapshot.snapshot_id)
       appendLog('success', `Run once completed in ${(snapshot.elapsed_seconds * 1000).toFixed(1)} ms on ${snapshot.device.toUpperCase()} · hover any port to inspect data.`)
     } catch (e) { executionError(e) } finally { setRunOnceActive(false) }
   }
@@ -242,7 +247,7 @@ function App() {
           <button className="ghost" onClick={() => setLeftOpen(value => !value)} title={leftOpen ? 'Hide block library' : 'Show block library'}><PanelLeft size={16} /></button>
           <button className="ghost" onClick={() => setRightOpen(value => !value)} title={rightOpen ? 'Hide inspector' : 'Show inspector'}><PanelRight size={16} /></button>
           <button className={`ghost ${consoleOpen ? 'active' : ''}`} onClick={() => setConsoleOpen(value => !value)} title={consoleOpen ? 'Hide console' : 'Show console'}><PanelBottom size={16} /></button>
-          <button className="ghost" onClick={() => { setNodes(initialNodes); setEdges(initialEdges); setSelectedId('channel') }} title="Reset sample"><RotateCcw size={16} /></button>
+          <button className="ghost" onClick={() => { clearDiagnostics(); setNodes(initialNodes); setEdges(initialEdges); setSelectedId('channel') }} title="Reset sample"><RotateCcw size={16} /></button>
           <button className="ghost labeled" onClick={() => fileRef.current?.click()}><Upload size={15} /> Import</button>
           <input ref={fileRef} type="file" accept=".json" hidden onChange={e => importProject(e.target.files?.[0])} />
           <button className="ghost labeled" onClick={exportProject}><Download size={15} /> Export</button>
@@ -281,6 +286,8 @@ function App() {
            {selected.data.blockType === 'awgn' && String(selected.data.params.snr_mode || 'experiment') === 'fixed' && <label>Fixed SNR dB<input type="number" value={String(selected.data.params.ebn0_db ?? 4)} onChange={e => updateSelected({ params: { ...selected.data.params, ebn0_db: Number(e.target.value) } })} /></label>}
            {selected.data.blockType === 'image_file_source' && <label>Pixel mode<select value={String(selected.data.params.mode || 'grayscale')} onChange={e => updateSelected({ params: { ...selected.data.params, mode: e.target.value } })}><option value="grayscale">Grayscale</option><option value="rgb">RGB</option></select></label>}
            {visibleParams.length ? visibleParams.map(([key, value]) => <label key={key}>{key.replaceAll('_', ' ')}<input type={typeof value === 'number' ? 'number' : 'text'} value={String(value)} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value } })} /></label>) : !['awgn', 'text_file_source', 'image_file_source'].includes(selected.data.blockType) && <p className="muted">This block has no parameters.</p>}
+          <div className="section-rule"><span>CURRENT PORT DATA</span><em>representative frame</em></div>
+          <PortDataInspector snapshotId={snapshotId} nodeId={selected.id} previews={selected.data.portPreviews} />
           {selected.data.blockType === 'ber' && livePoints.length ? <><div className="section-rule"><span>SINK PREVIEW</span></div><BerChart points={livePoints} live={job?.status === 'running'} /></> : null}
           {result?.sink_metrics && selected.data.blockType === 'power_meter' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean power</span><strong>{result.sink_metrics.power_mean?.toExponential(3) ?? '—'}</strong></div></div></>}
           {result?.sink_metrics && selected.data.blockType === 'scope' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean amplitude</span><strong>{result.sink_metrics.scope_mean_amplitude?.toFixed(4) ?? '—'}</strong></div><div><span>Peak</span><strong>{result.sink_metrics.scope_peak_amplitude?.toFixed(4) ?? '—'}</strong></div></div></>}

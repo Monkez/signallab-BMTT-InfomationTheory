@@ -1,6 +1,7 @@
 import base64
 
 import pytest
+from fastapi.testclient import TestClient
 
 from backend.app.blocks import PROCESSORS, make_context, python_block
 from backend.app.block_registry import SPEC_BY_TYPE
@@ -8,6 +9,7 @@ from backend.app.contracts import BlockExecutionError
 from backend.app.contracts import validate_inputs, validate_outputs
 from backend.app.engine import execute_trial, run_once, run_simulation, validate_graph
 from backend.app.models import Edge, Graph, SimulationConfig
+from backend.app.main import app
 import numpy as np
 
 
@@ -68,6 +70,24 @@ def test_run_once_captures_input_and_output_port_samples():
     assert source["shape"] == [400]
     assert len(source["sample"]) == 8
     assert decoder_input["size"] == 700
+    assert result["_port_values"]["1"]["inputs"]["in"] is result["_port_values"]["0"]["outputs"]["out"]
+
+
+def test_run_once_snapshot_exposes_every_port_value_by_page():
+    client = TestClient(app)
+    response = client.post("/api/run-once", json={
+        "graph": sample_graph().model_dump(),
+        "config": SimulationConfig(seed=42, device="cpu").model_dump(),
+    })
+    assert response.status_code == 200
+    result = response.json()
+    assert "_port_values" not in result
+    page = client.get(f"/api/snapshots/{result['snapshot_id']}/nodes/0/ports/outputs/out?offset=396&limit=16")
+    assert page.status_code == 200
+    payload = page.json()
+    assert payload["total"] == 400
+    assert payload["offset"] == 396
+    assert len(payload["values"]) == 4
 
 
 def test_hamming_rejects_input_that_would_be_silently_padded():

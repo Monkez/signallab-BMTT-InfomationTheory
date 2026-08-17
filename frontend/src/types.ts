@@ -38,7 +38,21 @@ export type RunOnceResult = {
   elapsed_seconds: number
   metrics: Record<string, number>
   port_previews: PortPreviewMap
+  snapshot_id: string
   warnings: string[]
+}
+
+export type PortDataPage = {
+  snapshot_id: string
+  node_id: string
+  direction: 'inputs' | 'outputs'
+  port: string
+  dtype: string
+  shape: number[]
+  total: number
+  offset: number
+  limit: number
+  values: string[]
 }
 
 export type FlowNode = Node<BlockData, 'signal'>
@@ -103,6 +117,7 @@ export type Job = {
     warnings: string[]
     sink_metrics: Record<string, number>
     port_previews: PortPreviewMap
+    snapshot_id?: string
     snr_points: Array<{
       snr_db: number
       bit_errors: number

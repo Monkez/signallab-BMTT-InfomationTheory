@@ -1,4 +1,4 @@
-import type { FlowEdge, FlowNode, Job, RunOnceResult, SimulationConfig } from './types'
+import type { FlowEdge, FlowNode, Job, PortDataPage, RunOnceResult, SimulationConfig } from './types'
 
 export class GraphApiError extends Error {
   nodeErrors: Record<string, string[]>
@@ -57,6 +57,16 @@ export async function runGraphOnce(nodes: FlowNode[], edges: FlowEdge[], config:
 export async function getJob(id: string): Promise<Job> {
   const response = await fetch(`/api/jobs/${id}`)
   if (!response.ok) throw new Error('Simulation job was not found')
+  return response.json()
+}
+
+export async function getPortValues(snapshotId: string, nodeId: string, direction: 'inputs' | 'outputs', port: string, offset = 0, limit = 128): Promise<PortDataPage> {
+  const [snapshot, node, portName] = [snapshotId, nodeId, port].map(encodeURIComponent)
+  const response = await fetch(`/api/snapshots/${snapshot}/nodes/${node}/ports/${direction}/${portName}?offset=${offset}&limit=${limit}`)
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}))
+    throw new Error(body.detail || 'Port data is no longer available; run the graph again')
+  }
   return response.json()
 }
 

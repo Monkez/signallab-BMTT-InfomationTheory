@@ -21,6 +21,7 @@ export type BerReference = {
 }
 
 const chart = { width: 340, height: 190, left: 42, right: 12, top: 14, bottom: 30 }
+const reportChart = { width: 960, height: 520, left: 82, right: 28, top: 24, bottom: 62 }
 const referenceStorageKey = 'signallab.ber-references.v1'
 const lineStyles: Array<{ value: BerLineStyle; label: string; dash: string }> = [
   { value: 'solid', label: 'Solid', dash: '' },
@@ -161,11 +162,24 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   }
   const labelStyle: CSSProperties = { fontSize: 9, fill: '#6b7788' }
   const yTicks = [0, 1, 2, 3].map(index => maxLog - (index * yRange) / 3)
-  const renderReportPlot = (ref: RefObject<SVGSVGElement>) => <svg ref={ref} className="ber-report-plot" viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="Detailed bit error rate versus SNR chart">
-    <rect x={chart.left} y={chart.top} width={chart.width - chart.left - chart.right} height={chart.height - chart.top - chart.bottom} fill="#f8fafc" stroke="#d7dee8" />
-    {yTicks.map((tick, index) => { const yy = chart.top + (index / 3) * (chart.height - chart.top - chart.bottom); return <g key={`report-${tick}`}><line x1={chart.left} x2={chart.width - chart.right} y1={yy} y2={yy} stroke="#e3e8ef" /><text x={chart.left - 7} y={yy + 3} textAnchor="end" style={labelStyle}>{`1e${tick.toFixed(0)}`}</text></g> })}
-    {curves.map((curve, curveIndex) => <g key={`report-${curve.id}`}><polyline points={lineFor(curve)} fill="none" stroke={curve.color} strokeWidth={curveIndex === 0 ? 2.8 : 2.2} strokeDasharray={styleDash(curve.style)} strokeLinejoin="round" opacity={curveIndex === 0 ? 1 : 0.86} />{curve.plotted.filter(point => point.ber !== 0).map(point => <circle key={`report-${curve.id}-${point.snr_db}-${point.frames}`} cx={x(point.snr_db)} cy={y(Number(point.ber ?? 0))} r={curveIndex === 0 ? 3.8 : 3.2} fill={curve.color} stroke="#fff" strokeWidth="1.5" />)}</g>)}
-    <text x={chart.width / 2} y={chart.height - 5} textAnchor="middle" style={labelStyle}>SNR (dB)</text><text x="11" y={chart.height / 2} textAnchor="middle" transform={`rotate(-90 11 ${chart.height / 2})`} style={labelStyle}>BER (log)</text><text x={chart.left} y={chart.height - 17} textAnchor="middle" style={labelStyle}>{minX.toFixed(1)}</text><text x={chart.width - chart.right} y={chart.height - 17} textAnchor="middle" style={labelStyle}>{maxX.toFixed(1)}</text>
+  const reportX = (value: number) => reportChart.left + ((value - minX) / xRange) * (reportChart.width - reportChart.left - reportChart.right)
+  const reportY = (value: number) => reportChart.top + ((maxLog - Math.log10(Math.max(value, 1e-8))) / yRange) * (reportChart.height - reportChart.top - reportChart.bottom)
+  const reportLineFor = (curve: typeof curves[number]) => {
+    const linePoints: string[] = []
+    const linePlotted = curve.firstZero >= 0 ? curve.plotted.slice(0, curve.firstZero) : curve.plotted
+    linePlotted.forEach(point => linePoints.push(`${reportX(point.snr_db)},${reportY(Number(point.ber ?? 0))}`))
+    if (curve.firstZero > 0 && linePlotted.length) linePoints.push(`${reportX(linePlotted[linePlotted.length - 1].snr_db)},${reportY(0)}`)
+    return linePoints.join(' ')
+  }
+  const reportYTicks = [0, 1, 2, 3, 4].map(index => maxLog - (index * yRange) / 4)
+  const reportXTicks = [0, 1, 2, 3, 4].map(index => minX + (index * xRange) / 4)
+  const reportLabelStyle: CSSProperties = { fontSize: 14, fill: '#68778b' }
+  const renderReportPlot = (ref: RefObject<SVGSVGElement>) => <svg ref={ref} className="ber-report-plot" viewBox={`0 0 ${reportChart.width} ${reportChart.height}`} role="img" aria-label="Detailed bit error rate versus SNR chart" shapeRendering="geometricPrecision" textRendering="geometricPrecision">
+    <rect x={reportChart.left} y={reportChart.top} width={reportChart.width - reportChart.left - reportChart.right} height={reportChart.height - reportChart.top - reportChart.bottom} fill="#f8fafc" stroke="#cfd8e4" strokeWidth="1.5" />
+    {reportYTicks.map((tick, index) => { const yy = reportChart.top + (index / 4) * (reportChart.height - reportChart.top - reportChart.bottom); return <g key={`report-y-${index}`}><line x1={reportChart.left} x2={reportChart.width - reportChart.right} y1={yy} y2={yy} stroke="#e1e7ef" strokeWidth="1.25" /><text x={reportChart.left - 14} y={yy + 5} textAnchor="end" style={reportLabelStyle}>{`1e${tick.toFixed(1).replace('.0', '')}`}</text></g> })}
+    {reportXTicks.map((tick, index) => { const xx = reportChart.left + (index / 4) * (reportChart.width - reportChart.left - reportChart.right); return <g key={`report-x-${index}`}><line x1={xx} x2={xx} y1={reportChart.top} y2={reportChart.height - reportChart.bottom} stroke="#edf1f5" strokeWidth="1" /><text x={xx} y={reportChart.height - reportChart.bottom + 25} textAnchor="middle" style={reportLabelStyle}>{tick.toFixed(1)}</text></g> })}
+    {curves.map((curve, curveIndex) => <g key={`report-${curve.id}`}><polyline points={reportLineFor(curve)} fill="none" stroke={curve.color} strokeWidth={curveIndex === 0 ? 3.2 : 2.6} strokeDasharray={styleDash(curve.style)} strokeLinecap="round" strokeLinejoin="round" opacity={curveIndex === 0 ? 1 : 0.86} />{curve.plotted.filter(point => point.ber !== 0).map(point => <circle key={`report-${curve.id}-${point.snr_db}-${point.frames}`} cx={reportX(point.snr_db)} cy={reportY(Number(point.ber ?? 0))} r={curveIndex === 0 ? 5.5 : 4.6} fill={curve.color} stroke="#fff" strokeWidth="2"><title>{`${curve.name} · ${point.snr_db} dB: BER ${point.ber ?? 0}`}</title></circle>)}</g>)}
+    <text x={reportChart.width / 2} y={reportChart.height - 8} textAnchor="middle" style={{ ...reportLabelStyle, fontSize: 16 }}>SNR (dB)</text><text x="22" y={reportChart.height / 2} textAnchor="middle" transform={`rotate(-90 22 ${reportChart.height / 2})`} style={{ ...reportLabelStyle, fontSize: 16 }}>BER (log)</text>
   </svg>
 
   const updateSelectedCurve = (patch: Partial<Pick<BerReference, 'name' | 'color' | 'style'>>) => {

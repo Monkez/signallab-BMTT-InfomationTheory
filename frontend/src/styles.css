@@ -61,6 +61,10 @@ button { color: inherit; border: 0; cursor: pointer; }
 .react-flow__handle { width: 8px !important; height: 8px !important; border: 2px solid #fff !important; background: #5477a7 !important; }
 .port-label.input .react-flow__handle { left: -13px !important; }
 .port-label.output .react-flow__handle { right: -13px !important; }
+.signal-node.ports-reversed .port-label.input { left: auto; right: 8px; padding-left: 0; padding-right: 1px; text-align: right; }
+.signal-node.ports-reversed .port-label.input .react-flow__handle { left: auto !important; right: -13px !important; }
+.signal-node.ports-reversed .port-label.output { right: auto; left: 8px; padding-right: 0; padding-left: 1px; text-align: left; }
+.signal-node.ports-reversed .port-label.output .react-flow__handle { right: auto !important; left: -13px !important; }
 .inspector { border-left: 1px solid var(--line); display: flex; flex-direction: column; }
 .tabs { height: 48px; display: grid; grid-template-columns: 1fr 1fr; padding: 0 14px; border-bottom: 1px solid var(--line); }
 .tabs button { background: transparent; color: #788493; border-bottom: 2px solid transparent; font-size: 10px; }
@@ -72,6 +76,11 @@ button { color: inherit; border: 0; cursor: pointer; }
 .selection-heading h3 { margin: 3px 0 0; font-size: 13px; }
 .icon-danger { width: 27px; height: 27px; background: transparent; color: #7e8998; border-radius: 6px; }
 .icon-danger:hover { background: #fff0f1; color: #c7354d; }
+.port-layout-control { display: flex; align-items: center; justify-content: space-between; gap: 9px; padding: 10px; margin: 0 0 14px; border: 1px solid var(--line); border-radius: 7px; background: #f8fafc; }
+.port-layout-control span { display: block; color: #536071; font-size: 12px; font-weight: 600; }
+.port-layout-control small { display: block; color: #7e8998; font-size: 10px; margin-top: 4px; }
+.port-toggle { min-height: 31px; padding: 0 9px; display: flex; align-items: center; gap: 5px; border: 1px solid var(--line-strong); border-radius: 6px; background: #fff; color: #526174; font-size: 10px; white-space: nowrap; }
+.port-toggle:hover, .port-toggle.active { border-color: #7da1dc; background: #eef4ff; color: #1f57ba; }
 label { display: block; font-size: 9px; color: #667282; text-transform: capitalize; margin: 0 0 12px; position: relative; }
 input, select { display: block; width: 100%; margin-top: 6px; height: 34px; padding: 0 9px; background: #fff; border: 1px solid var(--line-strong); color: #263140; border-radius: 6px; outline: none; font-size: 10px; }
 input:focus, select:focus, textarea:focus { border-color: #4d78cb; box-shadow: 0 0 0 2px rgba(37,99,235,.1); }

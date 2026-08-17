@@ -5,7 +5,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
-  Box, Braces, ChevronDown, CircleStop, Cpu, Download, Gauge,
+  ArrowLeftRight, Box, Braces, ChevronDown, CircleStop, Cpu, Download, Gauge,
   Layers3, Play, Plus, Radio, RotateCcw, Search, Upload, Waves, X, Zap,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
@@ -70,7 +70,7 @@ function App() {
     const id = `${spec.type}-${Date.now()}`
     const node: FlowNode = {
       id, type: 'signal', position: { x: 300 + Math.random() * 300, y: 140 + Math.random() * 300 },
-      data: { label: spec.label, blockType: spec.type, category: spec.category, params: { ...spec.defaults }, inputs: spec.inputs, outputs: spec.outputs, code: spec.type === 'python' ? pythonTemplate : undefined },
+      data: { label: spec.label, blockType: spec.type, category: spec.category, params: { ...spec.defaults }, inputs: spec.inputs, outputs: spec.outputs, portOrientation: 'standard', code: spec.type === 'python' ? pythonTemplate : undefined },
     }
     setNodes(ns => [...ns, node]); setSelectedId(id); setRightTab('block')
   }
@@ -94,7 +94,7 @@ function App() {
       const specMap = new Map(specs.map(s => [s.type, s]))
       setNodes(project.graph.nodes.map((n: any) => ({
         id: n.id, type: 'signal', position: n.position,
-        data: { label: n.label, blockType: n.type, category: specMap.get(n.type)?.category || '', params: n.params || {}, code: n.code, inputs: specMap.get(n.type)?.inputs || ['in'], outputs: specMap.get(n.type)?.outputs || ['out'] },
+        data: { label: n.label, blockType: n.type, category: specMap.get(n.type)?.category || '', params: n.params || {}, code: n.code, portOrientation: n.port_orientation || 'standard', inputs: specMap.get(n.type)?.inputs || ['in'], outputs: specMap.get(n.type)?.outputs || ['out'] },
       })))
       setEdges(project.graph.edges.map((e: any) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.source_handle, targetHandle: e.target_handle })))
       if (project.config) setConfig(project.config)
@@ -141,6 +141,7 @@ function App() {
         {rightTab === 'block' ? selected ? <div className="inspector-content">
           <div className="selection-heading"><span className="large-icon">{selected.data.blockType === 'python' ? <Braces /> : <Box />}</span><div><small>SELECTED BLOCK</small><h3>{selected.data.label}</h3></div><button className="icon-danger" onClick={() => { setNodes(ns => ns.filter(n => n.id !== selected.id)); setEdges(es => es.filter(e => e.source !== selected.id && e.target !== selected.id)); setSelectedId(null) }}><X size={16} /></button></div>
           <label>Display name<input value={selected.data.label} onChange={e => updateSelected({ label: e.target.value })} /></label>
+          <div className="port-layout-control"><div><span>Port layout</span><small>{selected.data.portOrientation === 'reversed' ? 'Input right · Output left' : 'Input left · Output right'}</small></div><button className={`port-toggle ${selected.data.portOrientation === 'reversed' ? 'active' : ''}`} onClick={() => updateSelected({ portOrientation: selected.data.portOrientation === 'reversed' ? 'standard' : 'reversed' })}><ArrowLeftRight size={15} /> {selected.data.portOrientation === 'reversed' ? 'Reversed' : 'Standard'}</button></div>
           <div className="section-rule"><span>PARAMETERS</span></div>
           {Object.entries(selected.data.params).length ? Object.entries(selected.data.params).map(([key, value]) => <label key={key}>{key.replaceAll('_', ' ')}<input type={typeof value === 'number' ? 'number' : 'text'} value={String(value)} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value } })} /></label>) : <p className="muted">This block has no parameters.</p>}
           {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><textarea className="code-editor" spellCheck={false} value={selected.data.code || pythonTemplate} onChange={e => updateSelected({ code: e.target.value })} /><p className="code-hint">Use <code>context.xp</code> for CPU/GPU portable array operations.</p></>}

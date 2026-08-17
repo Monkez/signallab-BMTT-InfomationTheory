@@ -5,6 +5,7 @@ const graphPayload = (nodes: FlowNode[], edges: FlowEdge[]) => ({
   nodes: nodes.map(n => ({
     id: n.id, type: n.data.blockType, label: n.data.label, position: n.position,
     params: n.data.params, code: n.data.code,
+    port_orientation: n.data.portOrientation || 'standard',
   })),
   edges: edges.map(e => ({
     id: e.id, source: e.source, target: e.target,
@@ -35,4 +36,3 @@ export async function cancelJob(id: string) {
 }
 
 export { graphPayload }
-

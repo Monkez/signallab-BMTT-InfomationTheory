@@ -8,6 +8,7 @@ export type BlockData = {
   code?: string
   inputs: string[]
   outputs: string[]
+  portOrientation?: 'standard' | 'reversed'
   [key: string]: unknown
 }
 
@@ -53,4 +54,3 @@ export type Job = {
     warnings: string[]
   }
 }
-

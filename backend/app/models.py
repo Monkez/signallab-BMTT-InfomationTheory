@@ -17,6 +17,7 @@ class Node(BaseModel):
     position: Position = Field(default_factory=Position)
     params: dict[str, Any] = Field(default_factory=dict)
     code: str | None = None
+    port_orientation: Literal["standard", "reversed"] = "standard"
 
 
 class Edge(BaseModel):
@@ -58,4 +59,3 @@ class ValidationResult(BaseModel):
     valid: bool
     errors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
-

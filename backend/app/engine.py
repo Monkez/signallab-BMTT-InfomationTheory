@@ -104,13 +104,16 @@ def execute_trial(
             pass
     rng = np.random.default_rng(seed)
     context = make_context(xp, rng, trial_index, seed, actual_device, snr_db)
-    nodes = {node["id"]: node for node in graph_dict["nodes"]}
+    nodes = graph_dict.get("_node_map") or {node["id"]: node for node in graph_dict["nodes"]}
     outputs: dict[str, dict[str, Any]] = {}
     metrics: dict[str, float] = {"bit_errors": 0, "total_bits": 0}
-    incoming: dict[str, list[dict[str, Any]]] = {node_id: [] for node_id in nodes}
-    for edge in graph_dict["edges"]:
-        incoming[edge["target"]].append(edge)
-    for node_id in topological_order(graph_dict):
+    incoming = graph_dict.get("_incoming_edges")
+    if incoming is None:
+        incoming = {node_id: [] for node_id in nodes}
+        for edge in graph_dict["edges"]:
+            incoming[edge["target"]].append(edge)
+    order = graph_dict.get("_execution_order") or topological_order(graph_dict)
+    for node_id in order:
         node = nodes[node_id]
         node_inputs = {}
         for edge in incoming[node_id]:
@@ -163,6 +166,13 @@ def run_simulation(
         raise ValueError("; ".join(validation.errors))
     started = time.perf_counter()
     graph_dict = graph.model_dump()
+    # Compile immutable graph lookups once. They are plain dictionaries/lists,
+    # so the compiled plan is also serializable to ProcessPool workers.
+    graph_dict["_node_map"] = {node["id"]: node for node in graph_dict["nodes"]}
+    graph_dict["_incoming_edges"] = {node["id"]: [] for node in graph_dict["nodes"]}
+    for edge in graph_dict["edges"]:
+        graph_dict["_incoming_edges"][edge["target"]].append(edge)
+    graph_dict["_execution_order"] = topological_order(graph_dict)
     max_frames = config.max_frames or config.trials
     min_frames = min(config.min_frames, max_frames)
     if config.snr_db_stop < config.snr_db_start:
@@ -179,7 +189,12 @@ def run_simulation(
         raise ValueError("GPU was requested but CuPy/CUDA is unavailable")
     device = "gpu" if config.device in ("gpu", "auto") and gpu["available"] and gpu_compatible else "cpu"
     cpu_count = os.cpu_count() or 1
-    workers = config.workers or max(1, cpu_count - 1)
+    # Auto mode avoids creating one OS process per frame on high-core machines
+    # and keeps small vectorized jobs inline, where ProcessPool overhead wins.
+    if config.workers:
+        workers = config.workers
+    else:
+        workers = 1 if max_frames < 128 else min(32, max(1, cpu_count - 1), max_frames // max(1, config.chunk_size))
     workers = min(workers, max_frames, cpu_count)
     if device == "gpu":
         workers = 1
@@ -187,24 +202,29 @@ def run_simulation(
     point_results: list[dict[str, Any]] = []
     total_budget = len(snr_values) * max_frames
     was_cancelled = False
+    pool = (
+        ProcessPoolExecutor(max_workers=workers)
+        if device == "cpu" and workers > 1 and max_frames >= max(4, config.chunk_size)
+        else None
+    )
 
-    for snr_index, snr_db in enumerate(snr_values):
-        point: dict[str, float] = {"bit_errors": 0, "total_bits": 0, "frames": 0}
-        seed_sequence = np.random.SeedSequence([config.seed, snr_index])
-        seeds = seed_sequence.spawn(max_frames)
-        items = [(i, int(seed.generate_state(1)[0])) for i, seed in enumerate(seeds)]
-        offset = 0
-        while offset < max_frames:
-            if cancelled and cancelled():
-                was_cancelled = True
-                break
-            batch = items[offset : offset + config.chunk_size * workers]
-            chunks = [batch[i : i + config.chunk_size] for i in range(0, len(batch), config.chunk_size)]
-            results: list[dict[str, float]] = []
-            if workers == 1 or len(batch) < max(4, config.chunk_size):
-                results = [_run_chunk(graph_dict, chunk, device, snr_db) for chunk in chunks]
-            else:
-                with ProcessPoolExecutor(max_workers=workers) as pool:
+    try:
+        for snr_index, snr_db in enumerate(snr_values):
+            point: dict[str, float] = {"bit_errors": 0, "total_bits": 0, "frames": 0}
+            seed_rng = np.random.default_rng(np.random.SeedSequence([config.seed, snr_index]))
+            offset = 0
+            while offset < max_frames:
+                if cancelled and cancelled():
+                    was_cancelled = True
+                    break
+                batch_size = min(config.chunk_size * workers, max_frames - offset)
+                batch_seeds = seed_rng.integers(0, np.iinfo(np.uint32).max, size=batch_size, dtype=np.uint32)
+                batch = [(offset + index, int(seed)) for index, seed in enumerate(batch_seeds)]
+                chunks = [batch[i : i + config.chunk_size] for i in range(0, len(batch), config.chunk_size)]
+                results: list[dict[str, float]] = []
+                if workers == 1 or len(batch) < max(4, config.chunk_size):
+                    results = [_run_chunk(graph_dict, chunk, device, snr_db) for chunk in chunks]
+                elif pool is not None:
                     futures = [pool.submit(_run_chunk, graph_dict, chunk, device, snr_db) for chunk in chunks]
                     for future in as_completed(futures):
                         if cancelled and cancelled():
@@ -213,35 +233,46 @@ def run_simulation(
                                 pending.cancel()
                             break
                         results.append(future.result())
-            for result in results:
-                _merge_metrics(point, result)
-                _merge_metrics(aggregate, result)
-                point["frames"] += result.get("completed_trials", 0)
-            offset += len(batch)
-            if progress:
-                progress({
-                    **aggregate,
-                    "trials": total_budget,
-                    "device": device,
-                    "workers": workers,
-                    "snr_db": snr_db,
-                    "snr_index": snr_index,
-                    "snr_count": len(snr_values),
-                })
-            stop_criteria_met = point["frames"] >= min_frames and (
-                point["bit_errors"] >= config.min_errors or point["frames"] >= max_frames
-            )
-            if was_cancelled or stop_criteria_met:
+                for result in results:
+                    _merge_metrics(point, result)
+                    _merge_metrics(aggregate, result)
+                    point["frames"] += result.get("completed_trials", 0)
+                offset += len(batch)
+                if progress:
+                    live_points = [*point_results, {
+                        "snr_db": snr_db,
+                        "bit_errors": point["bit_errors"],
+                        "total_bits": point["total_bits"],
+                        "frames": point["frames"],
+                        "ber": point["bit_errors"] / point["total_bits"] if point["total_bits"] else None,
+                    }]
+                    progress({
+                        **aggregate,
+                        "trials": total_budget,
+                        "device": device,
+                        "workers": workers,
+                        "snr_db": snr_db,
+                        "snr_index": snr_index,
+                        "snr_count": len(snr_values),
+                        "snr_points": live_points,
+                    })
+                stop_criteria_met = point["frames"] >= min_frames and (
+                    point["bit_errors"] >= config.min_errors or point["frames"] >= max_frames
+                )
+                if was_cancelled or stop_criteria_met:
+                    break
+            point_results.append({
+                "snr_db": snr_db,
+                "bit_errors": point["bit_errors"],
+                "total_bits": point["total_bits"],
+                "frames": point["frames"],
+                "ber": point["bit_errors"] / point["total_bits"] if point["total_bits"] else None,
+            })
+            if was_cancelled:
                 break
-        point_results.append({
-            "snr_db": snr_db,
-            "bit_errors": point["bit_errors"],
-            "total_bits": point["total_bits"],
-            "frames": point["frames"],
-            "ber": point["bit_errors"] / point["total_bits"] if point["total_bits"] else None,
-        })
-        if was_cancelled:
-            break
+    finally:
+        if pool is not None:
+            pool.shutdown(wait=True, cancel_futures=True)
     elapsed = time.perf_counter() - started
     bits = aggregate["total_bits"]
     sink_metrics: dict[str, float] = {}

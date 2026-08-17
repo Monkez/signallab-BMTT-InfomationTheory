@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import { useRef, useState, type CSSProperties } from 'react'
 
 export type SinkPoint = {
   snr_db: number
@@ -10,7 +10,36 @@ export type SinkPoint = {
 
 const chart = { width: 340, height: 190, left: 42, right: 12, top: 14, bottom: 30 }
 
-export function BerChart({ points }: { points: SinkPoint[] }) {
+async function svgToPng(svg: SVGSVGElement): Promise<Blob> {
+  const clone = svg.cloneNode(true) as SVGSVGElement
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+  clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink')
+  const source = new XMLSerializer().serializeToString(clone)
+  const image = new Image()
+  const url = URL.createObjectURL(new Blob([source], { type: 'image/svg+xml;charset=utf-8' }))
+  try {
+    await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('Could not render chart image')); image.src = url })
+    const scale = 3
+    const canvas = document.createElement('canvas')
+    canvas.width = chart.width * scale
+    canvas.height = chart.height * scale
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Canvas is unavailable')
+    context.fillStyle = '#ffffff'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+    return await new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not encode chart image')), 'image/png'))
+  } finally { URL.revokeObjectURL(url) }
+}
+
+async function copyPng(blob: Blob) {
+  if (!navigator.clipboard || typeof ClipboardItem === 'undefined') throw new Error('Image clipboard is unavailable')
+  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+}
+
+export function BerChart({ points, live = false }: { points: SinkPoint[]; live?: boolean }) {
+  const svgRef = useRef<SVGSVGElement>(null)
+  const [notice, setNotice] = useState('')
   const valid = points.filter(point => Number.isFinite(point.snr_db) && point.total_bits > 0)
   if (!valid.length) return <div className="sink-chart empty">Run an experiment to see BER vs SNR.</div>
 
@@ -27,9 +56,28 @@ export function BerChart({ points }: { points: SinkPoint[] }) {
   const labelStyle: CSSProperties = { fontSize: 9, fill: '#6b7788' }
   const yTicks = [0, 1, 2, 3].map(index => maxLog - (index * yRange) / 3)
 
+  const exportImage = async (copy: boolean) => {
+    if (!svgRef.current) return
+    try {
+      const blob = await svgToPng(svgRef.current)
+      if (copy) {
+        await copyPng(blob)
+        setNotice('Copied')
+      } else {
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = 'signallab-ber-vs-snr.png'
+        link.click()
+        URL.revokeObjectURL(link.href)
+        setNotice('PNG saved')
+      }
+    } catch (error) { setNotice((error as Error).message) }
+    window.setTimeout(() => setNotice(''), 1800)
+  }
+
   return <div className="sink-chart">
-    <div className="sink-chart-title">BER vs SNR</div>
-    <svg viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="Bit error rate versus SNR chart">
+    <div className="sink-chart-toolbar"><div className="sink-chart-title">BER vs SNR {live && <span className="live-badge">LIVE</span>}</div><div className="chart-actions"><button onClick={() => exportImage(true)} title="Copy chart as PNG" aria-label="Copy chart as PNG">Copy</button><button onClick={() => exportImage(false)} title="Export chart as PNG" aria-label="Export chart as PNG">PNG</button></div></div>
+    <svg ref={svgRef} viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="Bit error rate versus SNR chart">
       <rect x={chart.left} y={chart.top} width={chart.width - chart.left - chart.right} height={chart.height - chart.top - chart.bottom} fill="#f8fafc" stroke="#d7dee8" />
       {yTicks.map((tick, index) => {
         const yy = chart.top + (index / 3) * (chart.height - chart.top - chart.bottom)
@@ -42,6 +90,7 @@ export function BerChart({ points }: { points: SinkPoint[] }) {
       <text x={chart.left} y={chart.height - 17} textAnchor="middle" style={labelStyle}>{minX.toFixed(1)}</text>
       <text x={chart.width - chart.right} y={chart.height - 17} textAnchor="middle" style={labelStyle}>{maxX.toFixed(1)}</text>
     </svg>
+    {notice && <div className="chart-notice">{notice}</div>}
     <div className="sink-chart-label">{valid.length} SNR points · {valid[valid.length - 1]?.frames ?? 0} frames at last point</div>
   </div>
 }

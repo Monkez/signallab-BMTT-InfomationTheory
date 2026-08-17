@@ -125,9 +125,23 @@ input:focus, select:focus, textarea:focus { border-color: #4d78cb; box-shadow: 0
 .warning { border-color: #e9d396; background: #fff9e8; color: #785f19; margin-top: 9px; }
 .sink-chart { width: 100%; border: 1px solid var(--line); border-radius: 7px; background: #fff; padding: 8px; margin-bottom: 10px; }
 .sink-chart.empty { color: var(--muted); font-size: 11px; padding: 18px 10px; text-align: center; }
+.sink-chart-toolbar, .results-table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sink-chart-title { color: #526174; font-size: 11px; font-weight: 600; margin: 0 2px 4px; }
+.live-badge { display: inline-block; margin-left: 5px; padding: 2px 5px; border-radius: 4px; background: #e5f7ed; color: #16804d; font-size: 8px; letter-spacing: .06em; vertical-align: 1px; }
+.chart-actions { display: flex; gap: 4px; }
+.chart-actions button { height: 24px; padding: 0 6px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: #58708f; font-size: 9px; }
+.chart-actions button:hover { border-color: #9bb9e6; color: #1f57ba; background: #f4f8ff; }
+.chart-notice { color: #1f57ba; font-size: 9px; margin: 3px 2px; }
 .sink-chart svg { display: block; width: 100%; height: auto; }
 .sink-chart-label { color: #7e8998; font-size: 10px; text-align: center; margin-top: 4px; }
+.results-table-wrap { border: 1px solid var(--line); border-radius: 7px; background: #fff; padding: 8px; margin-bottom: 10px; }
+.results-table-toolbar { color: #526174; font-size: 11px; font-weight: 600; margin-bottom: 6px; }
+.results-table-scroll { max-height: 190px; overflow: auto; }
+.results-table-wrap table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.results-table-wrap th, .results-table-wrap td { padding: 6px 5px; border-bottom: 1px solid #edf0f4; text-align: right; white-space: nowrap; }
+.results-table-wrap th { color: #718096; font-size: 9px; font-weight: 600; }
+.results-table-wrap td { color: #3f4c5e; font-family: Consolas, monospace; }
+.results-table-wrap tr:last-child td { border-bottom: 0; }
 .sink-result { display: flex; align-items: center; gap: 10px; padding: 11px; border: 1px solid #cbdaf7; border-radius: 7px; background: #f3f7ff; color: #285da9; }
 .sink-result > svg { flex: 0 0 auto; }
 .sink-result > div { min-width: 0; }

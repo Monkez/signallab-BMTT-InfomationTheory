@@ -43,11 +43,13 @@ def test_simulation_is_reproducible():
         chunk_size=2,
         device="cpu",
     )
-    first = run_simulation(graph, config)
+    updates = []
+    first = run_simulation(graph, config, progress=updates.append)
     second = run_simulation(graph, config)
     assert first["bit_errors"] == second["bit_errors"]
     assert first["total_bits"] == second["total_bits"]
     assert [point["snr_db"] for point in first["snr_points"]] == [0.0, 2.0, 4.0]
+    assert updates and updates[-1]["snr_points"][-1]["frames"] >= 1
 
 
 def test_cycle_is_rejected():

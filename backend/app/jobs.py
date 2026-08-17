@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import threading
 import traceback
 import uuid
@@ -19,6 +20,8 @@ class JobManager:
     def create(self, request: SimulationRequest) -> str:
         job_id = uuid.uuid4().hex
         event = threading.Event()
+        max_frames = request.config.max_frames or request.config.trials
+        snr_count = max(1, math.floor((request.config.snr_db_stop - request.config.snr_db_start) / request.config.snr_db_step + 1e-9) + 1)
         with self.lock:
             self.cancel_events[job_id] = event
             self.jobs[job_id] = {
@@ -26,7 +29,7 @@ class JobManager:
                 "status": "queued",
                 "progress": 0,
                 "completed_trials": 0,
-                "trials": request.config.trials,
+                "trials": snr_count * max_frames,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
         thread = threading.Thread(target=self._run, args=(job_id, request, event), daemon=True)
@@ -63,4 +66,3 @@ class JobManager:
 
 
 manager = JobManager()
-

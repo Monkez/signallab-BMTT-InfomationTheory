@@ -53,4 +53,10 @@ Mỗi node có `port_orientation` (`standard` hoặc `reversed`). Đây là thu�
 
 Experiment tạo dải SNR từ `snr_db_start/stop/step`; mỗi trial nhận `context.snr_db`, vì vậy AWGN ở chế độ `experiment` không cần hard-code một giá trị. Mỗi điểm dừng khi đạt `min_frames` và (`min_errors` hoặc `max_frames`). Kết quả giữ `snr_points` để Sink vẽ BER theo SNR. Block được chọn ngay tại sự kiện bắt đầu kéo; hai sidebar có thể ẩn/hiện và kéo đổi chiều rộng. BER Meter hiển thị đồ thị SVG log-scale trong inspector sau khi có kết quả.
 
-Console dock là lớp hiển thị phía frontend, nhận sự kiện khi nạp block, xếp hàng/chạy/kết thúc/hủy job và lỗi API. Engine trả thêm `sink_metrics` cho Scope, Constellation và Power Meter để inspector hiển thị tóm tắt trực quan mà không truyền mảng mẫu lớn qua API.
+Console dock là lớp hiển thị phía frontend, nhận sự kiện khi nạp block, xếp hàng/chạy/kết thúc/hủy job và lỗi API. Trong lúc chạy, callback tiến độ mang theo `snr_points` gồm các điểm đã hoàn tất và điểm SNR hiện tại, vì vậy dashboard có thể vẽ BER theo thời gian thực mà không đợi job kết thúc. Engine trả thêm `sink_metrics` cho Scope, Constellation và Power Meter để inspector hiển thị tóm tắt trực quan mà không truyền mảng mẫu lớn qua API.
+
+## Xuất kết quả và tối ưu hiệu năng
+
+- Biểu đồ BER có thể copy trực tiếp ảnh PNG vào clipboard hoặc tải xuống; bảng kết quả theo SNR có thể copy dạng TSV, tải CSV hoặc PNG.
+- Graph được biên dịch thành `node_map`, danh sách cạnh vào và thứ tự thực thi một lần trước sweep. Seed được sinh theo từng batch thay vì cấp phát toàn bộ số frame từ đầu.
+- CPU dùng một `ProcessPoolExecutor` dùng lại cho toàn bộ sweep; chế độ tự động chạy inline với workload nhỏ và giới hạn số worker hợp lý để tránh overhead tạo process lớn hơn thời gian tính toán. Người dùng vẫn có thể đặt `Workers` thủ công khi benchmark hệ thống cụ thể.

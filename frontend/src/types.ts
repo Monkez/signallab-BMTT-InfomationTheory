@@ -52,6 +52,13 @@ export type Job = {
   snr_db?: number
   snr_index?: number
   snr_count?: number
+  snr_points?: Array<{
+    snr_db: number
+    bit_errors: number
+    total_bits: number
+    frames: number
+    ber: number | null
+  }>
   result?: {
     bit_errors: number
     total_bits: number

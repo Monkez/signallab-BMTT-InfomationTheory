@@ -19,7 +19,7 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 3. Chọn khối để sửa tên và tham số. Với Python Block, sửa hàm `process` theo mẫu.
 4. Trong tab **Experiment**, chọn SNR Start/Stop/Step, frame tối đa/tối thiểu và lỗi tối thiểu cho mỗi điểm. Chọn worker, seed và thiết bị.
 5. Nhấn **Run simulation**. Kết quả cập nhật trong panel bên phải.
-6. Theo dõi **Console** ở phía dưới để xem job, cảnh báo và lỗi. Có thể kéo mép trên để đổi chiều cao hoặc ẩn bằng nút Console trên thanh công cụ.
+6. Theo dõi **Console** ở phía dưới để xem job, cảnh báo và lỗi. Có thể kéo mép trên để đổi chiều cao hoặc ẩn bằng nút Console trên thanh công cụ. Khi job đang chạy, phần **LIVE RESULTS** cập nhật BER theo từng batch.
 
 ## Thao tác canvas
 
@@ -42,6 +42,7 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 - `Seed`: cho kết quả tái lập.
 - `Auto`: chọn GPU nếu có và phù hợp, nếu không dùng CPU.
 - Sau khi chạy, BER Meter và tab Experiment hiển thị đồ thị BER theo SNR cùng số frame/lỗi từng điểm.
+- Trên biểu đồ BER, chọn **Copy** để copy ảnh PNG hoặc **PNG** để tải ảnh. Bảng **Results by SNR** hỗ trợ **Copy** (TSV), **CSV** và **PNG**, thuận tiện đưa vào báo cáo.
 - Thư viện có thêm Text Source, Differential Encoder/Decoder, Repetition-3, QPSK, Rayleigh Fading, Signal Scope, Constellation Sink và Power Meter. Các Sink mới hiển thị tóm tắt kết quả trong tab Block sau khi chạy.
 
 ## Lưu dự án

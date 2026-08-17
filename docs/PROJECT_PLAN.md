@@ -17,6 +17,8 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 - AWGN tham chiếu SNR của Experiment hoặc giữ giá trị cố định; Sink BER hiển thị đồ thị BER theo SNR.
 - Chọn block ngay khi bắt đầu kéo; sidebar thư viện và inspector có thể ẩn/hiện, kéo đổi kích thước.
 - Console dock phía dưới ghi lại trạng thái job, cảnh báo và lỗi để debug mô phỏng ngay trong app.
+- Dashboard realtime cập nhật BER theo SNR khi simulation đang chạy; biểu đồ và bảng có thao tác copy/export PNG, TSV và CSV.
+- Engine tối ưu graph lookup, seed theo batch và tái sử dụng process pool; auto mode tránh multiprocessing cho workload nhỏ để giảm độ trễ.
 - Python Block dùng API đơn giản `process(signal, params) -> array`; scheduler đảm nhiệm song song hóa các frame, không bắt người dùng viết mã multiprocessing/GPU.
 - Thư viện mở rộng với Text Source, differential source coding, repetition code, QPSK, Rayleigh fading, Scope, Constellation và Power Meter.
 - Script Windows một lần bấm cho cài đặt, chạy và build.

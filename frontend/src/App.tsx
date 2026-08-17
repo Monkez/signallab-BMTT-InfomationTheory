@@ -13,6 +13,7 @@ import { cancelJob, createJob, getJob, graphPayload } from './api'
 import { initialEdges, initialNodes, pythonTemplate } from './sample'
 import type { BlockSpec, FlowNode, Job, SimulationConfig } from './types'
 import { BerChart } from './SinkChart'
+import { ResultsTable } from './ResultsTable'
 
 const fallbackSpecs: BlockSpec[] = [
   { type: 'bit_source', label: 'Bit Source', category: 'Sources', description: 'Random binary messages', defaults: { length: 4096 }, inputs: [], outputs: ['out'], gpu_compatible: true },
@@ -38,6 +39,7 @@ const fallbackSpecs: BlockSpec[] = [
 
 const iconFor = (type: string) => type.includes('source') ? Binary : type.includes('awgn') || type.includes('rayleigh') ? Waves : type.includes('bpsk') || type.includes('qpsk') ? Radio : type === 'ber' ? Gauge : type === 'scope' || type === 'constellation' || type === 'power_meter' ? Activity : type === 'python' ? Braces : Box
 const formatNumber = (n: number) => new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(n)
+const snrPointCount = (config: SimulationConfig) => Math.max(1, Math.floor((config.snr_db_stop - config.snr_db_start) / config.snr_db_step + 1e-9) + 1)
 const defaultSimulationConfig: SimulationConfig = { trials: 100, max_frames: 100, min_frames: 20, min_errors: 100, snr_db_start: -2, snr_db_stop: 10, snr_db_step: 2, workers: 0, seed: 2026, device: 'auto', chunk_size: 10 }
 type ConsoleLevel = 'info' | 'success' | 'warning' | 'error'
 type ConsoleEntry = { id: number; time: string; level: ConsoleLevel; message: string }
@@ -152,8 +154,9 @@ function App() {
     appendLog('info', `Starting Monte-Carlo sweep ${config.snr_db_start}…${config.snr_db_stop} dB.`)
     try {
       const id = await createJob(nodes, edges, config)
-      setJob({ id, status: 'queued', progress: 0, completed_trials: 0, trials: config.max_frames })
-      appendLog('info', `Job ${id.slice(0, 8)} queued · ${config.max_frames} max frames/SNR.`)
+      const totalTrials = snrPointCount(config) * config.max_frames
+      setJob({ id, status: 'queued', progress: 0, completed_trials: 0, trials: totalTrials })
+      appendLog('info', `Job ${id.slice(0, 8)} queued · ${config.max_frames} max frames × ${snrPointCount(config)} SNR points.`)
     } catch (e) { const message = (e as Error).message; setError(message); appendLog('error', message) }
   }
 
@@ -181,6 +184,7 @@ function App() {
   }
   const grouped = useMemo(() => specs.filter(s => `${s.label} ${s.category}`.toLowerCase().includes(search.toLowerCase())).reduce<Record<string, BlockSpec[]>>((acc, spec) => ((acc[spec.category] ||= []).push(spec), acc), {}), [specs, search])
   const result = job?.result
+  const livePoints = job?.status === 'running' ? (job.snr_points || []) : (result?.snr_points || job?.snr_points || [])
 
   return (
     <div className="app-shell" style={{ gridTemplateRows: `60px minmax(0, 1fr) ${consoleOpen ? consoleHeight : 0}px`, gridTemplateColumns: `${leftOpen ? leftWidth : 0}px minmax(0, 1fr) ${rightOpen ? rightWidth : 0}px` }}>
@@ -226,7 +230,7 @@ function App() {
           {selected.data.blockType === 'awgn' && <label>SNR source<select value={String(selected.data.params.snr_mode || 'experiment')} onChange={e => updateSelected({ params: { ...selected.data.params, snr_mode: e.target.value } })}><option value="experiment">Experiment sweep</option><option value="fixed">Fixed block value</option></select></label>}
           {selected.data.blockType === 'awgn' && String(selected.data.params.snr_mode || 'experiment') === 'fixed' && <label>Fixed SNR dB<input type="number" value={String(selected.data.params.ebn0_db ?? 4)} onChange={e => updateSelected({ params: { ...selected.data.params, ebn0_db: Number(e.target.value) } })} /></label>}
           {Object.entries(selected.data.params).filter(([key]) => !(selected.data.blockType === 'awgn' && (key === 'snr_mode' || key === 'ebn0_db'))).length ? Object.entries(selected.data.params).filter(([key]) => !(selected.data.blockType === 'awgn' && (key === 'snr_mode' || key === 'ebn0_db'))).map(([key, value]) => <label key={key}>{key.replaceAll('_', ' ')}<input type={typeof value === 'number' ? 'number' : 'text'} value={String(value)} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value } })} /></label>) : selected.data.blockType !== 'awgn' && <p className="muted">This block has no parameters.</p>}
-          {selected.data.blockType === 'ber' && result?.snr_points?.length ? <><div className="section-rule"><span>SINK PREVIEW</span></div><BerChart points={result.snr_points} /></> : null}
+          {selected.data.blockType === 'ber' && livePoints.length ? <><div className="section-rule"><span>SINK PREVIEW</span></div><BerChart points={livePoints} live={job?.status === 'running'} /></> : null}
           {result?.sink_metrics && selected.data.blockType === 'power_meter' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean power</span><strong>{result.sink_metrics.power_mean?.toExponential(3) ?? '—'}</strong></div></div></>}
           {result?.sink_metrics && selected.data.blockType === 'scope' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean amplitude</span><strong>{result.sink_metrics.scope_mean_amplitude?.toFixed(4) ?? '—'}</strong></div><div><span>Peak</span><strong>{result.sink_metrics.scope_peak_amplitude?.toFixed(4) ?? '—'}</strong></div></div></>}
           {result?.sink_metrics && selected.data.blockType === 'constellation' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean I / Q</span><strong>{`${result.sink_metrics.constellation_mean_i?.toFixed(3) ?? '—'} / ${result.sink_metrics.constellation_mean_q?.toFixed(3) ?? '—'}`}</strong></div><div><span>Mean |x|</span><strong>{result.sink_metrics.constellation_mean_power?.toFixed(4) ?? '—'}</strong></div></div></>}
@@ -245,7 +249,7 @@ function App() {
           <button className="run-wide" onClick={run} disabled={job?.status === 'running'}><Play size={16} fill="currentColor" /> {job?.status === 'running' ? 'Simulation running…' : 'Run simulation'}</button>
           {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} / {job.trials} trials</span><span>{job.device || result?.device || 'preparing'}</span></div>{job.status === 'running' && <button className="cancel" onClick={() => cancelJob(job.id)}><CircleStop size={14} /> Cancel</button>}</div>}
           {error && <div className="error-box">{error}</div>}
-          {result && <div className="results"><div className="section-rule"><span>RESULTS</span></div><div className="metric hero"><span>Overall bit error rate</span><strong>{result.ber === null ? '—' : result.ber.toExponential(3)}</strong></div><BerChart points={result.snr_points || []} /><div className="metric-row"><div className="metric"><span>Bit errors</span><strong>{formatNumber(result.bit_errors)}</strong></div><div className="metric"><span>Total bits</span><strong>{formatNumber(result.total_bits)}</strong></div></div><div className="metric-row"><div className="metric"><span>Elapsed</span><strong>{result.elapsed_seconds.toFixed(2)} s</strong></div><div className="metric"><span>Throughput</span><strong>{formatNumber(result.throughput_bps / 1000)} kb/s</strong></div></div>{result.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}</div>}
+          {(result || livePoints.length > 0) && <div className="results"><div className="section-rule"><span>{job?.status === 'running' ? 'LIVE RESULTS' : 'RESULTS'}</span></div>{result && <div className="metric hero"><span>Overall bit error rate</span><strong>{result.ber === null ? '—' : result.ber.toExponential(3)}</strong></div>}<BerChart points={livePoints} live={job?.status === 'running'} /><ResultsTable points={livePoints} />{result && <><div className="metric-row"><div className="metric"><span>Bit errors</span><strong>{formatNumber(result.bit_errors)}</strong></div><div className="metric"><span>Total bits</span><strong>{formatNumber(result.total_bits)}</strong></div></div><div className="metric-row"><div className="metric"><span>Elapsed</span><strong>{result.elapsed_seconds.toFixed(2)} s</strong></div><div className="metric"><span>Throughput</span><strong>{formatNumber(result.throughput_bps / 1000)} kb/s</strong></div></div>{result.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}</>}</div>}
         </div>}
         {rightOpen && <div className="sidebar-resizer right-resizer" onPointerDown={event => startResize('right', event)} title="Resize inspector" />}
       </aside>

@@ -1,4 +1,5 @@
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { useEffect } from 'react'
+import { Handle, Position, useUpdateNodeInternals, type NodeProps } from '@xyflow/react'
 import { Binary, Braces, Radio, Waves, Gauge, Box } from 'lucide-react'
 import type { FlowNode } from './types'
 
@@ -7,11 +8,19 @@ const icons: Record<string, typeof Box> = {
   bpsk_mod: Radio, bpsk_demod: Radio,
 }
 
-export function SignalNode({ data, selected }: NodeProps<FlowNode>) {
+export function SignalNode({ id, data, selected }: NodeProps<FlowNode>) {
   const Icon = icons[data.blockType] || Box
   const reversed = data.portOrientation === 'reversed'
   const inputPosition = reversed ? Position.Right : Position.Left
   const outputPosition = reversed ? Position.Left : Position.Right
+  const updateNodeInternals = useUpdateNodeInternals()
+
+  useEffect(() => {
+    // Handle positions are dynamic. React Flow needs an explicit measurement
+    // refresh so existing edges follow the new side immediately.
+    updateNodeInternals(id)
+  }, [id, reversed, updateNodeInternals])
+
   return (
     <div className={`signal-node ${selected ? 'selected' : ''} ${reversed ? 'ports-reversed' : ''}`}>
       <div className="node-glow" />

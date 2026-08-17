@@ -27,6 +27,7 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 - Khi đang nhập trong ô text hoặc Python editor, `Delete` chỉ sửa nội dung đang nhập và không xóa block.
 - Dùng các nút zoom ở góc dưới canvas nếu sơ đồ lớn.
 - Trong panel **Block**, dùng **Port layout** để đổi giữa `Input left · Output right` và `Input right · Output left`. Cấu hình được lưu cùng file Export.
+- Sau khi đổi layout, các đường nối hiện tại tự động được đo lại và bám theo handle mới.
 
 ## Cấu hình Monte-Carlo
 

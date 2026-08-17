@@ -16,6 +16,11 @@ echo [SignalLab] Running backend tests...
 ".venv\Scripts\python.exe" -m pytest backend\tests
 if errorlevel 1 goto :error
 
+echo [SignalLab] Creating application icon...
+if not exist "assets" mkdir assets
+".venv\Scripts\python.exe" tools\create_icon.py
+if errorlevel 1 goto :error
+
 echo [SignalLab] Packaging Windows desktop application...
 ".venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean SignalLab.spec
 if errorlevel 1 goto :error
@@ -29,4 +34,3 @@ exit /b 0
 echo.
 echo Desktop build failed. Review the message above.
 exit /b 1
-

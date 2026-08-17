@@ -9,4 +9,5 @@
 - Kiểm thử desktop: EXE mở thành công, 100 trial hoàn tất, BER 1.453e-3, multiprocessing CPU hoạt động trong bản frozen.
 - Hoàn tất cập nhật: typography dễ đọc hơn, logo/icon SVG đồng bộ, phím `Delete` xóa block đã chọn; EXE đã build lại tại `dist\\SignalLab\\SignalLab.exe`.
 - Hoàn tất: port orientation theo block (`standard`/`reversed`), lưu trong project JSON, UI test xác nhận input chuyển sang phải.
+- Hoàn tất sửa lỗi: React Flow đo lại node internals sau khi đảo port, 2/7 edge path liên quan đã thay đổi đúng trong UI test; PyInstaller nhúng `assets/app.ico` thay icon Python mặc định.
 - Quyết định: code tùy biến được xem là trusted-local code trong MVP.

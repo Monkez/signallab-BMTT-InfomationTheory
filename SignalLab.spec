@@ -23,6 +23,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="SignalLab",
+    icon="assets/app.ico",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -39,4 +40,3 @@ coll = COLLECT(
     upx=True,
     name="SignalLab",
 )
-

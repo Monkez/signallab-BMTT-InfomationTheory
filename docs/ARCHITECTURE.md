@@ -36,14 +36,12 @@ Mỗi node nhận `inputs`, `params`, `context` và trả về dictionary các o
 ## Python block API
 
 ```python
-def process(inputs, params, context):
-    xp = context.xp
-    samples = xp.asarray(inputs["in"])
+def process(signal, params):
     gain = float(params.get("gain", 1.0))
-    return {"out": samples * gain}
+    return signal * gain
 ```
 
-`context` cung cấp `xp`, `rng`, `trial_index`, `seed`, `device`. Code tùy biến hiện chạy với quyền của người dùng local. Khi chạy dưới dịch vụ dùng chung, bắt buộc thêm sandbox, giới hạn CPU/RAM/thời gian và allowlist import.
+Đây là API khuyến nghị: block nhận một mảng NumPy của một frame và trả về một mảng. Runtime tự bọc kết quả thành output `out`, tự chạy các frame độc lập trên worker CPU; người dùng không cần viết multiprocessing, batch scheduler hay mã GPU. API cũ `process(inputs, params, context) -> {"out": ...}` vẫn được hỗ trợ cho project trước đây. Code tùy biến hiện chạy với quyền của người dùng local; khi chạy dưới dịch vụ dùng chung, bắt buộc thêm sandbox, giới hạn CPU/RAM/thời gian và allowlist import.
 
 ## Định dạng dự án
 

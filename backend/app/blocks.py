@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import Any, Callable
 
 import numpy as np
+import inspect
 
 
 @dataclass(frozen=True)
@@ -38,7 +39,7 @@ SPECS = [
     BlockSpec("constellation", "Constellation Sink", "Sinks", "Summarize I/Q samples for constellation inspection.", {}, ["in"], []),
     BlockSpec("power_meter", "Power Meter", "Sinks", "Measure mean signal power.", {}, ["in"], []),
     BlockSpec("ber", "BER Meter", "Sinks", "Compare received bits with a reference stream.", {}, ["reference", "estimate"], []),
-    BlockSpec("python", "Python Block", "Custom", "Run a custom process(inputs, params, context) function.", {"gain": 1.0}, ["in"], ["out"], False),
+    BlockSpec("python", "Python Block", "Custom", "Write process(signal, params); the runtime handles trial parallelism.", {"gain": 1.0}, ["in"], ["out"], False),
 ]
 
 SPEC_BY_TYPE = {spec.type: spec for spec in SPECS}
@@ -200,15 +201,31 @@ def power_meter(inputs, params, context):
 def python_block(inputs, params, context, code):
     if not code:
         return {"out": inputs.get("in")}
-    namespace = {"np": np, "numpy": np, "__builtins__": __builtins__}
+    namespace = {"np": np, "numpy": np, "signal": inputs.get("in"), "__builtins__": __builtins__}
     exec(compile(code, "<python-block>", "exec"), namespace, namespace)
     process = namespace.get("process")
     if not callable(process):
         raise ValueError("Python block must define process(inputs, params, context)")
-    result = process(inputs, params, context)
-    if not isinstance(result, dict):
-        raise ValueError("Python block process() must return a dictionary")
-    return result
+    signal = inputs.get("in")
+    positional = [parameter for parameter in inspect.signature(process).parameters.values() if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)]
+    has_varargs = any(parameter.kind == parameter.VAR_POSITIONAL for parameter in inspect.signature(process).parameters.values())
+    if has_varargs or len(positional) >= 3:
+        # Backward-compatible form: process(inputs, params, context) -> {"out": ...}
+        result = process(inputs, params, context)
+    elif len(positional) == 2:
+        # Recommended form: process(signal, params) -> array
+        result = process(signal, params)
+    elif len(positional) == 1:
+        result = process(signal)
+    else:
+        result = process()
+    if isinstance(result, dict):
+        if "out" not in result:
+            raise ValueError("A Python block dictionary result must contain an 'out' key")
+        return result
+    if result is None:
+        raise ValueError("Python block process() must return a signal array")
+    return {"out": result}
 
 
 PROCESSORS: dict[str, Callable] = {

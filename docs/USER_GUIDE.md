@@ -29,7 +29,7 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 - Dùng các nút zoom ở góc dưới canvas nếu sơ đồ lớn.
 - Trong panel **Block**, dùng **Port layout** để đổi giữa `Input left · Output right` và `Input right · Output left`. Cấu hình được lưu cùng file Export.
 - Sau khi đổi layout, các đường nối hiện tại tự động được đo lại và bám theo handle mới.
-- Dùng hai nút panel trên thanh trên để ẩn/hiện **Block library** hoặc **Inspector**. Kéo mép sidebar để đổi kích thước.
+- Dùng các nút panel trên thanh trên để ẩn/hiện **Block library**, **Inspector** hoặc **Console**. Kéo mép sidebar/console để đổi kích thước. Console giữ nguyên trạng thái ẩn/hiện khi chạy mô phỏng.
 
 ## Cấu hình Monte-Carlo
 
@@ -46,4 +46,11 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 
 ## Lưu dự án
 
-Nút Export tải file `.json`; Import đọc lại file đó. Không lưu code tùy biến từ nguồn không tin cậy rồi chạy.
+Nút Export tải file `.json`; Import đọc lại file đó. Với Python Block, viết tự nhiên theo mẫu:
+
+```python
+def process(signal, params):
+    return signal * float(params.get("gain", 1.0))
+```
+
+Chỉ cần xử lý một frame và trả về mảng; runtime tự song song hóa các frame Monte-Carlo. API cũ có `inputs, params, context` vẫn được giữ tương thích. Không lưu code tùy biến từ nguồn không tin cậy rồi chạy.

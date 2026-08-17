@@ -1,5 +1,7 @@
+from backend.app.blocks import make_context, python_block
 from backend.app.engine import execute_trial, run_simulation, validate_graph
 from backend.app.models import Edge, Graph, SimulationConfig
+import numpy as np
 
 
 def sample_graph():
@@ -74,3 +76,12 @@ def test_qpsk_graph_reports_sink_metrics():
     graph = Graph(nodes=nodes, edges=edges)
     result = run_simulation(graph, SimulationConfig(max_frames=2, min_frames=1, min_errors=0, snr_db_start=0, snr_db_stop=0, workers=1, chunk_size=1, device="cpu"))
     assert result["sink_metrics"]["power_mean"] > 0
+
+
+def test_python_block_supports_natural_and_legacy_apis():
+    context = make_context(np, np.random.default_rng(1), 0, 1, "cpu")
+    signal = np.array([1.0, 2.0])
+    natural = "def process(signal, params):\n    return signal * params['gain']"
+    assert (python_block({"in": signal}, {"gain": 3}, context, natural)["out"] == [3.0, 6.0]).all()
+    legacy = "def process(inputs, params, context):\n    return {'out': inputs['in'] + 1}"
+    assert (python_block({"in": signal}, {}, context, legacy)["out"] == [2.0, 3.0]).all()

@@ -24,10 +24,9 @@ export const initialEdges: FlowEdge[] = [
   { id: 'e7', source: 'decoder', target: 'meter', sourceHandle: 'out', targetHandle: 'estimate' },
 ]
 
-export const pythonTemplate = `# NumPy is available as np. Use context.xp for NumPy/CuPy portable code.
-def process(inputs, params, context):
-    xp = context.xp
-    samples = xp.asarray(inputs["in"])
+export const pythonTemplate = `# Write ordinary NumPy code for one signal frame.
+# SignalLab runs separate Monte-Carlo frames in parallel for you.
+def process(signal, params):
     gain = float(params.get("gain", 1.0))
-    return {"out": samples * gain}
+    return signal * gain
 `

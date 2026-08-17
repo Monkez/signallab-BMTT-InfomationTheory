@@ -21,9 +21,9 @@ button { color: inherit; border: 0; cursor: pointer; }
 .ghost { background: transparent; border: 1px solid transparent; height: 34px; min-width: 34px; border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 7px; color: #596575; }
 .ghost:hover, .ghost.active { background: #eef4ff; color: #1f57ba; border-color: #cbdaf7; }
 .ghost.labeled { padding: 0 10px; font-size: 11px; }
-.run-button, .run-wide { background: var(--accent); color: #fff; border-radius: 6px; height: 35px; padding: 0 15px; display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; }
-.run-button:hover, .run-wide:hover { background: #1d4ed8; }
-.run-button:disabled, .run-wide:disabled { opacity: .55; cursor: default; }
+.run-wide { background: var(--accent); color: #fff; border-radius: 6px; height: 35px; padding: 0 15px; display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; }
+.run-wide:hover { background: #1d4ed8; }
+.run-wide:disabled { opacity: .55; cursor: default; }
 .library, .inspector { background: var(--panel); min-height: 0; z-index: 5; position: relative; transition: opacity .15s ease; }
 .library.collapsed, .inspector.collapsed { overflow: hidden; visibility: hidden; pointer-events: none; opacity: 0; }
 .library { border-right: 1px solid var(--line); display: flex; flex-direction: column; }
@@ -170,7 +170,7 @@ body { font-size: 13px; }
 .brand strong { font-size: 17px; }
 .brand span { font-size: 10px; }
 .project-name { font-size: 13px; }
-.ghost.labeled, .run-button, .run-wide { font-size: 13px; }
+.ghost.labeled, .run-wide { font-size: 13px; }
 .panel-title { font-size: 13px; }
 .search input { font-size: 13px; }
 .library-list section h4 { font-size: 11px; }

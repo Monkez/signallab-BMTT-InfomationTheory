@@ -19,7 +19,7 @@ button { color: inherit; border: 0; cursor: pointer; }
 .top-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .top-actions input[type="file"] { display: none; }
 .ghost { background: transparent; border: 1px solid transparent; height: 34px; min-width: 34px; border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 7px; color: #596575; }
-.ghost:hover { background: #f3f5f7; color: #17202c; border-color: var(--line); }
+.ghost:hover, .ghost.active { background: #eef4ff; color: #1f57ba; border-color: #cbdaf7; }
 .ghost.labeled { padding: 0 10px; font-size: 11px; }
 .run-button, .run-wide { background: var(--accent); color: #fff; border-radius: 6px; height: 35px; padding: 0 15px; display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; }
 .run-button:hover, .run-wide:hover { background: #1d4ed8; }
@@ -32,6 +32,7 @@ button { color: inherit; border: 0; cursor: pointer; }
 .left-resizer { right: -4px; }
 .right-resizer { left: -4px; }
 .panel-title { height: 48px; padding: 0 17px; display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; border-bottom: 1px solid var(--line); }
+.panel-title small { margin-left: auto; color: #8993a1; font-size: 10px; font-weight: 400; }
 .search { margin: 13px; display: flex; height: 34px; align-items: center; gap: 8px; padding: 0 10px; background: #f7f8fa; border: 1px solid var(--line); border-radius: 6px; color: #8993a1; }
 .search input { width: 100%; border: 0; outline: 0; background: transparent; color: #263140; font-size: 11px; margin: 0; padding: 0; height: auto; }
 .search input::placeholder { color: #929baa; }
@@ -127,6 +128,31 @@ input:focus, select:focus, textarea:focus { border-color: #4d78cb; box-shadow: 0
 .sink-chart-title { color: #526174; font-size: 11px; font-weight: 600; margin: 0 2px 4px; }
 .sink-chart svg { display: block; width: 100%; height: auto; }
 .sink-chart-label { color: #7e8998; font-size: 10px; text-align: center; margin-top: 4px; }
+.sink-result { display: flex; align-items: center; gap: 10px; padding: 11px; border: 1px solid #cbdaf7; border-radius: 7px; background: #f3f7ff; color: #285da9; }
+.sink-result > svg { flex: 0 0 auto; }
+.sink-result > div { min-width: 0; }
+.sink-result > div + div { padding-left: 10px; border-left: 1px solid #d8e4f8; }
+.sink-result span, .sink-result strong { display: block; }
+.sink-result span { color: #6880a4; font-size: 10px; }
+.sink-result strong { margin-top: 4px; color: #1f57ba; font: 600 13px Consolas, monospace; white-space: nowrap; }
+.console-dock { grid-column: 1 / 4; min-height: 0; position: relative; z-index: 8; display: flex; flex-direction: column; border-top: 1px solid var(--line-strong); background: #17202b; color: #dce5f0; }
+.console-resizer { position: absolute; left: 0; right: 0; top: -5px; height: 9px; cursor: row-resize; z-index: 2; }
+.console-resizer:hover { background: rgba(93, 151, 235, .35); }
+.console-header { height: 36px; flex: 0 0 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid #2c3948; }
+.console-header > div { display: flex; align-items: center; gap: 8px; }
+.console-header strong { font-size: 12px; }
+.console-header span { color: #8ea0b5; font-size: 10px; }
+.console-clear { display: grid; place-items: center; width: 26px; height: 26px; color: #9bacc0; background: transparent; border-radius: 5px; }
+.console-clear:hover { color: #fff; background: #2c3948; }
+.console-body { overflow: auto; padding: 6px 14px 10px; font: 11px/1.55 Consolas, 'Courier New', monospace; }
+.console-line { display: grid; grid-template-columns: 76px 58px 1fr; gap: 9px; white-space: pre-wrap; }
+.console-line time { color: #718298; }
+.console-line b { color: #8ea0b5; font-size: 10px; text-transform: uppercase; }
+.console-line.info span { color: #dce5f0; }
+.console-line.success b, .console-line.success span { color: #7dd3a8; }
+.console-line.warning b, .console-line.warning span { color: #f5ca75; }
+.console-line.error b, .console-line.error span { color: #ff8f9d; }
+.console-empty { color: #718298; padding: 8px 0; }
 ::-webkit-scrollbar { width: 7px; height: 7px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd2da; border-radius: 10px; }

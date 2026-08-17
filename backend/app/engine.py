@@ -92,7 +92,7 @@ def execute_trial(
     seed: int,
     device: str = "cpu",
     snr_db: float | None = None,
-) -> dict[str, int]:
+) -> dict[str, float]:
     xp = np
     actual_device = "cpu"
     if device == "gpu":
@@ -106,7 +106,7 @@ def execute_trial(
     context = make_context(xp, rng, trial_index, seed, actual_device, snr_db)
     nodes = {node["id"]: node for node in graph_dict["nodes"]}
     outputs: dict[str, dict[str, Any]] = {}
-    metrics = {"bit_errors": 0, "total_bits": 0}
+    metrics: dict[str, float] = {"bit_errors": 0, "total_bits": 0}
     incoming: dict[str, list[dict[str, Any]]] = {node_id: [] for node_id in nodes}
     for edge in graph_dict["edges"]:
         incoming[edge["target"]].append(edge)
@@ -122,7 +122,7 @@ def execute_trial(
         node_metrics = result.pop("__metrics__", None)
         if node_metrics:
             for key, value in node_metrics.items():
-                metrics[key] = metrics.get(key, 0) + int(value)
+                metrics[key] = metrics.get(key, 0) + float(value)
         outputs[node_id] = result
     return metrics
 
@@ -132,14 +132,24 @@ def _run_chunk(
     items: list[tuple[int, int]],
     device: str,
     snr_db: float,
-) -> dict[str, int]:
-    total = {"bit_errors": 0, "total_bits": 0, "completed_trials": 0}
+) -> dict[str, float]:
+    total: dict[str, float] = {"completed_trials": 0}
     for trial_index, seed in items:
         result = execute_trial(graph_dict, trial_index, seed, device, snr_db)
-        total["bit_errors"] += result["bit_errors"]
-        total["total_bits"] += result["total_bits"]
+        for key, value in result.items():
+            total[key] = total.get(key, 0) + value
         total["completed_trials"] += 1
     return total
+
+
+def _merge_metrics(target: dict[str, float], source: dict[str, float]) -> None:
+    for key, value in source.items():
+        if key == "completed_trials":
+            target[key] = target.get(key, 0) + value
+        elif key.endswith("_peak"):
+            target[key] = max(target.get(key, 0), value)
+        else:
+            target[key] = target.get(key, 0) + value
 
 
 def run_simulation(
@@ -173,13 +183,13 @@ def run_simulation(
     workers = min(workers, max_frames, cpu_count)
     if device == "gpu":
         workers = 1
-    aggregate = {"bit_errors": 0, "total_bits": 0, "completed_trials": 0}
+    aggregate: dict[str, float] = {"bit_errors": 0, "total_bits": 0, "completed_trials": 0}
     point_results: list[dict[str, Any]] = []
     total_budget = len(snr_values) * max_frames
     was_cancelled = False
 
     for snr_index, snr_db in enumerate(snr_values):
-        point = {"bit_errors": 0, "total_bits": 0, "frames": 0}
+        point: dict[str, float] = {"bit_errors": 0, "total_bits": 0, "frames": 0}
         seed_sequence = np.random.SeedSequence([config.seed, snr_index])
         seeds = seed_sequence.spawn(max_frames)
         items = [(i, int(seed.generate_state(1)[0])) for i, seed in enumerate(seeds)]
@@ -190,7 +200,7 @@ def run_simulation(
                 break
             batch = items[offset : offset + config.chunk_size * workers]
             chunks = [batch[i : i + config.chunk_size] for i in range(0, len(batch), config.chunk_size)]
-            results: list[dict[str, int]] = []
+            results: list[dict[str, float]] = []
             if workers == 1 or len(batch) < max(4, config.chunk_size):
                 results = [_run_chunk(graph_dict, chunk, device, snr_db) for chunk in chunks]
             else:
@@ -204,12 +214,9 @@ def run_simulation(
                             break
                         results.append(future.result())
             for result in results:
-                point["bit_errors"] += result["bit_errors"]
-                point["total_bits"] += result["total_bits"]
-                point["frames"] += result["completed_trials"]
-                aggregate["bit_errors"] += result["bit_errors"]
-                aggregate["total_bits"] += result["total_bits"]
-                aggregate["completed_trials"] += result["completed_trials"]
+                _merge_metrics(point, result)
+                _merge_metrics(aggregate, result)
+                point["frames"] += result.get("completed_trials", 0)
             offset += len(batch)
             if progress:
                 progress({
@@ -237,6 +244,17 @@ def run_simulation(
             break
     elapsed = time.perf_counter() - started
     bits = aggregate["total_bits"]
+    sink_metrics: dict[str, float] = {}
+    if aggregate.get("power_count", 0):
+        sink_metrics["power_mean"] = aggregate.get("power_sum", 0) / aggregate["power_count"]
+    if aggregate.get("scope_count", 0):
+        sink_metrics["scope_mean_amplitude"] = aggregate.get("scope_sum", 0) / aggregate["scope_count"]
+        sink_metrics["scope_peak_amplitude"] = aggregate.get("scope_peak", 0)
+    if aggregate.get("constellation_count", 0):
+        count = aggregate["constellation_count"]
+        sink_metrics["constellation_mean_i"] = aggregate.get("constellation_i_sum", 0) / count
+        sink_metrics["constellation_mean_q"] = aggregate.get("constellation_q_sum", 0) / count
+        sink_metrics["constellation_mean_power"] = aggregate.get("constellation_power_sum", 0) / count
     return {
         **aggregate,
         "ber": aggregate["bit_errors"] / bits if bits else None,
@@ -246,5 +264,6 @@ def run_simulation(
         "workers": workers,
         "cancelled": was_cancelled,
         "snr_points": point_results,
+        "sink_metrics": sink_metrics,
         "warnings": validation.warnings + (["GPU unavailable or graph incompatible; used CPU"] if config.device == "auto" and device == "cpu" else []),
     }

@@ -16,6 +16,8 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 - Quét SNR dB theo start/stop/step; mỗi điểm có giới hạn frame tối thiểu/tối đa và số lỗi tối thiểu.
 - AWGN tham chiếu SNR của Experiment hoặc giữ giá trị cố định; Sink BER hiển thị đồ thị BER theo SNR.
 - Chọn block ngay khi bắt đầu kéo; sidebar thư viện và inspector có thể ẩn/hiện, kéo đổi kích thước.
+- Console dock phía dưới ghi lại trạng thái job, cảnh báo và lỗi để debug mô phỏng ngay trong app.
+- Thư viện mở rộng với Text Source, differential source coding, repetition code, QPSK, Rayleigh fading, Scope, Constellation và Power Meter.
 - Script Windows một lần bấm cho cài đặt, chạy và build.
 - Bản desktop Windows có `SignalLab.exe`, chứa frontend production và backend local, không cần Vite khi sử dụng.
 

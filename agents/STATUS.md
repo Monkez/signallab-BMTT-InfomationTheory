@@ -13,3 +13,4 @@
 - Quyết định: code tùy biến được xem là trusted-local code trong MVP.
 - Cập nhật hiện tại: hoàn tất SNR sweep Monte-Carlo với stopping criteria theo từng điểm; AWGN tham chiếu `context.snr_db`; thêm biểu đồ BER SVG cho Sink và Experiment; chọn block ngay khi drag; sidebar hai bên có ẩn/hiện và resize.
 - Kiểm thử mới nhất: backend 3/3 pass, frontend `npm run build` pass, browser E2E xác nhận drag-select, sidebar toggle, SNR sweep, Sink chart và port reversal. `build_app.bat` đã chạy thành công; EXE phát hành đã cập nhật.
+- Hoàn tất mốc hiện tại: Console dock dưới canvas có resize/clear; header/library đã tinh gọn; graph mẫu được bố trí hai hàng; bổ sung block nguồn/mã nguồn/mã kênh/điều chế/kênh/receiver/sink; engine trả `sink_metrics` cho các Sink trực quan. Build desktop mới đã thành công.

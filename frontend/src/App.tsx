@@ -5,8 +5,8 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
-  ArrowLeftRight, Box, Braces, ChevronDown, CircleStop, Cpu, Download, Gauge,
-  Layers3, PanelLeft, PanelRight, Play, Plus, Radio, RotateCcw, Search, Upload, Waves, X, Zap,
+  Activity, ArrowLeftRight, Binary, Box, Braces, CircleStop, Download, Gauge,
+  Layers3, PanelBottom, PanelLeft, PanelRight, Play, Plus, Radio, RotateCcw, Search, Terminal, Trash2, Upload, Waves, X,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
 import { cancelJob, createJob, getJob, graphPayload } from './api'
@@ -16,18 +16,31 @@ import { BerChart } from './SinkChart'
 
 const fallbackSpecs: BlockSpec[] = [
   { type: 'bit_source', label: 'Bit Source', category: 'Sources', description: 'Random binary messages', defaults: { length: 4096 }, inputs: [], outputs: ['out'], gpu_compatible: true },
+  { type: 'text_source', label: 'Text Source', category: 'Sources', description: 'UTF-8 text to bits', defaults: { text: 'HELLO', repeat: 1 }, inputs: [], outputs: ['out', 'reference'], gpu_compatible: true },
+  { type: 'differential_encode', label: 'Differential Encoder', category: 'Source coding', description: 'Cumulative XOR transform', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
+  { type: 'differential_decode', label: 'Differential Decoder', category: 'Source coding', description: 'Invert differential bits', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'hamming74_encode', label: 'Hamming Encoder', category: 'Channel coding', description: 'Hamming (7,4)', defaults: {}, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: true },
+  { type: 'repetition3_encode', label: 'Repetition-3 Encoder', category: 'Channel coding', description: 'Repeat each bit three times', defaults: {}, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: true },
+  { type: 'repetition3_decode', label: 'Repetition-3 Decoder', category: 'Channel coding', description: 'Majority decode triples', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'bpsk_mod', label: 'BPSK Modulator', category: 'Modulation', description: 'Binary phase shift keying', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
+  { type: 'qpsk_mod', label: 'QPSK Modulator', category: 'Modulation', description: 'Map bit pairs to I/Q', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'awgn', label: 'AWGN Channel', category: 'Channels', description: 'Experiment SNR sweep or fixed SNR', defaults: { ebn0_db: 4, snr_mode: 'experiment' }, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
+  { type: 'rayleigh', label: 'Rayleigh Fading', category: 'Channels', description: 'Flat fading plus noise', defaults: { ebn0_db: 4, snr_mode: 'experiment' }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
   { type: 'bpsk_demod', label: 'BPSK Demodulator', category: 'Receivers', description: 'Hard decision', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
+  { type: 'qpsk_demod', label: 'QPSK Demodulator', category: 'Receivers', description: 'Hard decision I/Q', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'hamming74_decode', label: 'Hamming Decoder', category: 'Channel coding', description: 'Correct one bit', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
+  { type: 'scope', label: 'Signal Scope', category: 'Sinks', description: 'Amplitude and peak summary', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
+  { type: 'constellation', label: 'Constellation Sink', category: 'Sinks', description: 'I/Q sample summary', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
+  { type: 'power_meter', label: 'Power Meter', category: 'Sinks', description: 'Mean signal power', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
   { type: 'ber', label: 'BER Meter', category: 'Sinks', description: 'Measure bit error rate', defaults: {}, inputs: ['reference', 'estimate'], outputs: [], gpu_compatible: true },
   { type: 'python', label: 'Python Block', category: 'Custom', description: 'Custom NumPy processing', defaults: { gain: 1 }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
 ]
 
-const iconFor = (type: string) => type.includes('awgn') ? Waves : type.includes('bpsk') ? Radio : type === 'ber' ? Gauge : type === 'python' ? Braces : Box
+const iconFor = (type: string) => type.includes('source') ? Binary : type.includes('awgn') || type.includes('rayleigh') ? Waves : type.includes('bpsk') || type.includes('qpsk') ? Radio : type === 'ber' ? Gauge : type === 'scope' || type === 'constellation' || type === 'power_meter' ? Activity : type === 'python' ? Braces : Box
 const formatNumber = (n: number) => new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(n)
 const defaultSimulationConfig: SimulationConfig = { trials: 100, max_frames: 100, min_frames: 20, min_errors: 100, snr_db_start: -2, snr_db_stop: 10, snr_db_step: 2, workers: 0, seed: 2026, device: 'auto', chunk_size: 10 }
+type ConsoleLevel = 'info' | 'success' | 'warning' | 'error'
+type ConsoleEntry = { id: number; time: string; level: ConsoleLevel; message: string }
 
 function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initialNodes)
@@ -43,11 +56,25 @@ function App() {
   const [rightOpen, setRightOpen] = useState(true)
   const [leftWidth, setLeftWidth] = useState(270)
   const [rightWidth, setRightWidth] = useState(360)
+  const [consoleOpen, setConsoleOpen] = useState(true)
+  const [consoleHeight, setConsoleHeight] = useState(156)
+  const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
+  const bootLoggedRef = useRef(false)
+  const lastSnrRef = useRef<number | null>(null)
+  const consoleResizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
   const resizeRef = useRef<{ side: 'left' | 'right'; startX: number; startWidth: number } | null>(null)
   const selected = nodes.find(n => n.id === selectedId)
+  const appendLog = useCallback((level: ConsoleLevel, message: string) => {
+    setConsoleEntries(entries => [...entries.slice(-199), { id: Date.now() + Math.random(), time: new Date().toLocaleTimeString(), level, message }])
+  }, [])
 
-  useEffect(() => { fetch('/api/blocks').then(r => r.ok ? r.json() : fallbackSpecs).then(setSpecs).catch(() => {}) }, [])
+  useEffect(() => {
+    if (bootLoggedRef.current) return
+    bootLoggedRef.current = true
+    appendLog('info', 'SignalLab ready · build the graph, then run an experiment.')
+    fetch('/api/blocks').then(r => r.ok ? r.json() : fallbackSpecs).then(data => { setSpecs(data); appendLog('success', `${data.length} blocks loaded into the library.`) }).catch(() => appendLog('warning', 'Backend unavailable; using the built-in block library.'))
+  }, [appendLog])
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Delete' || !selectedId) return
@@ -64,10 +91,21 @@ function App() {
   useEffect(() => {
     if (!job || !['queued', 'running'].includes(job.status)) return
     const timer = window.setInterval(async () => {
-      try { setJob(await getJob(job.id)) } catch (e) { setError((e as Error).message) }
+      try { setJob(await getJob(job.id)) } catch (e) { const message = (e as Error).message; setError(message); appendLog('error', message) }
     }, 500)
     return () => window.clearInterval(timer)
-  }, [job?.id, job?.status])
+  }, [appendLog, job?.id, job?.status])
+  useEffect(() => {
+    if (job?.status === 'completed' && job.result) appendLog('success', `Simulation completed · BER ${job.result.ber === null ? 'n/a' : job.result.ber.toExponential(3)} · ${job.result.snr_points.length} SNR points.`)
+    if (job?.status === 'failed' && job.error) appendLog('error', job.error)
+    if (job?.status === 'cancelled') appendLog('warning', 'Simulation cancelled by the user.')
+  }, [appendLog, job?.status])
+  useEffect(() => {
+    if (job?.status !== 'running' || typeof job.snr_db !== 'number') return
+    if (lastSnrRef.current === job.snr_db) return
+    lastSnrRef.current = job.snr_db
+    appendLog('info', `SNR ${job.snr_db.toFixed(2)} dB · point ${(job.snr_index ?? 0) + 1}/${job.snr_count ?? '?'}`)
+  }, [appendLog, job?.snr_count, job?.snr_db, job?.snr_index, job?.status])
 
   const onConnect = useCallback((connection: Connection) => setEdges(eds => addEdge({ ...connection, markerEnd: { type: MarkerType.ArrowClosed }, animated: true }, eds)), [setEdges])
   const onNodeClick: NodeMouseHandler<FlowNode> = (_, node) => { setSelectedId(node.id); setRightTab('block') }
@@ -87,6 +125,18 @@ function App() {
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', stop)
   }
+  const startConsoleResize = (event: React.PointerEvent) => {
+    event.preventDefault()
+    consoleResizeRef.current = { startY: event.clientY, startHeight: consoleHeight }
+    const move = (moveEvent: PointerEvent) => {
+      const current = consoleResizeRef.current
+      if (!current) return
+      setConsoleHeight(Math.min(320, Math.max(92, current.startHeight - (moveEvent.clientY - current.startY))))
+    }
+    const stop = () => { consoleResizeRef.current = null; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop) }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', stop)
+  }
 
   const addBlock = (spec: BlockSpec) => {
     const id = `${spec.type}-${Date.now()}`
@@ -98,11 +148,13 @@ function App() {
   }
 
   const run = async () => {
-    setError(''); setRightTab('run')
+    setError(''); setRightTab('run'); setConsoleOpen(true); lastSnrRef.current = null
+    appendLog('info', `Starting Monte-Carlo sweep ${config.snr_db_start}…${config.snr_db_stop} dB.`)
     try {
       const id = await createJob(nodes, edges, config)
       setJob({ id, status: 'queued', progress: 0, completed_trials: 0, trials: config.max_frames })
-    } catch (e) { setError((e as Error).message) }
+      appendLog('info', `Job ${id.slice(0, 8)} queued · ${config.max_frames} max frames/SNR.`)
+    } catch (e) { const message = (e as Error).message; setError(message); appendLog('error', message) }
   }
 
   const exportProject = () => {
@@ -131,13 +183,14 @@ function App() {
   const result = job?.result
 
   return (
-    <div className="app-shell" style={{ gridTemplateColumns: `${leftOpen ? leftWidth : 0}px minmax(0, 1fr) ${rightOpen ? rightWidth : 0}px` }}>
+    <div className="app-shell" style={{ gridTemplateRows: `60px minmax(0, 1fr) ${consoleOpen ? consoleHeight : 0}px`, gridTemplateColumns: `${leftOpen ? leftWidth : 0}px minmax(0, 1fr) ${rightOpen ? rightWidth : 0}px` }}>
       <header className="topbar">
         <div className="brand"><div className="brand-mark"><img src="/app-icon.svg" alt="SignalLab logo" /></div><div><strong>SignalLab</strong><span>Communications Studio</span></div></div>
-        <div className="project-name"><span className="status-dot" /> Hamming BPSK over AWGN <ChevronDown size={14} /></div>
+        <div className="project-name"><span className="status-dot" /> <span>Hamming BPSK over AWGN</span></div>
         <div className="top-actions">
           <button className="ghost" onClick={() => setLeftOpen(value => !value)} title={leftOpen ? 'Hide block library' : 'Show block library'}><PanelLeft size={16} /></button>
           <button className="ghost" onClick={() => setRightOpen(value => !value)} title={rightOpen ? 'Hide inspector' : 'Show inspector'}><PanelRight size={16} /></button>
+          <button className={`ghost ${consoleOpen ? 'active' : ''}`} onClick={() => setConsoleOpen(value => !value)} title={consoleOpen ? 'Hide console' : 'Show console'}><PanelBottom size={16} /></button>
           <button className="ghost" onClick={() => { setNodes(initialNodes); setEdges(initialEdges); setSelectedId('channel') }} title="Reset sample"><RotateCcw size={16} /></button>
           <button className="ghost labeled" onClick={() => fileRef.current?.click()}><Upload size={15} /> Import</button>
           <input ref={fileRef} type="file" accept=".json" hidden onChange={e => importProject(e.target.files?.[0])} />
@@ -147,12 +200,11 @@ function App() {
       </header>
 
       <aside className={`library ${leftOpen ? '' : 'collapsed'}`}>
-        <div className="panel-title"><Layers3 size={16} /><span>Block library</span></div>
+        <div className="panel-title"><Layers3 size={16} /><span>Block library</span><small>{specs.length} blocks</small></div>
         <div className="search"><Search size={15} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search blocks…" /></div>
         <div className="library-list">
           {Object.entries(grouped).map(([category, blocks]) => <section key={category}><h4>{category}</h4>{blocks.map(spec => { const Icon = iconFor(spec.type); return <button className="block-item" key={spec.type} onClick={() => addBlock(spec)}><span className="block-icon"><Icon size={16} /></span><span><b>{spec.label}</b><small>{spec.description}</small></span><Plus size={14} /></button> })}</section>)}
         </div>
-        <div className="compute-card"><Zap size={16} /><div><b>Parallel runtime</b><small>Auto-scales across CPU cores and CUDA</small></div></div>
         {leftOpen && <div className="sidebar-resizer left-resizer" onPointerDown={event => startResize('left', event)} title="Resize block library" />}
       </aside>
 
@@ -176,10 +228,13 @@ function App() {
           {selected.data.blockType === 'awgn' && String(selected.data.params.snr_mode || 'experiment') === 'fixed' && <label>Fixed SNR dB<input type="number" value={String(selected.data.params.ebn0_db ?? 4)} onChange={e => updateSelected({ params: { ...selected.data.params, ebn0_db: Number(e.target.value) } })} /></label>}
           {Object.entries(selected.data.params).filter(([key]) => !(selected.data.blockType === 'awgn' && (key === 'snr_mode' || key === 'ebn0_db'))).length ? Object.entries(selected.data.params).filter(([key]) => !(selected.data.blockType === 'awgn' && (key === 'snr_mode' || key === 'ebn0_db'))).map(([key, value]) => <label key={key}>{key.replaceAll('_', ' ')}<input type={typeof value === 'number' ? 'number' : 'text'} value={String(value)} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value } })} /></label>) : selected.data.blockType !== 'awgn' && <p className="muted">This block has no parameters.</p>}
           {selected.data.blockType === 'ber' && result?.snr_points?.length ? <><div className="section-rule"><span>SINK PREVIEW</span></div><BerChart points={result.snr_points} /></> : null}
+          {result?.sink_metrics && selected.data.blockType === 'power_meter' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean power</span><strong>{result.sink_metrics.power_mean?.toExponential(3) ?? '—'}</strong></div></div></>}
+          {result?.sink_metrics && selected.data.blockType === 'scope' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean amplitude</span><strong>{result.sink_metrics.scope_mean_amplitude?.toFixed(4) ?? '—'}</strong></div><div><span>Peak</span><strong>{result.sink_metrics.scope_peak_amplitude?.toFixed(4) ?? '—'}</strong></div></div></>}
+          {result?.sink_metrics && selected.data.blockType === 'constellation' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean I / Q</span><strong>{`${result.sink_metrics.constellation_mean_i?.toFixed(3) ?? '—'} / ${result.sink_metrics.constellation_mean_q?.toFixed(3) ?? '—'}`}</strong></div><div><span>Mean |x|</span><strong>{result.sink_metrics.constellation_mean_power?.toFixed(4) ?? '—'}</strong></div></div></>}
           {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><textarea className="code-editor" spellCheck={false} value={selected.data.code || pythonTemplate} onChange={e => updateSelected({ code: e.target.value })} /><p className="code-hint">Use <code>context.xp</code> for CPU/GPU portable array operations.</p></>}
         </div> : <div className="empty-state"><Box size={32} /><h3>No block selected</h3><p>Select a block on the canvas to edit its parameters and Python code.</p></div> :
         <div className="inspector-content">
-          <div className="experiment-title"><div><small>MONTE-CARLO</small><h2>Experiment</h2></div><span className="engine-pill"><Cpu size={13} /> local engine</span></div>
+          <div className="experiment-title"><div><small>MONTE-CARLO</small><h2>Experiment</h2></div></div>
           <div className="section-rule"><span>SNR SWEEP (dB)</span></div>
           <div className="form-grid"><label>Start<input type="number" step="any" value={config.snr_db_start} onChange={e => setConfig({ ...config, snr_db_start: Number(e.target.value) })} /></label><label>Stop<input type="number" step="any" value={config.snr_db_stop} onChange={e => setConfig({ ...config, snr_db_stop: Number(e.target.value) })} /></label></div>
           <div className="form-grid"><label>Step<input type="number" min="0.01" step="any" value={config.snr_db_step} onChange={e => setConfig({ ...config, snr_db_step: Number(e.target.value) })} /></label><label>Max frames / SNR<input type="number" min="1" value={config.max_frames} onChange={e => { const value = Number(e.target.value); setConfig({ ...config, max_frames: value, trials: value }) }} /></label></div>
@@ -195,6 +250,14 @@ function App() {
         </div>}
         {rightOpen && <div className="sidebar-resizer right-resizer" onPointerDown={event => startResize('right', event)} title="Resize inspector" />}
       </aside>
+
+      {consoleOpen && <section className="console-dock">
+        <div className="console-resizer" onPointerDown={startConsoleResize} title="Resize console" />
+        <div className="console-header"><div><Terminal size={15} /><strong>Console</strong><span>{consoleEntries.length} events</span></div><button className="console-clear" onClick={() => setConsoleEntries([])} title="Clear console"><Trash2 size={14} /></button></div>
+        <div className="console-body">
+          {consoleEntries.length ? consoleEntries.map(entry => <div className={`console-line ${entry.level}`} key={entry.id}><time>{entry.time}</time><b>{entry.level}</b><span>{entry.message}</span></div>) : <div className="console-empty">No messages yet.</div>}
+        </div>
+      </section>}
     </div>
   )
 }

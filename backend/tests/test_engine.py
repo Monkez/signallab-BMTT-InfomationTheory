@@ -52,3 +52,25 @@ def test_cycle_is_rejected():
     graph = sample_graph()
     graph.edges.append(Edge(id="cycle", source="5", target="2"))
     assert not validate_graph(graph).valid
+
+
+def test_qpsk_graph_reports_sink_metrics():
+    nodes = [
+        {"id": "src", "type": "text_source", "label": "Text", "params": {"text": "AB", "repeat": 1}},
+        {"id": "mod", "type": "qpsk_mod", "label": "QPSK", "params": {}},
+        {"id": "channel", "type": "awgn", "label": "AWGN", "params": {"snr_mode": "experiment"}},
+        {"id": "demod", "type": "qpsk_demod", "label": "QPSK Demod", "params": {}},
+        {"id": "ber", "type": "ber", "label": "BER", "params": {}},
+        {"id": "power", "type": "power_meter", "label": "Power", "params": {}},
+    ]
+    edges = [
+        {"id": "e1", "source": "src", "target": "mod", "source_handle": "out", "target_handle": "in"},
+        {"id": "e2", "source": "mod", "target": "channel", "source_handle": "out", "target_handle": "in"},
+        {"id": "e3", "source": "channel", "target": "demod", "source_handle": "out", "target_handle": "in"},
+        {"id": "e4", "source": "demod", "target": "ber", "source_handle": "out", "target_handle": "estimate"},
+        {"id": "e5", "source": "src", "target": "ber", "source_handle": "reference", "target_handle": "reference"},
+        {"id": "e6", "source": "channel", "target": "power", "source_handle": "out", "target_handle": "in"},
+    ]
+    graph = Graph(nodes=nodes, edges=edges)
+    result = run_simulation(graph, SimulationConfig(max_frames=2, min_frames=1, min_errors=0, snr_db_start=0, snr_db_stop=0, workers=1, chunk_size=1, device="cpu"))
+    assert result["sink_metrics"]["power_mean"] > 0

@@ -49,6 +49,9 @@ export type Job = {
   error?: string
   device?: string
   workers?: number
+  snr_db?: number
+  snr_index?: number
+  snr_count?: number
   result?: {
     bit_errors: number
     total_bits: number
@@ -58,6 +61,7 @@ export type Job = {
     device: string
     workers: number
     warnings: string[]
+    sink_metrics: Record<string, number>
     snr_points: Array<{
       snr_db: number
       bit_errors: number

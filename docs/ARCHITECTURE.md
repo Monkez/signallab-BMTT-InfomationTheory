@@ -6,7 +6,8 @@
 React + React Flow
   ├─ block library / canvas / property editor
   ├─ Python code editor
-  └─ experiment dashboard
+  ├─ experiment dashboard
+  └─ console dock (job/runtime events)
              │ REST + polling
 FastAPI job service
   ├─ schema validation + DAG compiler
@@ -53,3 +54,5 @@ Mỗi node có `port_orientation` (`standard` hoặc `reversed`). Đây là thu�
 ## Experiment sweep và Sink
 
 Experiment tạo dải SNR từ `snr_db_start/stop/step`; mỗi trial nhận `context.snr_db`, vì vậy AWGN ở chế độ `experiment` không cần hard-code một giá trị. Mỗi điểm dừng khi đạt `min_frames` và (`min_errors` hoặc `max_frames`). Kết quả giữ `snr_points` để Sink vẽ BER theo SNR. Block được chọn ngay tại sự kiện bắt đầu kéo; hai sidebar có thể ẩn/hiện và kéo đổi chiều rộng. BER Meter hiển thị đồ thị SVG log-scale trong inspector sau khi có kết quả.
+
+Console dock là lớp hiển thị phía frontend, nhận sự kiện khi nạp block, xếp hàng/chạy/kết thúc/hủy job và lỗi API. Engine trả thêm `sink_metrics` cho Scope, Constellation và Power Meter để inspector hiển thị tóm tắt trực quan mà không truyền mảng mẫu lớn qua API.

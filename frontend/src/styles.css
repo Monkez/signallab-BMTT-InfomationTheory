@@ -141,9 +141,13 @@ input:focus, select:focus, textarea:focus { border-color: #4d78cb; box-shadow: 0
 .ber-curve-name { min-width: 92px; flex: 1 1 92px; padding: 0 6px; }
 .ber-color-input { width: 28px; padding: 2px; cursor: pointer; }
 .ber-curve-controls select { max-width: 78px; padding: 0 4px; }
-.ber-save, .ber-load { height: 24px; padding: 0 6px; border: 1px solid #b8cce9; border-radius: 4px; background: #f3f7ff; color: #285da9; font-size: 9px; cursor: pointer; }
+.ber-save, .ber-load { height: 24px; padding: 0 6px; border: 1px solid #b8cce9; border-radius: 4px; background: #f3f7ff; color: #285da9; font-size: 9px; cursor: pointer; white-space: nowrap; }
 .ber-save:hover, .ber-load:hover { border-color: #7fa7df; background: #eaf2ff; }
-.ber-save:disabled { opacity: .5; cursor: default; }
+.ber-save:disabled, .ber-load:disabled { opacity: .5; cursor: default; }
+.ber-reference-loader { position: relative; }
+.ber-reference-picker { position: absolute; right: 0; top: 28px; z-index: 12; min-width: 150px; padding: 4px; border: 1px solid var(--line-strong); border-radius: 5px; background: #fff; box-shadow: 0 4px 14px rgba(25,35,48,.14); }
+.ber-reference-picker button { display: block; width: 100%; padding: 6px 7px; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; background: transparent; color: #526174; font-size: 9px; border-radius: 3px; }
+.ber-reference-picker button:hover { background: #eef4ff; color: #1f57ba; }
 .ber-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 2px 2px 0; }
 .ber-legend-item { display: inline-flex; align-items: center; min-width: 0; gap: 4px; color: #526174; font-size: 9px; }
 .ber-legend-swatch { width: 18px; height: 0; border-top-width: 3px; flex: 0 0 auto; }

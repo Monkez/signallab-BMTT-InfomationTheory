@@ -90,6 +90,7 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   const [curveStyle, setCurveStyle] = useState<BerLineStyle>('solid')
   const [references, setReferences] = useState<BerReference[]>([])
   const [visibleReferenceIds, setVisibleReferenceIds] = useState<string[]>([])
+  const [showReferencePicker, setShowReferencePicker] = useState(false)
 
   useEffect(() => {
     const syncReferences = () => setReferences(readReferences())
@@ -178,7 +179,10 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
       <input className="ber-color-input" type="color" value={curveColor} onChange={event => setCurveColor(event.target.value)} aria-label="BER curve color" />
       <select value={curveStyle} onChange={event => setCurveStyle(event.target.value as BerLineStyle)} aria-label="BER curve style">{lineStyles.map(style => <option key={style.value} value={style.value}>{style.label}</option>)}</select>
       <button className="ber-save" onClick={saveReference} disabled={!current.valid.length} title="Save current curve as a reusable reference">Save reference</button>
-      {references.length > 0 && <select className="ber-load" defaultValue="" onChange={event => { loadReference(event.target.value); event.target.value = '' }} aria-label="Load BER reference"><option value="">Load reference…</option>{references.map(reference => <option key={reference.id} value={reference.id}>{reference.name}</option>)}</select>}
+      <div className="ber-reference-loader">
+        <button className="ber-load" onClick={() => setShowReferencePicker(value => !value)} disabled={!references.length} title="Choose a saved BER reference" aria-label="Load BER reference">Load reference</button>
+        {showReferencePicker && references.length > 0 && <div className="ber-reference-picker">{references.map(reference => <button key={reference.id} onClick={() => { loadReference(reference.id); setShowReferencePicker(false) }}>{reference.name}</button>)}</div>}
+      </div>
     </div>
     <svg ref={svgRef} viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="Bit error rate versus SNR chart">
       <rect x={chart.left} y={chart.top} width={chart.width - chart.left - chart.right} height={chart.height - chart.top - chart.bottom} fill="#f8fafc" stroke="#d7dee8" />

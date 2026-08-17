@@ -57,16 +57,17 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   const x = (value: number) => chart.left + ((value - minX) / xRange) * (chart.width - chart.left - chart.right)
   const y = (value: number) => chart.top + ((maxLog - Math.log10(Math.max(value, 1e-8))) / yRange) * (chart.height - chart.top - chart.bottom)
   const linePoints: string[] = []
-  plotted.forEach((point, index) => {
+  const linePlotted = firstZero >= 0 ? plotted.slice(0, firstZero) : plotted
+  linePlotted.forEach(point => {
     const pointX = x(point.snr_db)
     const pointY = y(Number(point.ber ?? 0))
-    if (index > 0 && point.ber === 0 && plotted[index - 1].ber !== 0) {
-      // A measured BER of zero is below the chart's finite log-scale floor.
-      // Drop at the previous measured point, then continue along the floor.
-      linePoints.push(`${x(plotted[index - 1].snr_db)},${pointY}`)
-    }
     linePoints.push(`${pointX},${pointY}`)
   })
+  if (firstZero > 0) {
+    // Keep the zero marker disconnected: the measured curve ends with a
+    // vertical drop, without an artificial horizontal segment at the floor.
+    linePoints.push(`${x(linePlotted[linePlotted.length - 1].snr_db)},${y(0)}`)
+  }
   const line = linePoints.join(' ')
   const labelStyle: CSSProperties = { fontSize: 9, fill: '#6b7788' }
   const yTicks = [0, 1, 2, 3].map(index => maxLog - (index * yRange) / 3)

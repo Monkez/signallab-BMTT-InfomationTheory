@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from .blocks import SPECS
+from .block_registry import SPECS
 from .engine import gpu_status, validate_graph
 from .jobs import manager
 from .models import Graph, SimulationRequest
@@ -23,7 +23,7 @@ def health():
 
 @app.get("/api/blocks")
 def blocks():
-    return [spec.__dict__ for spec in SPECS]
+    return [spec.to_dict() for spec in SPECS]
 
 
 @app.post("/api/validate")
@@ -52,4 +52,3 @@ def cancel_job(job_id: str):
     if not manager.cancel(job_id):
         raise HTTPException(404, detail="Job not found")
     return {"status": "cancellation_requested"}
-

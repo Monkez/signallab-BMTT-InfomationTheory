@@ -1,112 +1,15 @@
-import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { BerLegend } from './features/ber/BerLegend'
+import { BerPlot } from './features/ber/BerPlot'
+import { plottedPoints } from './features/ber/chartMath'
+import { lineStyles } from './features/ber/constants'
+import { copyPng, svgToPng } from './features/ber/imageExport'
+import { parseReferenceFile, saveReferenceFile } from './features/ber/referenceFiles'
+import { persistReferences, readReferences, referenceChangeEvent } from './features/ber/referenceStore'
+import type { BerCurve, BerLineStyle, BerReference, SinkPoint } from './features/ber/types'
 
-export type SinkPoint = {
-  snr_db: number
-  bit_errors: number
-  total_bits: number
-  frames: number
-  ber: number | null
-}
-
-export type BerLineStyle = 'solid' | 'dash' | 'dot' | 'dashdot'
-
-export type BerReference = {
-  id: string
-  name: string
-  color: string
-  style: BerLineStyle
-  points: SinkPoint[]
-  createdAt: string
-}
-
-const chart = { width: 340, height: 190, left: 42, right: 12, top: 14, bottom: 30 }
-const reportChart = { width: 960, height: 520, left: 82, right: 28, top: 24, bottom: 62 }
-const referenceStorageKey = 'signallab.ber-references.v1'
-const lineStyles: Array<{ value: BerLineStyle; label: string; dash: string }> = [
-  { value: 'solid', label: 'Solid', dash: '' },
-  { value: 'dash', label: 'Dashed', dash: '7 4' },
-  { value: 'dot', label: 'Dotted', dash: '2 4' },
-  { value: 'dashdot', label: 'Dash-dot', dash: '7 4 2 4' },
-]
-
-function styleDash(style: BerLineStyle) { return lineStyles.find(option => option.value === style)?.dash || '' }
-
-function readReferences(): BerReference[] {
-  try {
-    const raw = window.localStorage.getItem(referenceStorageKey)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter(item => item && typeof item.id === 'string' && typeof item.name === 'string' && Array.isArray(item.points))
-  } catch { return [] }
-}
-
-function writeReferences(references: BerReference[]) {
-  try { window.localStorage.setItem(referenceStorageKey, JSON.stringify(references)) } catch { /* storage can be disabled */ }
-}
-
-function persistReferences(references: BerReference[]) {
-  writeReferences(references)
-  window.dispatchEvent(new Event('signallab-ber-reference-change'))
-}
-
-function downloadReferenceFile(reference: BerReference) {
-  const payload = { format: 'signallab-ber-reference', version: 1, reference }
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-  const link = document.createElement('a')
-  link.href = URL.createObjectURL(blob)
-  link.download = `${reference.name.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-|-$/g, '') || 'ber-reference'}.ber.json`
-  link.click()
-  URL.revokeObjectURL(link.href)
-}
-
-async function saveReferenceFile(reference: BerReference) {
-  const fileName = `${reference.name.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-|-$/g, '') || 'ber-reference'}.ber.json`
-  const pickerWindow = window as Window & { showSaveFilePicker?: (options: unknown) => Promise<{ createWritable: () => Promise<{ write: (data: Blob) => Promise<void>; close: () => Promise<void> }> }> }
-  if (!pickerWindow.showSaveFilePicker) { downloadReferenceFile(reference); return }
-  const handle = await pickerWindow.showSaveFilePicker({
-    suggestedName: fileName,
-    types: [{ description: 'SignalLab BER reference', accept: { 'application/json': ['.ber.json', '.json'] } }],
-  })
-  const writable = await handle.createWritable()
-  const payload = { format: 'signallab-ber-reference', version: 1, reference }
-  await writable.write(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
-  await writable.close()
-}
-
-async function svgToPng(svg: SVGSVGElement): Promise<Blob> {
-  const clone = svg.cloneNode(true) as SVGSVGElement
-  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-  clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink')
-  const source = new XMLSerializer().serializeToString(clone)
-  const image = new Image()
-  const url = URL.createObjectURL(new Blob([source], { type: 'image/svg+xml;charset=utf-8' }))
-  try {
-    await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('Could not render chart image')); image.src = url })
-    const scale = 3
-    const canvas = document.createElement('canvas')
-    canvas.width = chart.width * scale
-    canvas.height = chart.height * scale
-    const context = canvas.getContext('2d')
-    if (!context) throw new Error('Canvas is unavailable')
-    context.fillStyle = '#ffffff'
-    context.fillRect(0, 0, canvas.width, canvas.height)
-    context.drawImage(image, 0, 0, canvas.width, canvas.height)
-    return await new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not encode chart image')), 'image/png'))
-  } finally { URL.revokeObjectURL(url) }
-}
-
-async function copyPng(blob: Blob) {
-  if (!navigator.clipboard || typeof ClipboardItem === 'undefined') throw new Error('Image clipboard is unavailable')
-  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
-}
-
-function plottedPoints(points: SinkPoint[]) {
-  const valid = points.filter(point => Number.isFinite(point.snr_db) && point.total_bits > 0)
-  const firstZero = valid.findIndex(point => point.ber === 0)
-  return { valid, firstZero, plotted: firstZero >= 0 ? valid.slice(0, firstZero + 1) : valid }
-}
+export type { BerLineStyle, BerReference, SinkPoint } from './features/ber/types'
 
 export function BerChart({ points, live = false }: { points: SinkPoint[]; live?: boolean }) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -126,8 +29,8 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   useEffect(() => {
     const syncReferences = () => setReferences(readReferences())
     syncReferences()
-    window.addEventListener('signallab-ber-reference-change', syncReferences)
-    return () => window.removeEventListener('signallab-ber-reference-change', syncReferences)
+    window.addEventListener(referenceChangeEvent, syncReferences)
+    return () => window.removeEventListener(referenceChangeEvent, syncReferences)
   }, [])
   useEffect(() => { setEditedCurrentPoints(points) }, [points])
 
@@ -136,7 +39,7 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   const selectedReference = selectedCurveId === 'current' ? null : references.find(reference => reference.id === selectedCurveId)
   const selectedCurve = selectedReference || { name: curveName, color: curveColor, style: curveStyle }
   const selectedPoints = selectedReference?.points || editedCurrentPoints
-  const curves = [
+  const curves: BerCurve[] = [
     { id: 'current', name: curveName.trim() || 'Current run', color: curveColor, style: curveStyle, ...current },
     ...activeReferences.map(reference => ({ id: reference.id, name: reference.name, color: reference.color, style: reference.style, ...plottedPoints(reference.points) })),
   ].filter(curve => curve.valid.length > 0)
@@ -144,43 +47,6 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   if (!curves.length) return <div className="sink-chart empty">Run an experiment to see BER vs SNR.</div>
 
   const allValid = curves.flatMap(curve => curve.valid)
-  const minX = Math.min(...allValid.map(point => point.snr_db))
-  const maxX = Math.max(...allValid.map(point => point.snr_db))
-  const xRange = Math.max(maxX - minX, 1)
-  const values = curves.flatMap(curve => curve.plotted.map(point => Math.max(Number(point.ber ?? 0), 1e-8)))
-  const maxLog = Math.ceil(Math.max(...values.map(value => Math.log10(value)), -1))
-  const minLog = Math.min(-8, Math.floor(Math.min(...values.map(value => Math.log10(value)))))
-  const yRange = Math.max(maxLog - minLog, 1)
-  const x = (value: number) => chart.left + ((value - minX) / xRange) * (chart.width - chart.left - chart.right)
-  const y = (value: number) => chart.top + ((maxLog - Math.log10(Math.max(value, 1e-8))) / yRange) * (chart.height - chart.top - chart.bottom)
-  const lineFor = (curve: typeof curves[number]) => {
-    const linePoints: string[] = []
-    const linePlotted = curve.firstZero >= 0 ? curve.plotted.slice(0, curve.firstZero) : curve.plotted
-    linePlotted.forEach(point => linePoints.push(`${x(point.snr_db)},${y(Number(point.ber ?? 0))}`))
-    if (curve.firstZero > 0 && linePlotted.length) linePoints.push(`${x(linePlotted[linePlotted.length - 1].snr_db)},${y(0)}`)
-    return linePoints.join(' ')
-  }
-  const labelStyle: CSSProperties = { fontSize: 9, fill: '#6b7788' }
-  const yTicks = [0, 1, 2, 3].map(index => maxLog - (index * yRange) / 3)
-  const reportX = (value: number) => reportChart.left + ((value - minX) / xRange) * (reportChart.width - reportChart.left - reportChart.right)
-  const reportY = (value: number) => reportChart.top + ((maxLog - Math.log10(Math.max(value, 1e-8))) / yRange) * (reportChart.height - reportChart.top - reportChart.bottom)
-  const reportLineFor = (curve: typeof curves[number]) => {
-    const linePoints: string[] = []
-    const linePlotted = curve.firstZero >= 0 ? curve.plotted.slice(0, curve.firstZero) : curve.plotted
-    linePlotted.forEach(point => linePoints.push(`${reportX(point.snr_db)},${reportY(Number(point.ber ?? 0))}`))
-    if (curve.firstZero > 0 && linePlotted.length) linePoints.push(`${reportX(linePlotted[linePlotted.length - 1].snr_db)},${reportY(0)}`)
-    return linePoints.join(' ')
-  }
-  const reportYTicks = [0, 1, 2, 3, 4].map(index => maxLog - (index * yRange) / 4)
-  const reportXTicks = [0, 1, 2, 3, 4].map(index => minX + (index * xRange) / 4)
-  const reportLabelStyle: CSSProperties = { fontSize: 14, fill: '#68778b' }
-  const renderReportPlot = (ref: RefObject<SVGSVGElement>) => <svg ref={ref} className="ber-report-plot" viewBox={`0 0 ${reportChart.width} ${reportChart.height}`} role="img" aria-label="Detailed bit error rate versus SNR chart" shapeRendering="geometricPrecision" textRendering="geometricPrecision">
-    <rect x={reportChart.left} y={reportChart.top} width={reportChart.width - reportChart.left - reportChart.right} height={reportChart.height - reportChart.top - reportChart.bottom} fill="#f8fafc" stroke="#cfd8e4" strokeWidth="1.5" />
-    {reportYTicks.map((tick, index) => { const yy = reportChart.top + (index / 4) * (reportChart.height - reportChart.top - reportChart.bottom); return <g key={`report-y-${index}`}><line x1={reportChart.left} x2={reportChart.width - reportChart.right} y1={yy} y2={yy} stroke="#e1e7ef" strokeWidth="1.25" /><text x={reportChart.left - 14} y={yy + 5} textAnchor="end" style={reportLabelStyle}>{`1e${tick.toFixed(1).replace('.0', '')}`}</text></g> })}
-    {reportXTicks.map((tick, index) => { const xx = reportChart.left + (index / 4) * (reportChart.width - reportChart.left - reportChart.right); return <g key={`report-x-${index}`}><line x1={xx} x2={xx} y1={reportChart.top} y2={reportChart.height - reportChart.bottom} stroke="#edf1f5" strokeWidth="1" /><text x={xx} y={reportChart.height - reportChart.bottom + 25} textAnchor="middle" style={reportLabelStyle}>{tick.toFixed(1)}</text></g> })}
-    {curves.map((curve, curveIndex) => <g key={`report-${curve.id}`}><polyline points={reportLineFor(curve)} fill="none" stroke={curve.color} strokeWidth={curveIndex === 0 ? 3.2 : 2.6} strokeDasharray={styleDash(curve.style)} strokeLinecap="round" strokeLinejoin="round" opacity={curveIndex === 0 ? 1 : 0.86} />{curve.plotted.filter(point => point.ber !== 0).map(point => <circle key={`report-${curve.id}-${point.snr_db}-${point.frames}`} cx={reportX(point.snr_db)} cy={reportY(Number(point.ber ?? 0))} r={curveIndex === 0 ? 5.5 : 4.6} fill={curve.color} stroke="#fff" strokeWidth="2"><title>{`${curve.name} · ${point.snr_db} dB: BER ${point.ber ?? 0}`}</title></circle>)}</g>)}
-    <text x={reportChart.width / 2} y={reportChart.height - 8} textAnchor="middle" style={{ ...reportLabelStyle, fontSize: 16 }}>SNR (dB)</text><text x="22" y={reportChart.height / 2} textAnchor="middle" transform={`rotate(-90 22 ${reportChart.height / 2})`} style={{ ...reportLabelStyle, fontSize: 16 }}>BER (log)</text>
-  </svg>
 
   const updateSelectedCurve = (patch: Partial<Pick<BerReference, 'name' | 'color' | 'style'>>) => {
     if (selectedCurveId === 'current') {
@@ -224,16 +90,7 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   const loadReferenceFile = async (file?: File) => {
     if (!file) return
     try {
-      const parsed = JSON.parse(await file.text())
-      const candidates = Array.isArray(parsed) ? parsed : [parsed.reference || parsed]
-      const imported = candidates.filter(item => item && typeof item.name === 'string' && Array.isArray(item.points) && item.points.length > 0).map(item => ({
-        id: `ber-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        name: item.name,
-        color: typeof item.color === 'string' ? item.color : '#d26782',
-        style: lineStyles.some(option => option.value === item.style) ? item.style : 'dash',
-        points: item.points,
-        createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString(),
-      } as BerReference))
+      const imported = await parseReferenceFile(file)
       if (!imported.length) throw new Error('No valid BER reference found in this file.')
       const next = [...references, ...imported]
       setReferences(next)
@@ -312,23 +169,15 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
         <input ref={referenceFileRef} type="file" accept=".json,.ber.json,application/json" hidden onChange={event => { void loadReferenceFile(event.target.files?.[0]); event.target.value = '' }} />
       </div>
     </div>
-    <svg ref={svgRef} viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="Bit error rate versus SNR chart">
-      <rect x={chart.left} y={chart.top} width={chart.width - chart.left - chart.right} height={chart.height - chart.top - chart.bottom} fill="#f8fafc" stroke="#d7dee8" />
-      {yTicks.map((tick, index) => { const yy = chart.top + (index / 3) * (chart.height - chart.top - chart.bottom); return <g key={tick}><line x1={chart.left} x2={chart.width - chart.right} y1={yy} y2={yy} stroke="#e3e8ef" /><text x={chart.left - 7} y={yy + 3} textAnchor="end" style={labelStyle}>{`1e${tick.toFixed(0)}`}</text></g> })}
-      {curves.map((curve, curveIndex) => <g key={curve.id}>
-        {lineFor(curve) && <polyline points={lineFor(curve)} fill="none" stroke={curve.color} strokeWidth={curveIndex === 0 ? 2.5 : 2} strokeDasharray={styleDash(curve.style)} strokeLinejoin="round" opacity={curveIndex === 0 ? 1 : 0.86} />}
-        {curve.plotted.filter(point => point.ber !== 0).map(point => <circle key={`${curve.id}-${point.snr_db}-${point.frames}`} cx={x(point.snr_db)} cy={y(Number(point.ber ?? 0))} r={curveIndex === 0 ? 3.5 : 3} fill={curve.color} stroke="#fff" strokeWidth="1.5"><title>{`${curve.name} · ${point.snr_db} dB: BER ${point.ber ?? 0}`}</title></circle>)}
-      </g>)}
-      <text x={chart.width / 2} y={chart.height - 5} textAnchor="middle" style={labelStyle}>SNR (dB)</text><text x="11" y={chart.height / 2} textAnchor="middle" transform={`rotate(-90 11 ${chart.height / 2})`} style={labelStyle}>BER (log)</text><text x={chart.left} y={chart.height - 17} textAnchor="middle" style={labelStyle}>{minX.toFixed(1)}</text><text x={chart.width - chart.right} y={chart.height - 17} textAnchor="middle" style={labelStyle}>{maxX.toFixed(1)}</text>
-    </svg>
-    <div className="ber-legend" aria-label="BER curve legend">{curves.map((curve, index) => <div className="ber-legend-item" key={curve.id}><span className="ber-legend-swatch" style={{ borderTopColor: curve.color, borderTopStyle: curve.style === 'dot' ? 'dotted' : curve.style === 'dash' || curve.style === 'dashdot' ? 'dashed' : 'solid' }} /><span className="ber-legend-name">{curve.name}</span>{index > 0 && <><button className="ber-legend-action" onClick={() => removeReference(curve.id)} title="Hide reference">Hide</button><button className="ber-legend-delete" onClick={() => deleteReference(curve.id)} title="Delete saved reference">×</button></>}</div>)}</div>
+    <BerPlot ref={svgRef} curves={curves} />
+    <BerLegend curves={curves} onHide={removeReference} onDelete={deleteReference} />
     {notice && <div className="chart-notice">{notice}</div>}
     <div className="sink-chart-label">{current.plotted.length} SNR points plotted · {current.plotted[current.plotted.length - 1]?.frames ?? 0} frames at last point</div>
     {detailsOpen && createPortal(<div className="ber-report-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDetailsOpen(false) }}>
       <div className="ber-report" role="dialog" aria-modal="true" aria-label="BER details report">
         <div className="ber-report-header"><div><small>BER REPORT</small><h2>BER vs SNR details</h2></div><button className="ber-report-close" onClick={() => setDetailsOpen(false)} aria-label="Close report">×</button></div>
         <div className="ber-report-tabs"><button className={detailsTab === 'chart' ? 'active' : ''} onClick={() => setDetailsTab('chart')}>Chart</button><button className={detailsTab === 'edit' ? 'active' : ''} onClick={() => setDetailsTab('edit')}>Edit &amp; Data</button></div>
-        {detailsTab === 'chart' ? <div className="ber-report-chart-wrap primary"><div className="ber-report-chart-title"><strong>BER vs SNR</strong><span>{curves.length} curve{curves.length === 1 ? '' : 's'} · {allValid.length} measured points</span></div>{renderReportPlot(reportSvgRef)}<div className="ber-report-chart-legend">{curves.map(curve => <span key={`report-legend-${curve.id}`}><i style={{ borderTopColor: curve.color, borderTopStyle: curve.style === 'dot' ? 'dotted' : curve.style === 'solid' ? 'solid' : 'dashed' }} />{curve.name}</span>)}</div></div> :
+        {detailsTab === 'chart' ? <div className="ber-report-chart-wrap primary"><div className="ber-report-chart-title"><strong>BER vs SNR</strong><span>{curves.length} curve{curves.length === 1 ? '' : 's'} · {allValid.length} measured points</span></div><BerLegend curves={curves} variant="report" /><BerPlot ref={reportSvgRef} curves={curves} variant="report" /></div> :
         <div className="ber-report-layout">
           <aside className="ber-report-curves"><div className="ber-report-section-title">CURVES</div><button className={`ber-report-curve ${selectedCurveId === 'current' ? 'active' : ''}`} onClick={() => setSelectedCurveId('current')}><span className="ber-report-dot" style={{ background: curveColor }} />{curveName || 'Current run'}</button>{references.map(reference => <button key={reference.id} className={`ber-report-curve ${selectedCurveId === reference.id ? 'active' : ''}`} onClick={() => { setSelectedCurveId(reference.id); setVisibleReferenceIds(ids => ids.includes(reference.id) ? ids : [...ids, reference.id]) }}><span className="ber-report-dot" style={{ background: reference.color }} />{reference.name}</button>)}</aside>
           <section className="ber-report-editor">

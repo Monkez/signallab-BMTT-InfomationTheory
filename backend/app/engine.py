@@ -8,7 +8,8 @@ from typing import Any, Callable
 
 import numpy as np
 
-from .blocks import PROCESSORS, SPEC_BY_TYPE, make_context, python_block
+from .block_registry import SPEC_BY_TYPE
+from .blocks import PROCESSORS, make_context, python_block
 from .models import Graph, SimulationConfig, ValidationResult
 
 

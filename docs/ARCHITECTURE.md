@@ -19,6 +19,30 @@ FastAPI job service
        block runtime + metric reducer
 ```
 
+## Ranh giới module
+
+Frontend được tổ chức theo feature thay vì dồn dữ liệu và thuật toán vào component màn hình:
+
+```text
+frontend/src/
+  App.tsx                         điều phối workspace và job
+  components/FlowMiniMapNode.tsx renderer MiniMap
+  features/blocks/catalog.ts      catalog offline + icon/màu nhóm block
+  features/experiment/config.ts   mặc định và phép tính SNR sweep
+  features/ber/
+    BerPlot.tsx                   SVG plot dùng chung preview/report
+    BerLegend.tsx                 legend dùng chung preview/report
+    chartMath.ts                  domain, log scale, quy tắc BER=0
+    referenceFiles.ts             định dạng .ber.json, Save As/Browse
+    referenceStore.ts             localStorage và đồng bộ reference
+    imageExport.ts                copy/xuất PNG
+    types.ts                      hợp đồng dữ liệu BER
+```
+
+Backend tách hợp đồng block khỏi thuật toán xử lý: `block_registry.py` chứa `BlockSpec`, catalog và khả năng GPU; `blocks.py` chỉ chứa processor; `engine.py` biên dịch/thực thi DAG; `jobs.py` quản lý vòng đời job; `main.py` chỉ là lớp HTTP. Nhờ vậy đổi nhãn/port/default không đụng thuật toán, còn thêm processor không làm phình API layer.
+
+`SinkChart.tsx` hiện là component điều phối trạng thái BER và dùng các module feature trên. Mọi plot đều đi qua `BerPlot`, nên preview, report, đường reference, marker và quy tắc điểm BER bằng 0 có một nguồn logic duy nhất.
+
 ## Bản desktop Windows
 
 PyWebView tạo cửa sổ native dùng WebView2. Một tiến trình Uvicorn nội bộ phục vụ cả API và frontend production trên loopback với port trống được chọn tự động. PyInstaller gom Python runtime, backend và `frontend/dist` vào thư mục phát hành onedir chứa `SignalLab.exe`. Onedir được chọn để khởi động nhanh và tránh mỗi worker Monte-Carlo phải giải nén lại toàn bộ onefile. Người dùng cuối không chạy Vite, Node.js hoặc hai terminal; Vite chỉ còn dành cho phát triển giao diện qua `run_dev.bat`.
@@ -66,3 +90,9 @@ Console dock là lớp hiển thị phía frontend, nhận sự kiện khi nạp
 - Biểu đồ BER có thể copy trực tiếp ảnh PNG vào clipboard hoặc tải xuống; bảng kết quả theo SNR có thể copy dạng TSV, tải CSV hoặc PNG.
 - Graph được biên dịch thành `node_map`, danh sách cạnh vào và thứ tự thực thi một lần trước sweep. Seed được sinh theo từng batch thay vì cấp phát toàn bộ số frame từ đầu.
 - CPU dùng một `ProcessPoolExecutor` dùng lại cho toàn bộ sweep; chế độ tự động chạy inline với workload nhỏ và giới hạn số worker hợp lý để tránh overhead tạo process lớn hơn thời gian tính toán. Người dùng vẫn có thể đặt `Workers` thủ công khi benchmark hệ thống cụ thể.
+
+## Quy trình mở rộng
+
+Khi thêm block built-in: thêm `BlockSpec` vào `backend/app/block_registry.py`, thêm processor và đăng ký trong `PROCESSORS` tại `backend/app/blocks.py`, rồi thêm catalog dự phòng ở `frontend/src/features/blocks/catalog.ts`. Catalog backend là nguồn chính khi app đã kết nối; catalog frontend chỉ giúp UI dùng được trong thời gian backend khởi động. Cuối cùng thêm round-trip/validation test trong `backend/tests`.
+
+Khi thêm kiểu Sink/đồ thị: tạo feature riêng trong `frontend/src/features`, định nghĩa type và hàm biến đổi dữ liệu thuần trước, sau đó mới viết component SVG/UI. Không sao chép phép chiếu đồ thị giữa preview và report.

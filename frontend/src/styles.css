@@ -156,11 +156,11 @@ input:focus, select:focus, textarea:focus { border-color: #4d78cb; box-shadow: 0
 .ber-load { grid-column: 3; }
 .ber-save:hover, .ber-load:hover { border-color: #7fa7df; background: #eaf2ff; }
 .ber-save:disabled, .ber-load:disabled { opacity: .5; cursor: default; }
-.ber-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 2px 2px 0; }
-.ber-legend-item { display: inline-flex; align-items: center; min-width: 0; gap: 4px; color: #526174; font-size: 9px; }
+.ber-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 6px 2px 2px; padding: 7px 9px; border: 1px solid #dce4ee; border-radius: 7px; background: #fbfcfe; }
+.ber-legend-item { display: inline-flex; align-items: center; min-width: 0; gap: 5px; color: #435268; font-size: 12px; font-weight: 600; }
 .ber-legend-swatch { width: 18px; height: 0; border-top-width: 3px; flex: 0 0 auto; }
 .ber-legend-name { max-width: 118px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ber-legend-action, .ber-legend-delete { padding: 0; background: transparent; color: #7a8aa0; font-size: 8px; }
+.ber-legend-action, .ber-legend-delete { padding: 0; background: transparent; color: #6f8097; font-size: 10px; font-weight: 500; }
 .ber-legend-action:hover, .ber-legend-delete:hover { color: #1f57ba; }
 .ber-legend-delete { font-size: 13px; line-height: 12px; }
 .ber-report-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(20, 31, 46, .38); }
@@ -179,7 +179,7 @@ input:focus, select:focus, textarea:focus { border-color: #4d78cb; box-shadow: 0
 .ber-report-chart-title span { color: #7e8998; font-size: 9px; }
 .ber-report-plot { display: block; width: 100%; height: auto; max-height: 285px; }
 .ber-report-chart-wrap.primary .ber-report-plot { min-height: 0; flex: 1; max-height: 560px; }
-.ber-report-chart-legend { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 18px; padding-top: 8px; color: #526174; font-size: 10px; }
+.ber-report-chart-legend { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 22px; margin: 8px 0 5px; padding: 9px 12px; border: 1px solid #dce4ee; border-radius: 8px; background: #fbfcfe; color: #435268; font-size: 13px; font-weight: 600; }
 .ber-report-chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .ber-report-chart-legend i { width: 24px; height: 0; border-top-width: 3px; }
 .ber-report-layout { min-height: 0; flex: 1; display: grid; grid-template-columns: 190px minmax(0, 1fr); overflow: hidden; }

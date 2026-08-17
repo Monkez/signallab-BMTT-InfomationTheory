@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { SinkPoint } from './SinkChart'
+import type { SinkPoint } from './features/ber/types'
 
 const format = (value: number | null) => value === null ? '—' : value.toExponential(4)
 

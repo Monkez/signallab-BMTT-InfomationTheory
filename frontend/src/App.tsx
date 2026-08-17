@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow, Background, Controls, MiniMap, addEdge, useNodesState, useEdgesState,
-  BackgroundVariant, MarkerType, type Connection, type MiniMapNodeProps, type NodeMouseHandler, type OnNodeDrag,
+  BackgroundVariant, MarkerType, type Connection, type NodeMouseHandler, type OnNodeDrag,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
-  Activity, ArrowLeftRight, Binary, Box, Braces, CircleStop, Download, Gauge,
-  Layers3, PanelBottom, PanelLeft, PanelRight, Play, Plus, Radio, RotateCcw, Search, Terminal, Trash2, Upload, Waves, X,
+  Activity, ArrowLeftRight, Box, Braces, CircleStop, Download,
+  Layers3, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Search, Terminal, Trash2, Upload, X,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
 import { cancelJob, createJob, getJob, graphPayload } from './api'
@@ -14,48 +14,11 @@ import { initialEdges, initialNodes, pythonTemplate } from './sample'
 import type { BlockSpec, FlowNode, Job, SimulationConfig } from './types'
 import { BerChart } from './SinkChart'
 import { ResultsTable } from './ResultsTable'
+import { FlowMiniMapNode } from './components/FlowMiniMapNode'
+import { fallbackSpecs, iconFor, miniMapColor } from './features/blocks/catalog'
+import { defaultSimulationConfig, snrPointCount } from './features/experiment/config'
 
-const fallbackSpecs: BlockSpec[] = [
-  { type: 'bit_source', label: 'Bit Source', category: 'Sources', description: 'Random binary messages', defaults: { length: 4096 }, inputs: [], outputs: ['out'], gpu_compatible: true },
-  { type: 'text_source', label: 'Text Source', category: 'Sources', description: 'UTF-8 text to bits', defaults: { text: 'HELLO', repeat: 1 }, inputs: [], outputs: ['out', 'reference'], gpu_compatible: true },
-  { type: 'text_file_source', label: 'Text File Source', category: 'Sources', description: 'Load a text file as bits', defaults: { file_name: '', data_base64: '', repeat: 1 }, inputs: [], outputs: ['out', 'reference'], gpu_compatible: false },
-  { type: 'image_file_source', label: 'Image File Source', category: 'Sources', description: 'Load image pixels as bits', defaults: { file_name: '', data_base64: '', mode: 'grayscale' }, inputs: [], outputs: ['out', 'reference'], gpu_compatible: false },
-  { type: 'differential_encode', label: 'Differential Encoder', category: 'Source coding', description: 'Cumulative XOR transform', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
-  { type: 'differential_decode', label: 'Differential Decoder', category: 'Source coding', description: 'Invert differential bits', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
-  { type: 'huffman_encode', label: 'Huffman Encoder', category: 'Source coding', description: 'Fixed 2-bit-symbol Huffman encoder', defaults: { weights: '8,4,2,1' }, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: false },
-  { type: 'huffman_decode', label: 'Huffman Decoder', category: 'Source coding', description: 'Decode Huffman stream', defaults: { weights: '8,4,2,1' }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
-  { type: 'shannon_fano_encode', label: 'Shannon-Fano Encoder', category: 'Source coding', description: 'Shannon-Fano source encoder', defaults: { weights: '8,4,2,1' }, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: false },
-  { type: 'shannon_fano_decode', label: 'Shannon-Fano Decoder', category: 'Source coding', description: 'Decode Shannon-Fano stream', defaults: { weights: '8,4,2,1' }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
-  { type: 'rle_encode', label: 'Run-Length Encoder', category: 'Source coding', description: 'Encode binary runs', defaults: {}, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: false },
-  { type: 'rle_decode', label: 'Run-Length Decoder', category: 'Source coding', description: 'Decode binary runs', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
-  { type: 'zip_encode', label: 'ZIP (DEFLATE) Encoder', category: 'Source coding', description: 'Standard DEFLATE compression', defaults: {}, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: false },
-  { type: 'zip_decode', label: 'ZIP (DEFLATE) Decoder', category: 'Source coding', description: 'Standard DEFLATE decompression', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
-  { type: 'hamming74_encode', label: 'Hamming Encoder', category: 'Channel coding', description: 'Hamming (7,4)', defaults: {}, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: true },
-  { type: 'repetition3_encode', label: 'Repetition-3 Encoder', category: 'Channel coding', description: 'Repeat each bit three times', defaults: {}, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: true },
-  { type: 'repetition3_decode', label: 'Repetition-3 Decoder', category: 'Channel coding', description: 'Majority decode triples', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
-  { type: 'bpsk_mod', label: 'BPSK Modulator', category: 'Modulation', description: 'Binary phase shift keying', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
-  { type: 'qpsk_mod', label: 'QPSK Modulator', category: 'Modulation', description: 'Map bit pairs to I/Q', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
-  { type: 'awgn', label: 'AWGN Channel', category: 'Channels', description: 'Experiment SNR sweep or fixed SNR', defaults: { ebn0_db: 4, snr_mode: 'experiment' }, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
-  { type: 'rayleigh', label: 'Rayleigh Fading', category: 'Channels', description: 'Flat fading plus noise', defaults: { ebn0_db: 4, snr_mode: 'experiment' }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
-  { type: 'bpsk_demod', label: 'BPSK Demodulator', category: 'Receivers', description: 'Hard decision', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
-  { type: 'qpsk_demod', label: 'QPSK Demodulator', category: 'Receivers', description: 'Hard decision I/Q', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
-  { type: 'hamming74_decode', label: 'Hamming Decoder', category: 'Channel coding', description: 'Correct one bit', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
-  { type: 'scope', label: 'Signal Scope', category: 'Sinks', description: 'Amplitude and peak summary', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
-  { type: 'constellation', label: 'Constellation Sink', category: 'Sinks', description: 'I/Q sample summary', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
-  { type: 'power_meter', label: 'Power Meter', category: 'Sinks', description: 'Mean signal power', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
-  { type: 'ber', label: 'BER Meter', category: 'Sinks', description: 'Measure bit error rate', defaults: {}, inputs: ['reference', 'estimate'], outputs: [], gpu_compatible: true },
-  { type: 'python', label: 'Python Block', category: 'Custom', description: 'Custom NumPy processing', defaults: { gain: 1 }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
-]
-
-const iconFor = (type: string) => type.includes('source') ? Binary : type.includes('awgn') || type.includes('rayleigh') ? Waves : type.includes('bpsk') || type.includes('qpsk') ? Radio : type === 'ber' ? Gauge : type === 'scope' || type === 'constellation' || type === 'power_meter' ? Activity : type === 'python' ? Braces : Box
-const miniMapColor = (type: string) => type.includes('source') ? '#5b8def' : type.includes('encode') || type.includes('decode') ? '#8b72d9' : type.includes('mod') || type.includes('demod') ? '#e49a45' : type.includes('awgn') || type.includes('rayleigh') ? '#41a987' : type === 'ber' || type.includes('meter') || type === 'scope' || type === 'constellation' ? '#d26782' : type === 'python' ? '#65748b' : '#8493a8'
-const MiniMapNode = ({ x, y, width, height, color, strokeColor, strokeWidth, borderRadius, shapeRendering, selected }: MiniMapNodeProps) => <g>
-  <rect x={x} y={y} width={width} height={height} rx={borderRadius} fill={color} stroke={selected ? '#1f57ba' : strokeColor} strokeWidth={selected ? 2 : strokeWidth} shapeRendering={shapeRendering} />
-  {width > 10 && <rect x={x + 2} y={y + 2} width={Math.min(4, width / 3)} height={Math.max(3, height - 4)} rx={1.5} fill="#fff" opacity={0.65} />}
-</g>
 const formatNumber = (n: number) => new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(n)
-const snrPointCount = (config: SimulationConfig) => Math.max(1, Math.floor((config.snr_db_stop - config.snr_db_start) / config.snr_db_step + 1e-9) + 1)
-const defaultSimulationConfig: SimulationConfig = { trials: 100, max_frames: 100, min_frames: 20, min_errors: 100, snr_db_start: -2, snr_db_stop: 10, snr_db_step: 2, workers: 0, seed: 2026, device: 'auto', chunk_size: 10 }
 type ConsoleLevel = 'info' | 'success' | 'warning' | 'error'
 type ConsoleEntry = { id: number; time: string; level: ConsoleLevel; message: string }
 
@@ -246,7 +209,7 @@ function App() {
         <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running' }))} nodeTypes={{ signal: SignalNode }} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onNodeClick={onNodeClick} onNodeDragStart={onNodeDragStart} onPaneClick={() => setSelectedId(null)} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
           <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#ccd3dc" />
           <Controls position="bottom-left" />
-          <MiniMap position="bottom-right" pannable zoomable offsetScale={4} nodeColor={node => miniMapColor(String((node.data as Record<string, unknown>)?.blockType || ''))} nodeStrokeColor="#ffffff" nodeStrokeWidth={1} nodeBorderRadius={3} nodeComponent={MiniMapNode} bgColor="#f9fbfd" maskColor="rgba(226,233,242,.62)" maskStrokeColor="#8ea8ca" maskStrokeWidth={1} style={{ width: 150, height: 92, border: '1px solid #cbd6e3', borderRadius: 8, boxShadow: '0 3px 12px rgba(36,55,78,.14)' }} />
+          <MiniMap position="bottom-right" pannable zoomable offsetScale={4} nodeColor={node => miniMapColor(String((node.data as Record<string, unknown>)?.blockType || ''))} nodeStrokeColor="#ffffff" nodeStrokeWidth={1} nodeBorderRadius={3} nodeComponent={FlowMiniMapNode} bgColor="#f9fbfd" maskColor="rgba(226,233,242,.62)" maskStrokeColor="#8ea8ca" maskStrokeWidth={1} style={{ width: 150, height: 92, border: '1px solid #cbd6e3', borderRadius: 8, boxShadow: '0 3px 12px rgba(36,55,78,.14)' }} />
         </ReactFlow>
       </main>
 

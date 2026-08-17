@@ -29,3 +29,7 @@
 - Report chart dùng hệ tọa độ SVG 960×520 riêng với geometric precision, trục/tick dày hơn và kích thước nét/marker độc lập khỏi preview 340×190.
 - MiniMap đã thu nhỏ còn 150×92px, dùng node renderer có stripe/viền và màu theo nhóm block, mask sáng tương phản; vẫn hỗ trợ pan/zoom.
 - Bổ sung Text File Source và Image File Source có file picker/base64; thêm Huffman, Shannon-Fano, RLE và ZIP/DEFLATE Encoder/Decoder. Backend round-trip tests đã nâng lên 6/6 pass, frontend build pass.
+- Refactor 2026-08-17: BER đã tách thành các module plot, legend, chart math, reference store/file và image export; preview/report dùng chung một renderer SVG. Legend luôn hiện rõ ở preview và tab Chart của BER Details.
+- Frontend đã tách block catalog, MiniMap renderer và experiment config khỏi `App.tsx`; backend đã tách `BlockSpec`/catalog sang `block_registry.py`, độc lập processor và engine. Tài liệu kiến trúc có sơ đồ module và quy trình mở rộng.
+- Xác minh sau refactor: backend 6/6 pass, frontend production build pass.
+- `build_app.bat` đã đóng gói lại thành công bản refactor; EXE mới ở `dist\\SignalLab\\SignalLab.exe`.

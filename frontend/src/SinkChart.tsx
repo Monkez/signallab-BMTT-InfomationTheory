@@ -100,7 +100,7 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
         return <g key={tick}><line x1={chart.left} x2={chart.width - chart.right} y1={yy} y2={yy} stroke="#e3e8ef" /><text x={chart.left - 7} y={yy + 3} textAnchor="end" style={labelStyle}>{`1e${tick.toFixed(0)}`}</text></g>
       })}
       <polyline points={line} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinejoin="round" />
-      {plotted.map(point => <circle key={`${point.snr_db}-${point.frames}`} cx={x(point.snr_db)} cy={y(Number(point.ber ?? 0))} r="3.5" fill="#2563eb" stroke="#fff" strokeWidth="1.5"><title>{`${point.snr_db} dB: BER ${point.ber ?? 0}`}</title></circle>)}
+      {plotted.filter(point => point.ber !== 0).map(point => <circle key={`${point.snr_db}-${point.frames}`} cx={x(point.snr_db)} cy={y(Number(point.ber ?? 0))} r="3.5" fill="#2563eb" stroke="#fff" strokeWidth="1.5"><title>{`${point.snr_db} dB: BER ${point.ber ?? 0}`}</title></circle>)}
       <text x={chart.width / 2} y={chart.height - 5} textAnchor="middle" style={labelStyle}>SNR (dB)</text>
       <text x="11" y={chart.height / 2} textAnchor="middle" transform={`rotate(-90 11 ${chart.height / 2})`} style={labelStyle}>BER (log)</text>
       <text x={chart.left} y={chart.height - 17} textAnchor="middle" style={labelStyle}>{minX.toFixed(1)}</text>

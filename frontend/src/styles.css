@@ -91,6 +91,7 @@ button { color: inherit; border: 0; cursor: pointer; }
 .port-toggle:hover, .port-toggle.active { border-color: #7da1dc; background: #eef4ff; color: #1f57ba; }
 label { display: block; font-size: 9px; color: #667282; text-transform: capitalize; margin: 0 0 12px; position: relative; }
 input, select { display: block; width: 100%; margin-top: 6px; height: 34px; padding: 0 9px; background: #fff; border: 1px solid var(--line-strong); color: #263140; border-radius: 6px; outline: none; font-size: 10px; }
+input[hidden] { display: none !important; }
 input:focus, select:focus, textarea:focus { border-color: #4d78cb; box-shadow: 0 0 0 2px rgba(37,99,235,.1); }
 .section-rule { display: flex; align-items: center; gap: 8px; color: #788493; font-size: 7px; letter-spacing: .1em; margin: 20px 0 12px; }
 .section-rule:after { content: ''; height: 1px; background: var(--line); flex: 1; }
@@ -124,6 +125,13 @@ input:focus, select:focus, textarea:focus { border-color: #4d78cb; box-shadow: 0
 .metric strong { display: block; font: 500 13px Consolas, monospace; color: #273346; margin-top: 6px; }
 .metric.hero { background: #f3f7ff; border-color: #cbdaf7; }
 .metric.hero strong { font-size: 23px; color: #1f57ba; }
+.overall-ber-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 12px; padding: 14px 16px; border: 1px solid #cbdaf7; border-radius: 8px; background: #f3f7ff; }
+.overall-ber-card span { display: block; color: #6880a4; font-size: 9px; letter-spacing: .08em; }
+.overall-ber-card small { display: block; color: #8090a8; font-size: 9px; margin-top: 5px; }
+.overall-ber-card strong { color: #1f57ba; font: 500 23px Consolas, monospace; white-space: nowrap; }
+.ber-plot-section { margin-top: 2px; padding-top: 1px; border: 1px solid #e0e6ee; border-radius: 8px; background: #fbfcfd; }
+.ber-plot-section > .section-rule { margin: 10px 12px 6px; }
+.ber-plot-section .sink-chart { margin: 0 8px 8px; width: calc(100% - 16px); }
 .warning { border-color: #e9d396; background: #fff9e8; color: #785f19; margin-top: 9px; }
 .sink-chart { width: 100%; border: 1px solid var(--line); border-radius: 7px; background: #fff; padding: 8px; margin-bottom: 10px; }
 .sink-chart.empty { color: var(--muted); font-size: 11px; padding: 18px 10px; text-align: center; }

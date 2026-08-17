@@ -52,7 +52,18 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   const yRange = Math.max(maxLog - minLog, 1)
   const x = (value: number) => chart.left + ((value - minX) / xRange) * (chart.width - chart.left - chart.right)
   const y = (value: number) => chart.top + ((maxLog - Math.log10(Math.max(value, 1e-8))) / yRange) * (chart.height - chart.top - chart.bottom)
-  const line = valid.map(point => `${x(point.snr_db)},${y(Number(point.ber ?? 0))}`).join(' ')
+  const linePoints: string[] = []
+  valid.forEach((point, index) => {
+    const pointX = x(point.snr_db)
+    const pointY = y(Number(point.ber ?? 0))
+    if (index > 0 && point.ber === 0 && valid[index - 1].ber !== 0) {
+      // A measured BER of zero is below the chart's finite log-scale floor.
+      // Extend to the current SNR first, then drop vertically to that floor.
+      linePoints.push(`${pointX},${y(Number(valid[index - 1].ber ?? 0))}`)
+    }
+    linePoints.push(`${pointX},${pointY}`)
+  })
+  const line = linePoints.join(' ')
   const labelStyle: CSSProperties = { fontSize: 9, fill: '#6b7788' }
   const yTicks = [0, 1, 2, 3].map(index => maxLog - (index * yRange) / 3)
 

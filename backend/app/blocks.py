@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import base64
+import heapq
+import inspect
+import zlib
 from dataclasses import dataclass
+from io import BytesIO
 from types import SimpleNamespace
 from typing import Any, Callable
 
 import numpy as np
-import inspect
 
 
 @dataclass(frozen=True)
@@ -23,8 +27,18 @@ class BlockSpec:
 SPECS = [
     BlockSpec("bit_source", "Bit Source", "Sources", "Generate random binary messages.", {"length": 4096}, [], ["out"]),
     BlockSpec("text_source", "Text Source", "Sources", "Convert UTF-8 text into a repeatable bit stream.", {"text": "HELLO", "repeat": 1}, [], ["out", "reference"]),
+    BlockSpec("text_file_source", "Text File Source", "Sources", "Load a UTF-8/text file and emit its bytes as bits.", {"file_name": "", "data_base64": "", "repeat": 1}, [], ["out", "reference"], False),
+    BlockSpec("image_file_source", "Image File Source", "Sources", "Load an image and emit grayscale or RGB pixel bits.", {"file_name": "", "data_base64": "", "mode": "grayscale"}, [], ["out", "reference"], False),
     BlockSpec("differential_encode", "Differential Encoder", "Source coding", "Cumulative XOR transform for a binary stream.", {}, ["in"], ["out"]),
     BlockSpec("differential_decode", "Differential Decoder", "Source coding", "Invert a differential binary stream.", {}, ["in"], ["out"]),
+    BlockSpec("huffman_encode", "Huffman Encoder", "Source coding", "Pedagogical fixed 2-bit-symbol Huffman encoder.", {"weights": "8,4,2,1"}, ["in"], ["out", "reference"], False),
+    BlockSpec("huffman_decode", "Huffman Decoder", "Source coding", "Decode the matching fixed Huffman codebook.", {"weights": "8,4,2,1"}, ["in"], ["out"], False),
+    BlockSpec("shannon_fano_encode", "Shannon-Fano Encoder", "Source coding", "Pedagogical Shannon-Fano encoder for 2-bit symbols.", {"weights": "8,4,2,1"}, ["in"], ["out", "reference"], False),
+    BlockSpec("shannon_fano_decode", "Shannon-Fano Decoder", "Source coding", "Decode the matching Shannon-Fano codebook.", {"weights": "8,4,2,1"}, ["in"], ["out"], False),
+    BlockSpec("rle_encode", "Run-Length Encoder", "Source coding", "Encode binary runs as 8-bit count plus value.", {}, ["in"], ["out", "reference"], False),
+    BlockSpec("rle_decode", "Run-Length Decoder", "Source coding", "Decode binary run-length pairs.", {}, ["in"], ["out"], False),
+    BlockSpec("zip_encode", "ZIP (DEFLATE) Encoder", "Source coding", "Compress a bitstream with the standard DEFLATE codec.", {}, ["in"], ["out", "reference"], False),
+    BlockSpec("zip_decode", "ZIP (DEFLATE) Decoder", "Source coding", "Decompress a bitstream encoded by ZIP Encoder.", {}, ["in"], ["out"], False),
     BlockSpec("hamming74_encode", "Hamming (7,4) Encoder", "Channel coding", "Encode 4 data bits into a Hamming(7,4) codeword.", {}, ["in"], ["out", "reference"]),
     BlockSpec("repetition3_encode", "Repetition-3 Encoder", "Channel coding", "Repeat each bit three times.", {}, ["in"], ["out", "reference"]),
     BlockSpec("repetition3_decode", "Repetition-3 Decoder", "Channel coding", "Majority decode groups of three bits.", {}, ["in"], ["out"]),
@@ -57,6 +71,160 @@ def text_source(inputs, params, context):
     bits = np.unpackbits(raw).astype(np.int8)
     stream = np.tile(bits, repeat)
     return {"out": stream, "reference": stream.copy()}
+
+
+def _file_bytes(params):
+    encoded = str(params.get("data_base64", ""))
+    if not encoded:
+        raise ValueError("Select a file before running this source block")
+    try:
+        return base64.b64decode(encoded, validate=True)
+    except Exception as exc:
+        raise ValueError("The selected file data is not valid base64") from exc
+
+
+def text_file_source(inputs, params, context):
+    raw = _file_bytes(params)
+    repeat = max(1, int(params.get("repeat", 1)))
+    bits = np.unpackbits(np.frombuffer(raw, dtype=np.uint8)).astype(np.int8)
+    stream = np.tile(bits, repeat)
+    return {"out": stream, "reference": stream.copy()}
+
+
+def image_file_source(inputs, params, context):
+    raw = _file_bytes(params)
+    try:
+        from PIL import Image
+        image = Image.open(BytesIO(raw)).convert("L" if str(params.get("mode", "grayscale")) == "grayscale" else "RGB")
+        pixels = np.asarray(image, dtype=np.uint8).reshape(-1)
+    except Exception as exc:
+        raise ValueError("The selected file is not a readable image") from exc
+    bits = np.unpackbits(pixels).astype(np.int8)
+    return {"out": bits, "reference": bits.copy()}
+
+
+def _weights(params):
+    try:
+        values = [max(1, int(value.strip())) for value in str(params.get("weights", "8,4,2,1")).split(",")]
+    except ValueError as exc:
+        raise ValueError("weights must be comma-separated positive integers") from exc
+    return (values + [1, 1, 1, 1])[:4]
+
+
+def _huffman_codes(weights):
+    heap = [[weight, [symbol, ""]] for symbol, weight in enumerate(weights)]
+    heapq.heapify(heap)
+    while len(heap) > 1:
+        left = heapq.heappop(heap)
+        right = heapq.heappop(heap)
+        for item in left[1:]: item[1] = "0" + item[1]
+        for item in right[1:]: item[1] = "1" + item[1]
+        heapq.heappush(heap, [left[0] + right[0], *left[1:], *right[1:]])
+    return {symbol: code or "0" for symbol, code in heap[0][1:]}
+
+
+def _shannon_fano_codes(weights):
+    codes = {symbol: "" for symbol in range(4)}
+    ordered = sorted(enumerate(weights), key=lambda item: (-item[1], item[0]))
+
+    def split(items):
+        if len(items) <= 1:
+            return
+        total = sum(weight for _, weight in items)
+        running = 0
+        cut = 1
+        for index, (_, weight) in enumerate(items[:-1], 1):
+            running += weight
+            if abs(total / 2 - running) < abs(total / 2 - sum(value for _, value in items[:cut])):
+                cut = index
+        for symbol, _ in items[:cut]: codes[symbol] += "0"
+        for symbol, _ in items[cut:]: codes[symbol] += "1"
+        split(items[:cut]); split(items[cut:])
+
+    split(ordered)
+    return {symbol: code or "0" for symbol, code in codes.items()}
+
+
+def _pack_symbol_bits(bits):
+    values = np.asarray(bits, dtype=np.int8).reshape(-1)
+    padding = (-len(values)) % 2
+    padded = np.pad(values, (0, padding)) if padding else values
+    return (padded[0::2] * 2 + padded[1::2]).astype(np.int8), len(values)
+
+
+def _variable_encode(inputs, params, code_factory):
+    symbols, original_length = _pack_symbol_bits(inputs["in"])
+    codes = code_factory(_weights(params))
+    encoded = [int(bit) for symbol in symbols for bit in codes[int(symbol)]]
+    header = np.unpackbits(np.array([original_length], dtype=">u4").view(np.uint8)).astype(np.int8)
+    return {"out": np.concatenate([header, np.asarray(encoded, dtype=np.int8)]), "reference": np.asarray(inputs["in"], dtype=np.int8).copy()}
+
+
+def _variable_decode(inputs, params, code_factory):
+    bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1)
+    if len(bits) < 32:
+        return {"out": np.array([], dtype=np.int8)}
+    header = np.packbits(bits[:32]).astype(np.uint8)
+    original_length = int.from_bytes(header.tobytes(), "big")
+    codes = code_factory(_weights(params))
+    reverse = {code: symbol for symbol, code in codes.items()}
+    decoded = []
+    token = ""
+    for bit in bits[32:]:
+        token += str(int(bit))
+        if token in reverse:
+            symbol = reverse[token]
+            decoded.extend([symbol // 2, symbol % 2])
+            token = ""
+    return {"out": np.asarray(decoded[:original_length], dtype=np.int8)}
+
+
+def huffman_encode(inputs, params, context): return _variable_encode(inputs, params, _huffman_codes)
+def huffman_decode(inputs, params, context): return _variable_decode(inputs, params, _huffman_codes)
+def shannon_fano_encode(inputs, params, context): return _variable_encode(inputs, params, _shannon_fano_codes)
+def shannon_fano_decode(inputs, params, context): return _variable_decode(inputs, params, _shannon_fano_codes)
+
+
+def rle_encode(inputs, params, context):
+    bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1)
+    encoded = []
+    index = 0
+    while index < len(bits):
+        value = int(bits[index]); end = index + 1
+        while end < len(bits) and int(bits[end]) == value and end - index < 255: end += 1
+        encoded.extend(np.unpackbits(np.array([end - index], dtype=np.uint8)).tolist())
+        encoded.append(value); index = end
+    return {"out": np.asarray(encoded, dtype=np.int8), "reference": bits.copy()}
+
+
+def rle_decode(inputs, params, context):
+    bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1)
+    decoded = []
+    for start in range(0, len(bits) - 8, 9):
+        count = int(np.packbits(bits[start:start + 8])[0])
+        decoded.extend([int(bits[start + 8])] * count)
+    return {"out": np.asarray(decoded, dtype=np.int8)}
+
+
+def zip_encode(inputs, params, context):
+    bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1)
+    packed = np.packbits(bits)
+    payload = zlib.compress(packed.tobytes())
+    header = len(bits).to_bytes(4, "big")
+    return {"out": np.unpackbits(np.frombuffer(header + payload, dtype=np.uint8)).astype(np.int8), "reference": bits.copy()}
+
+
+def zip_decode(inputs, params, context):
+    bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1)
+    raw = np.packbits(bits).tobytes()
+    if len(raw) < 4:
+        return {"out": np.array([], dtype=np.int8)}
+    try:
+        length = int.from_bytes(raw[:4], "big")
+        unpacked = np.unpackbits(np.frombuffer(zlib.decompress(raw[4:]), dtype=np.uint8)).astype(np.int8)
+    except zlib.error as exc:
+        raise ValueError("ZIP decoder received an invalid compressed stream") from exc
+    return {"out": unpacked[:length]}
 
 
 def differential_encode(inputs, params, context):
@@ -231,8 +399,18 @@ def python_block(inputs, params, context, code):
 PROCESSORS: dict[str, Callable] = {
     "bit_source": bit_source,
     "text_source": text_source,
+    "text_file_source": text_file_source,
+    "image_file_source": image_file_source,
     "differential_encode": differential_encode,
     "differential_decode": differential_decode,
+    "huffman_encode": huffman_encode,
+    "huffman_decode": huffman_decode,
+    "shannon_fano_encode": shannon_fano_encode,
+    "shannon_fano_decode": shannon_fano_decode,
+    "rle_encode": rle_encode,
+    "rle_decode": rle_decode,
+    "zip_encode": zip_encode,
+    "zip_decode": zip_decode,
     "hamming74_encode": hamming74_encode,
     "repetition3_encode": repetition3_encode,
     "repetition3_decode": repetition3_decode,

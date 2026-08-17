@@ -1,4 +1,6 @@
-from backend.app.blocks import make_context, python_block
+import base64
+
+from backend.app.blocks import PROCESSORS, make_context, python_block
 from backend.app.engine import execute_trial, run_simulation, validate_graph
 from backend.app.models import Edge, Graph, SimulationConfig
 import numpy as np
@@ -87,3 +89,14 @@ def test_python_block_supports_natural_and_legacy_apis():
     assert (python_block({"in": signal}, {"gain": 3}, context, natural)["out"] == [3.0, 6.0]).all()
     legacy = "def process(inputs, params, context):\n    return {'out': inputs['in'] + 1}"
     assert (python_block({"in": signal}, {}, context, legacy)["out"] == [2.0, 3.0]).all()
+
+
+def test_file_source_and_classic_source_codecs_round_trip():
+    context = make_context(np, np.random.default_rng(2), 0, 2, "cpu")
+    raw = base64.b64encode(b"SignalLab").decode()
+    source = PROCESSORS["text_file_source"]({}, {"data_base64": raw, "repeat": 1}, context)["out"]
+    assert len(source) == 72
+    for encoder, decoder in (("huffman_encode", "huffman_decode"), ("shannon_fano_encode", "shannon_fano_decode"), ("rle_encode", "rle_decode"), ("zip_encode", "zip_decode")):
+        encoded = PROCESSORS[encoder]({"in": source}, {"weights": "8,4,2,1"}, context)["out"]
+        decoded = PROCESSORS[decoder]({"in": encoded}, {"weights": "8,4,2,1"}, context)["out"]
+        assert np.array_equal(decoded, source), encoder

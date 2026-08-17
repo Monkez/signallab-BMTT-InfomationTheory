@@ -43,7 +43,8 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 - `Auto`: chọn GPU nếu có và phù hợp, nếu không dùng CPU.
 - Sau khi chạy, BER Meter và tab Experiment hiển thị đồ thị BER theo SNR cùng số frame/lỗi từng điểm.
 - Trên biểu đồ BER, chọn **Copy** để copy ảnh PNG hoặc **PNG** để tải ảnh. Bảng **Results by SNR** hỗ trợ **Copy** (TSV), **CSV** và **PNG**, thuận tiện đưa vào báo cáo.
-- Thư viện có thêm Text Source, Differential Encoder/Decoder, Repetition-3, QPSK, Rayleigh Fading, Signal Scope, Constellation Sink và Power Meter. Các Sink mới hiển thị tóm tắt kết quả trong tab Block sau khi chạy.
+- Thư viện có thêm Text Source, Text File Source, Image File Source, Differential Encoder/Decoder, Huffman, Shannon-Fano, Run-Length, ZIP/DEFLATE, Repetition-3, QPSK, Rayleigh Fading, Signal Scope, Constellation Sink và Power Meter. File Source cho phép chọn file trực tiếp trong panel Block; dữ liệu được lưu trong project dưới dạng base64 để chạy được cả desktop và dev server.
+- Các codec nguồn kinh điển làm việc trên stream bit: Encoder có cổng `reference` để nối vào BER, Decoder dùng cùng tham số codebook/codec để khôi phục stream. Huffman và Shannon-Fano dùng nhóm symbol 2-bit với trọng số có thể chỉnh; RLE dùng cặp count/value; ZIP dùng DEFLATE chuẩn.
 
 ## Lưu dự án
 

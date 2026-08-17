@@ -21,6 +21,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 - Engine tối ưu graph lookup, seed theo batch và tái sử dụng process pool; auto mode tránh multiprocessing cho workload nhỏ để giảm độ trễ.
 - Python Block dùng API đơn giản `process(signal, params) -> array`; scheduler đảm nhiệm song song hóa các frame, không bắt người dùng viết mã multiprocessing/GPU.
 - Thư viện mở rộng với Text Source, differential source coding, repetition code, QPSK, Rayleigh fading, Scope, Constellation và Power Meter.
+- Bổ sung Text File Source và Image File Source (file picker, base64 project payload), cùng các codec nguồn kinh điển Huffman, Shannon-Fano, RLE và ZIP/DEFLATE theo cặp Encoder/Decoder.
 - Script Windows một lần bấm cho cài đặt, chạy và build.
 - Bản desktop Windows có `SignalLab.exe`, chứa frontend production và backend local, không cần Vite khi sử dụng.
 

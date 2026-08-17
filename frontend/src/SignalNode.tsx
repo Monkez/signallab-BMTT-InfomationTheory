@@ -4,7 +4,8 @@ import { Binary, Braces, Radio, Waves, Gauge, Box } from 'lucide-react'
 import type { FlowNode } from './types'
 
 const icons: Record<string, typeof Box> = {
-  bit_source: Binary, python: Braces, awgn: Waves, ber: Gauge,
+  bit_source: Binary, text_source: Binary, text_file_source: Binary, image_file_source: Binary,
+  python: Braces, awgn: Waves, ber: Gauge,
   bpsk_mod: Radio, bpsk_demod: Radio,
 }
 

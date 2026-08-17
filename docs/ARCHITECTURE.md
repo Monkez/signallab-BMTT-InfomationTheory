@@ -33,6 +33,12 @@ Mỗi node nhận `inputs`, `params`, `context` và trả về dictionary các o
 - GPU: runtime thử nạp CuPy và kiểm tra device. Các khối built-in dùng namespace mảng `context.xp`. Bản MVP dùng một GPU worker theo batch nhỏ để tránh nhiều process tranh cùng device.
 - Auto: ưu tiên GPU khi khả dụng và graph tương thích, ngược lại dùng CPU; workload nhỏ chạy inline để tránh overhead.
 
+## Source và file blocks
+
+`text_file_source` đọc bytes UTF-8/binary của file text, còn `image_file_source` dùng Pillow để đọc pixel grayscale hoặc RGB; cả hai phát ra bitstream và một bản sao `reference`. Frontend dùng file picker rồi lưu payload base64 trong node params, không phụ thuộc đường dẫn máy cục bộ khi mở lại project.
+
+Nhóm source coding có cặp Encoder/Decoder cho Huffman, Shannon-Fano, RLE và ZIP/DEFLATE. Huffman/Shannon-Fano là implementation cố định 2-bit-symbol phục vụ giảng dạy; encoder đóng header độ dài để decoder loại padding. RLE và ZIP giữ header độ dài tương tự để round-trip chính xác.
+
 ## Python block API
 
 ```python

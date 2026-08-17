@@ -18,8 +18,18 @@ import { ResultsTable } from './ResultsTable'
 const fallbackSpecs: BlockSpec[] = [
   { type: 'bit_source', label: 'Bit Source', category: 'Sources', description: 'Random binary messages', defaults: { length: 4096 }, inputs: [], outputs: ['out'], gpu_compatible: true },
   { type: 'text_source', label: 'Text Source', category: 'Sources', description: 'UTF-8 text to bits', defaults: { text: 'HELLO', repeat: 1 }, inputs: [], outputs: ['out', 'reference'], gpu_compatible: true },
+  { type: 'text_file_source', label: 'Text File Source', category: 'Sources', description: 'Load a text file as bits', defaults: { file_name: '', data_base64: '', repeat: 1 }, inputs: [], outputs: ['out', 'reference'], gpu_compatible: false },
+  { type: 'image_file_source', label: 'Image File Source', category: 'Sources', description: 'Load image pixels as bits', defaults: { file_name: '', data_base64: '', mode: 'grayscale' }, inputs: [], outputs: ['out', 'reference'], gpu_compatible: false },
   { type: 'differential_encode', label: 'Differential Encoder', category: 'Source coding', description: 'Cumulative XOR transform', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'differential_decode', label: 'Differential Decoder', category: 'Source coding', description: 'Invert differential bits', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
+  { type: 'huffman_encode', label: 'Huffman Encoder', category: 'Source coding', description: 'Fixed 2-bit-symbol Huffman encoder', defaults: { weights: '8,4,2,1' }, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: false },
+  { type: 'huffman_decode', label: 'Huffman Decoder', category: 'Source coding', description: 'Decode Huffman stream', defaults: { weights: '8,4,2,1' }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
+  { type: 'shannon_fano_encode', label: 'Shannon-Fano Encoder', category: 'Source coding', description: 'Shannon-Fano source encoder', defaults: { weights: '8,4,2,1' }, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: false },
+  { type: 'shannon_fano_decode', label: 'Shannon-Fano Decoder', category: 'Source coding', description: 'Decode Shannon-Fano stream', defaults: { weights: '8,4,2,1' }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
+  { type: 'rle_encode', label: 'Run-Length Encoder', category: 'Source coding', description: 'Encode binary runs', defaults: {}, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: false },
+  { type: 'rle_decode', label: 'Run-Length Decoder', category: 'Source coding', description: 'Decode binary runs', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
+  { type: 'zip_encode', label: 'ZIP (DEFLATE) Encoder', category: 'Source coding', description: 'Standard DEFLATE compression', defaults: {}, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: false },
+  { type: 'zip_decode', label: 'ZIP (DEFLATE) Decoder', category: 'Source coding', description: 'Standard DEFLATE decompression', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
   { type: 'hamming74_encode', label: 'Hamming Encoder', category: 'Channel coding', description: 'Hamming (7,4)', defaults: {}, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: true },
   { type: 'repetition3_encode', label: 'Repetition-3 Encoder', category: 'Channel coding', description: 'Repeat each bit three times', defaults: {}, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: true },
   { type: 'repetition3_decode', label: 'Repetition-3 Decoder', category: 'Channel coding', description: 'Majority decode triples', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
@@ -67,6 +77,12 @@ function App() {
   const consoleResizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
   const resizeRef = useRef<{ side: 'left' | 'right'; startX: number; startWidth: number } | null>(null)
   const selected = nodes.find(n => n.id === selectedId)
+  const visibleParams = selected ? Object.entries(selected.data.params).filter(([key]) => {
+    if (key === 'data_base64' || key === 'file_name') return false
+    if (selected.data.blockType === 'awgn' && (key === 'snr_mode' || key === 'ebn0_db')) return false
+    if (selected.data.blockType === 'image_file_source' && key === 'mode') return false
+    return true
+  }) : []
   const appendLog = useCallback((level: ConsoleLevel, message: string) => {
     setConsoleEntries(entries => [...entries.slice(-199), { id: Date.now() + Math.random(), time: new Date().toLocaleTimeString(), level, message }])
   }, [])
@@ -113,6 +129,15 @@ function App() {
   const onNodeClick: NodeMouseHandler<FlowNode> = (_, node) => { setSelectedId(node.id); setRightTab('block') }
   const onNodeDragStart: OnNodeDrag<FlowNode> = (_, node) => { setSelectedId(node.id); setRightTab('block') }
   const updateSelected = (patch: Partial<FlowNode['data']>) => setNodes(items => items.map(n => n.id === selectedId ? { ...n, data: { ...n.data, ...patch } } : n))
+  const loadSourceFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !selected) return
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    let binary = ''
+    for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000))
+    updateSelected({ params: { ...selected.data.params, file_name: file.name, data_base64: btoa(binary) } })
+    appendLog('success', `${file.name} loaded into ${selected.data.label} (${bytes.length.toLocaleString()} bytes).`)
+  }
   const startResize = (side: 'left' | 'right', event: React.PointerEvent) => {
     event.preventDefault()
     resizeRef.current = { side, startX: event.clientX, startWidth: side === 'left' ? leftWidth : rightWidth }
@@ -225,11 +250,13 @@ function App() {
         {rightTab === 'block' ? selected ? <div className="inspector-content">
           <div className="selection-heading"><span className="large-icon">{selected.data.blockType === 'python' ? <Braces /> : <Box />}</span><div><small>SELECTED BLOCK</small><h3>{selected.data.label}</h3></div><button className="icon-danger" onClick={() => { setNodes(ns => ns.filter(n => n.id !== selected.id)); setEdges(es => es.filter(e => e.source !== selected.id && e.target !== selected.id)); setSelectedId(null) }}><X size={16} /></button></div>
           <label>Display name<input value={selected.data.label} onChange={e => updateSelected({ label: e.target.value })} /></label>
-          <div className="port-layout-control"><div><span>Port layout</span><small>{selected.data.portOrientation === 'reversed' ? 'Input right · Output left' : 'Input left · Output right'}</small></div><button className={`port-toggle ${selected.data.portOrientation === 'reversed' ? 'active' : ''}`} onClick={() => updateSelected({ portOrientation: selected.data.portOrientation === 'reversed' ? 'standard' : 'reversed' })}><ArrowLeftRight size={15} /> {selected.data.portOrientation === 'reversed' ? 'Reversed' : 'Standard'}</button></div>
-          <div className="section-rule"><span>PARAMETERS</span></div>
-          {selected.data.blockType === 'awgn' && <label>SNR source<select value={String(selected.data.params.snr_mode || 'experiment')} onChange={e => updateSelected({ params: { ...selected.data.params, snr_mode: e.target.value } })}><option value="experiment">Experiment sweep</option><option value="fixed">Fixed block value</option></select></label>}
-          {selected.data.blockType === 'awgn' && String(selected.data.params.snr_mode || 'experiment') === 'fixed' && <label>Fixed SNR dB<input type="number" value={String(selected.data.params.ebn0_db ?? 4)} onChange={e => updateSelected({ params: { ...selected.data.params, ebn0_db: Number(e.target.value) } })} /></label>}
-          {Object.entries(selected.data.params).filter(([key]) => !(selected.data.blockType === 'awgn' && (key === 'snr_mode' || key === 'ebn0_db'))).length ? Object.entries(selected.data.params).filter(([key]) => !(selected.data.blockType === 'awgn' && (key === 'snr_mode' || key === 'ebn0_db'))).map(([key, value]) => <label key={key}>{key.replaceAll('_', ' ')}<input type={typeof value === 'number' ? 'number' : 'text'} value={String(value)} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value } })} /></label>) : selected.data.blockType !== 'awgn' && <p className="muted">This block has no parameters.</p>}
+           <div className="port-layout-control"><div><span>Port layout</span><small>{selected.data.portOrientation === 'reversed' ? 'Input right · Output left' : 'Input left · Output right'}</small></div><button className={`port-toggle ${selected.data.portOrientation === 'reversed' ? 'active' : ''}`} onClick={() => updateSelected({ portOrientation: selected.data.portOrientation === 'reversed' ? 'standard' : 'reversed' })}><ArrowLeftRight size={15} /> {selected.data.portOrientation === 'reversed' ? 'Reversed' : 'Standard'}</button></div>
+           <div className="section-rule"><span>PARAMETERS</span></div>
+           {(selected.data.blockType === 'text_file_source' || selected.data.blockType === 'image_file_source') && <label>Input file<input type="file" accept={selected.data.blockType === 'image_file_source' ? 'image/*' : '.txt,.csv,.log,text/plain'} onChange={loadSourceFile} /><small>{String(selected.data.params.file_name || 'No file selected')}</small></label>}
+           {selected.data.blockType === 'awgn' && <label>SNR source<select value={String(selected.data.params.snr_mode || 'experiment')} onChange={e => updateSelected({ params: { ...selected.data.params, snr_mode: e.target.value } })}><option value="experiment">Experiment sweep</option><option value="fixed">Fixed block value</option></select></label>}
+           {selected.data.blockType === 'awgn' && String(selected.data.params.snr_mode || 'experiment') === 'fixed' && <label>Fixed SNR dB<input type="number" value={String(selected.data.params.ebn0_db ?? 4)} onChange={e => updateSelected({ params: { ...selected.data.params, ebn0_db: Number(e.target.value) } })} /></label>}
+           {selected.data.blockType === 'image_file_source' && <label>Pixel mode<select value={String(selected.data.params.mode || 'grayscale')} onChange={e => updateSelected({ params: { ...selected.data.params, mode: e.target.value } })}><option value="grayscale">Grayscale</option><option value="rgb">RGB</option></select></label>}
+           {visibleParams.length ? visibleParams.map(([key, value]) => <label key={key}>{key.replaceAll('_', ' ')}<input type={typeof value === 'number' ? 'number' : 'text'} value={String(value)} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value } })} /></label>) : !['awgn', 'text_file_source', 'image_file_source'].includes(selected.data.blockType) && <p className="muted">This block has no parameters.</p>}
           {selected.data.blockType === 'ber' && livePoints.length ? <><div className="section-rule"><span>SINK PREVIEW</span></div><BerChart points={livePoints} live={job?.status === 'running'} /></> : null}
           {result?.sink_metrics && selected.data.blockType === 'power_meter' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean power</span><strong>{result.sink_metrics.power_mean?.toExponential(3) ?? '—'}</strong></div></div></>}
           {result?.sink_metrics && selected.data.blockType === 'scope' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean amplitude</span><strong>{result.sink_metrics.scope_mean_amplitude?.toFixed(4) ?? '—'}</strong></div><div><span>Peak</span><strong>{result.sink_metrics.scope_peak_amplitude?.toFixed(4) ?? '—'}</strong></div></div></>}

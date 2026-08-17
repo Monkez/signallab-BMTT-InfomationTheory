@@ -54,7 +54,8 @@ def text_source(inputs, params, context):
     repeat = max(1, int(params.get("repeat", 1)))
     raw = np.frombuffer(text.encode("utf-8"), dtype=np.uint8)
     bits = np.unpackbits(raw).astype(np.int8)
-    return {"out": np.tile(bits, repeat), "reference": bits.copy()}
+    stream = np.tile(bits, repeat)
+    return {"out": stream, "reference": stream.copy()}
 
 
 def differential_encode(inputs, params, context):

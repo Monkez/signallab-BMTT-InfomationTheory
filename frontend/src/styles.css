@@ -149,24 +149,24 @@ input:focus, select:focus, textarea:focus { border-color: #4d78cb; box-shadow: 0
 .sink-result span, .sink-result strong { display: block; }
 .sink-result span { color: #6880a4; font-size: 10px; }
 .sink-result strong { margin-top: 4px; color: #1f57ba; font: 600 13px Consolas, monospace; white-space: nowrap; }
-.console-dock { grid-column: 1 / 4; min-height: 0; position: relative; z-index: 8; display: flex; flex-direction: column; border-top: 1px solid var(--line-strong); background: #17202b; color: #dce5f0; }
+.console-dock { grid-column: 2; min-width: 0; min-height: 0; width: 100%; position: relative; z-index: 8; display: flex; flex-direction: column; border: 1px solid var(--line-strong); border-bottom: 0; background: var(--panel); color: #263140; overflow: hidden; }
 .console-resizer { position: absolute; left: 0; right: 0; top: -5px; height: 9px; cursor: row-resize; z-index: 2; }
 .console-resizer:hover { background: rgba(93, 151, 235, .35); }
-.console-header { height: 36px; flex: 0 0 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid #2c3948; }
+.console-header { height: 36px; flex: 0 0 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--line); background: #fff; }
 .console-header > div { display: flex; align-items: center; gap: 8px; }
 .console-header strong { font-size: 12px; }
-.console-header span { color: #8ea0b5; font-size: 10px; }
-.console-clear { display: grid; place-items: center; width: 26px; height: 26px; color: #9bacc0; background: transparent; border-radius: 5px; }
-.console-clear:hover { color: #fff; background: #2c3948; }
-.console-body { overflow: auto; padding: 6px 14px 10px; font: 11px/1.55 Consolas, 'Courier New', monospace; }
+.console-header span { color: #7b8796; font-size: 10px; }
+.console-clear { display: grid; place-items: center; width: 26px; height: 26px; color: #6d7a8b; background: transparent; border-radius: 5px; }
+.console-clear:hover { color: #1f57ba; background: #eef4ff; }
+.console-body { min-height: 0; overflow: auto; padding: 6px 14px 10px; background: #fbfcfd; font: 11px/1.55 Consolas, 'Courier New', monospace; }
 .console-line { display: grid; grid-template-columns: 76px 58px 1fr; gap: 9px; white-space: pre-wrap; }
-.console-line time { color: #718298; }
-.console-line b { color: #8ea0b5; font-size: 10px; text-transform: uppercase; }
-.console-line.info span { color: #dce5f0; }
-.console-line.success b, .console-line.success span { color: #7dd3a8; }
-.console-line.warning b, .console-line.warning span { color: #f5ca75; }
-.console-line.error b, .console-line.error span { color: #ff8f9d; }
-.console-empty { color: #718298; padding: 8px 0; }
+.console-line time { color: #8a95a3; }
+.console-line b { color: #718096; font-size: 10px; text-transform: uppercase; }
+.console-line.info span { color: #465467; }
+.console-line.success b, .console-line.success span { color: #16804d; }
+.console-line.warning b, .console-line.warning span { color: #9a6700; }
+.console-line.error b, .console-line.error span { color: #c7354d; }
+.console-empty { color: #8a95a3; padding: 8px 0; }
 ::-webkit-scrollbar { width: 7px; height: 7px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd2da; border-radius: 10px; }

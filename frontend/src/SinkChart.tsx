@@ -58,8 +58,8 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
     const pointY = y(Number(point.ber ?? 0))
     if (index > 0 && point.ber === 0 && valid[index - 1].ber !== 0) {
       // A measured BER of zero is below the chart's finite log-scale floor.
-      // Extend to the current SNR first, then drop vertically to that floor.
-      linePoints.push(`${pointX},${y(Number(valid[index - 1].ber ?? 0))}`)
+      // Drop at the previous measured point, then continue along the floor.
+      linePoints.push(`${x(valid[index - 1].snr_db)},${pointY}`)
     }
     linePoints.push(`${pointX},${pointY}`)
   })

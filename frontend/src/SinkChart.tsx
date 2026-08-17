@@ -44,6 +44,11 @@ function writeReferences(references: BerReference[]) {
   try { window.localStorage.setItem(referenceStorageKey, JSON.stringify(references)) } catch { /* storage can be disabled */ }
 }
 
+function persistReferences(references: BerReference[]) {
+  writeReferences(references)
+  window.dispatchEvent(new Event('signallab-ber-reference-change'))
+}
+
 async function svgToPng(svg: SVGSVGElement): Promise<Blob> {
   const clone = svg.cloneNode(true) as SVGSVGElement
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
@@ -86,7 +91,12 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   const [references, setReferences] = useState<BerReference[]>([])
   const [visibleReferenceIds, setVisibleReferenceIds] = useState<string[]>([])
 
-  useEffect(() => { setReferences(readReferences()) }, [])
+  useEffect(() => {
+    const syncReferences = () => setReferences(readReferences())
+    syncReferences()
+    window.addEventListener('signallab-ber-reference-change', syncReferences)
+    return () => window.removeEventListener('signallab-ber-reference-change', syncReferences)
+  }, [])
 
   const activeReferences = references.filter(reference => visibleReferenceIds.includes(reference.id))
   const current = plottedPoints(points)
@@ -130,7 +140,7 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
     const next = [...references, reference]
     setReferences(next)
     setVisibleReferenceIds(ids => [...ids, reference.id])
-    writeReferences(next)
+    persistReferences(next)
     setNotice(`Saved “${reference.name}”`)
   }
 
@@ -146,7 +156,7 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
     const next = references.filter(reference => reference.id !== id)
     setReferences(next)
     setVisibleReferenceIds(ids => ids.filter(value => value !== id))
-    writeReferences(next)
+    persistReferences(next)
     setNotice('Reference deleted')
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 
 export type SinkPoint = {
   snr_db: number
@@ -108,6 +108,7 @@ function plottedPoints(points: SinkPoint[]) {
 
 export function BerChart({ points, live = false }: { points: SinkPoint[]; live?: boolean }) {
   const svgRef = useRef<SVGSVGElement>(null)
+  const reportSvgRef = useRef<SVGSVGElement>(null)
   const referenceFileRef = useRef<HTMLInputElement>(null)
   const [notice, setNotice] = useState('')
   const [curveName, setCurveName] = useState('Current run')
@@ -158,6 +159,12 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   }
   const labelStyle: CSSProperties = { fontSize: 9, fill: '#6b7788' }
   const yTicks = [0, 1, 2, 3].map(index => maxLog - (index * yRange) / 3)
+  const renderReportPlot = (ref: RefObject<SVGSVGElement>) => <svg ref={ref} className="ber-report-plot" viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="Detailed bit error rate versus SNR chart">
+    <rect x={chart.left} y={chart.top} width={chart.width - chart.left - chart.right} height={chart.height - chart.top - chart.bottom} fill="#f8fafc" stroke="#d7dee8" />
+    {yTicks.map((tick, index) => { const yy = chart.top + (index / 3) * (chart.height - chart.top - chart.bottom); return <g key={`report-${tick}`}><line x1={chart.left} x2={chart.width - chart.right} y1={yy} y2={yy} stroke="#e3e8ef" /><text x={chart.left - 7} y={yy + 3} textAnchor="end" style={labelStyle}>{`1e${tick.toFixed(0)}`}</text></g> })}
+    {curves.map((curve, curveIndex) => <g key={`report-${curve.id}`}><polyline points={lineFor(curve)} fill="none" stroke={curve.color} strokeWidth={curveIndex === 0 ? 2.8 : 2.2} strokeDasharray={styleDash(curve.style)} strokeLinejoin="round" opacity={curveIndex === 0 ? 1 : 0.86} />{curve.plotted.filter(point => point.ber !== 0).map(point => <circle key={`report-${curve.id}-${point.snr_db}-${point.frames}`} cx={x(point.snr_db)} cy={y(Number(point.ber ?? 0))} r={curveIndex === 0 ? 3.8 : 3.2} fill={curve.color} stroke="#fff" strokeWidth="1.5" />)}</g>)}
+    <text x={chart.width / 2} y={chart.height - 5} textAnchor="middle" style={labelStyle}>SNR (dB)</text><text x="11" y={chart.height / 2} textAnchor="middle" transform={`rotate(-90 11 ${chart.height / 2})`} style={labelStyle}>BER (log)</text><text x={chart.left} y={chart.height - 17} textAnchor="middle" style={labelStyle}>{minX.toFixed(1)}</text><text x={chart.width - chart.right} y={chart.height - 17} textAnchor="middle" style={labelStyle}>{maxX.toFixed(1)}</text>
+  </svg>
 
   const updateSelectedCurve = (patch: Partial<Pick<BerReference, 'name' | 'color' | 'style'>>) => {
     if (selectedCurveId === 'current') {
@@ -304,6 +311,7 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
     {detailsOpen && <div className="ber-report-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDetailsOpen(false) }}>
       <div className="ber-report" role="dialog" aria-modal="true" aria-label="BER details report">
         <div className="ber-report-header"><div><small>BER REPORT</small><h2>BER vs SNR details</h2></div><button className="ber-report-close" onClick={() => setDetailsOpen(false)} aria-label="Close report">×</button></div>
+        <div className="ber-report-chart-wrap"><div className="ber-report-chart-title"><strong>BER vs SNR</strong><span>{curves.length} curve{curves.length === 1 ? '' : 's'} · {allValid.length} measured points</span></div>{renderReportPlot(reportSvgRef)}</div>
         <div className="ber-report-layout">
           <aside className="ber-report-curves"><div className="ber-report-section-title">CURVES</div><button className={`ber-report-curve ${selectedCurveId === 'current' ? 'active' : ''}`} onClick={() => setSelectedCurveId('current')}><span className="ber-report-dot" style={{ background: curveColor }} />{curveName || 'Current run'}</button>{references.map(reference => <button key={reference.id} className={`ber-report-curve ${selectedCurveId === reference.id ? 'active' : ''}`} onClick={() => { setSelectedCurveId(reference.id); setVisibleReferenceIds(ids => ids.includes(reference.id) ? ids : [...ids, reference.id]) }}><span className="ber-report-dot" style={{ background: reference.color }} />{reference.name}</button>)}</aside>
           <section className="ber-report-editor">

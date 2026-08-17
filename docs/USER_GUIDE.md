@@ -27,6 +27,7 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 - Nhấn `Delete` để xóa block đang chọn cùng các đường nối của block đó.
 - Khi đang nhập trong ô text hoặc Python editor, `Delete` chỉ sửa nội dung đang nhập và không xóa block.
 - Dùng các nút zoom ở góc dưới canvas nếu sơ đồ lớn.
+- MiniMap ở góc dưới phải được thu gọn để tiết kiệm diện tích; màu node thể hiện nhóm Sources/Source coding/Modulation/Channels/Sinks, có thể pan/zoom để xem nhanh toàn bộ graph.
 - Trong panel **Block**, dùng **Port layout** để đổi giữa `Input left · Output right` và `Input right · Output left`. Cấu hình được lưu cùng file Export.
 - Sau khi đổi layout, các đường nối hiện tại tự động được đo lại và bám theo handle mới.
 - Dùng các nút panel trên thanh trên để ẩn/hiện **Block library**, **Inspector** hoặc **Console**. Kéo mép sidebar/console để đổi kích thước. Console giữ nguyên trạng thái ẩn/hiện khi chạy mô phỏng.

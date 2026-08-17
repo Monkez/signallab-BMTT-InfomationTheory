@@ -18,4 +18,5 @@
 - Hoàn tất mốc realtime/export: dashboard nhận `snr_points` theo từng batch để vẽ BER trực tiếp; biểu đồ có Copy/PNG, bảng có Copy/CSV/PNG. Engine biên dịch graph plan một lần, sinh seed theo batch, tái sử dụng process pool và tự tránh process overhead với workload nhỏ. Đã xác nhận backend 5/5 pass, frontend production build pass và `dist\\SignalLab\\SignalLab.exe` đã build lại.
 - Sửa biểu đồ BER: khi điểm đo có BER đúng bằng 0, chỉ giữ điểm zero đầu tiên; các SNR đo sau đó không vẽ marker/đường nữa. Marker zero cũng được ẩn hoàn toàn; đoạn cuối chỉ rơi thẳng đứng xuống sàn log-scale.
 - Console dock đã chuyển sang theme sáng và chỉ chiếm cột canvas trung tâm của CSS grid; không còn tràn qua block library/inspector hai bên.
+- MiniMap đã thu nhỏ còn 150×92px, dùng node renderer có stripe/viền và màu theo nhóm block, mask sáng tương phản; vẫn hỗ trợ pan/zoom.
 - Bổ sung Text File Source và Image File Source có file picker/base64; thêm Huffman, Shannon-Fano, RLE và ZIP/DEFLATE Encoder/Decoder. Backend round-trip tests đã nâng lên 6/6 pass, frontend build pass.

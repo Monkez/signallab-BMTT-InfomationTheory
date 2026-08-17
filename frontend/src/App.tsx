@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow, Background, Controls, MiniMap, addEdge, useNodesState, useEdgesState,
-  BackgroundVariant, MarkerType, type Connection, type NodeMouseHandler, type OnNodeDrag,
+  BackgroundVariant, MarkerType, type Connection, type MiniMapNodeProps, type NodeMouseHandler, type OnNodeDrag,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
@@ -48,6 +48,11 @@ const fallbackSpecs: BlockSpec[] = [
 ]
 
 const iconFor = (type: string) => type.includes('source') ? Binary : type.includes('awgn') || type.includes('rayleigh') ? Waves : type.includes('bpsk') || type.includes('qpsk') ? Radio : type === 'ber' ? Gauge : type === 'scope' || type === 'constellation' || type === 'power_meter' ? Activity : type === 'python' ? Braces : Box
+const miniMapColor = (type: string) => type.includes('source') ? '#5b8def' : type.includes('encode') || type.includes('decode') ? '#8b72d9' : type.includes('mod') || type.includes('demod') ? '#e49a45' : type.includes('awgn') || type.includes('rayleigh') ? '#41a987' : type === 'ber' || type.includes('meter') || type === 'scope' || type === 'constellation' ? '#d26782' : type === 'python' ? '#65748b' : '#8493a8'
+const MiniMapNode = ({ x, y, width, height, color, strokeColor, strokeWidth, borderRadius, shapeRendering, selected }: MiniMapNodeProps) => <g>
+  <rect x={x} y={y} width={width} height={height} rx={borderRadius} fill={color} stroke={selected ? '#1f57ba' : strokeColor} strokeWidth={selected ? 2 : strokeWidth} shapeRendering={shapeRendering} />
+  {width > 10 && <rect x={x + 2} y={y + 2} width={Math.min(4, width / 3)} height={Math.max(3, height - 4)} rx={1.5} fill="#fff" opacity={0.65} />}
+</g>
 const formatNumber = (n: number) => new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(n)
 const snrPointCount = (config: SimulationConfig) => Math.max(1, Math.floor((config.snr_db_stop - config.snr_db_start) / config.snr_db_step + 1e-9) + 1)
 const defaultSimulationConfig: SimulationConfig = { trials: 100, max_frames: 100, min_frames: 20, min_errors: 100, snr_db_start: -2, snr_db_stop: 10, snr_db_step: 2, workers: 0, seed: 2026, device: 'auto', chunk_size: 10 }
@@ -241,7 +246,7 @@ function App() {
         <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running' }))} nodeTypes={{ signal: SignalNode }} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onNodeClick={onNodeClick} onNodeDragStart={onNodeDragStart} onPaneClick={() => setSelectedId(null)} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
           <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#ccd3dc" />
           <Controls position="bottom-left" />
-          <MiniMap position="bottom-right" pannable zoomable nodeColor="#7c8da5" maskColor="rgba(235,239,244,.72)" />
+          <MiniMap position="bottom-right" pannable zoomable offsetScale={4} nodeColor={node => miniMapColor(String((node.data as Record<string, unknown>)?.blockType || ''))} nodeStrokeColor="#ffffff" nodeStrokeWidth={1} nodeBorderRadius={3} nodeComponent={MiniMapNode} bgColor="#f9fbfd" maskColor="rgba(226,233,242,.62)" maskStrokeColor="#8ea8ca" maskStrokeWidth={1} style={{ width: 150, height: 92, border: '1px solid #cbd6e3', borderRadius: 8, boxShadow: '0 3px 12px rgba(36,55,78,.14)' }} />
         </ReactFlow>
       </main>
 

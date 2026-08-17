@@ -18,7 +18,7 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 2. Kéo từ cổng bên phải của một khối sang cổng bên trái khối kế tiếp.
 3. Chọn khối để sửa tên và tham số. Với Python Block, sửa hàm `process` theo mẫu.
 4. Trong tab **Experiment**, chọn SNR Start/Stop/Step, frame tối đa/tối thiểu và lỗi tối thiểu cho mỗi điểm. Chọn worker, seed và thiết bị.
-5. Nhấn **Run simulation**. Kết quả cập nhật trong panel bên phải.
+5. Dùng **Run once** ở đầu tab để chạy đúng một frame tại giá trị SNR Start. Sau khi hoàn tất, rê chuột lên tên/cổng input hoặc output của block để xem kiểu dữ liệu, shape, số phần tử, min/mean/max và các mẫu đầu tiên. Dùng **Run Benchmark** để chạy toàn bộ sweep Monte-Carlo; kết quả cập nhật trong panel bên phải.
 6. Theo dõi **Console** ở phía dưới vùng canvas để xem job, cảnh báo và lỗi. Graph luôn nằm ở cột trung tâm làm vùng làm việc chính; Experiment/Block nằm ở inspector bên phải, còn Console dùng theme sáng và cùng chiều rộng với graph, không phủ lên hai sidebar. Hai sidebar kéo dài liên tục qua cả vùng View và Console nên không còn khoảng trống phía dưới. Có thể kéo mép trên để đổi chiều cao hoặc ẩn bằng nút Console trên thanh công cụ. Khi job đang chạy, phần **LIVE RESULTS** cập nhật BER theo từng batch.
 7. Trong phần kết quả, **Overall bit error rate** được tách thành card tổng hợp riêng; biểu đồ **BER vs SNR** nằm ở khu vực độc lập bên dưới. Legend được vẽ trực tiếp ở góc trên bên phải vùng đồ thị và đi kèm khi Copy/PNG. Chọn đường trong danh sách, chỉnh tên/màu/kiểu nét rồi bấm **Save .BER** để xuất đường thành file JSON. Dùng **Browse file** để nạp lại file reference từ máy; khi chọn một reference có thể ẩn hoặc xóa bằng hàng thao tác bên dưới. Các reference đã nạp vẫn được lưu trong trình duyệt để dùng lại sau khi mở app.
 8. Bấm **Details** trên biểu đồ để mở báo cáo BER toàn màn hình. Tab **Chart** mặc định dùng đồ thị SVG độ phân giải cao riêng (viewBox lớn, nhiều vạch trục, nét/chữ không bị phóng từ preview) với legend nằm trong vùng vẽ; tab **Edit & Data** mới chứa danh sách đường, style, bảng SNR/BER/frame/error, thêm/xóa điểm, save và browse/load reference. Modal nằm trên toàn bộ app nên Console không xuất hiện chồng lên báo cáo.
@@ -32,6 +32,7 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 - MiniMap ở góc dưới phải được thu gọn để tiết kiệm diện tích; màu node thể hiện nhóm Sources/Source coding/Modulation/Channels/Sinks, có thể pan/zoom để xem nhanh toàn bộ graph.
 - Trong panel **Block**, dùng **Port layout** để đổi giữa `Input left · Output right` và `Input right · Output left`. Cấu hình được lưu cùng file Export.
 - Sau khi đổi layout, các đường nối hiện tại tự động được đo lại và bám theo handle mới.
+- **Run once** hữu ích để kiểm tra nhanh luồng dữ liệu trước khi benchmark. Sau **Run once** hoặc **Run Benchmark**, hover hay focus bằng bàn phím vào từng port để xem bản tóm tắt dữ liệu mới nhất. Khi sửa graph/tham số, preview cũ tự bị xóa để tránh hiểu nhầm.
 - Dùng các nút panel trên thanh trên để ẩn/hiện **Block library**, **Inspector** hoặc **Console**. Kéo mép sidebar/console để đổi kích thước. Console giữ nguyên trạng thái ẩn/hiện khi chạy mô phỏng.
 
 ## Cấu hình Monte-Carlo
@@ -45,6 +46,7 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 - `Seed`: cho kết quả tái lập.
 - `Auto`: chọn GPU nếu có và phù hợp, nếu không dùng CPU.
 - Sau khi chạy, BER Meter và tab Experiment hiển thị đồ thị BER theo SNR cùng số frame/lỗi từng điểm.
+- **Run Benchmark** là tên mới của thao tác Monte-Carlo trước đây. Sau khi benchmark hoàn tất, port preview đại diện được lấy từ một frame xác định tại SNR Start; dữ liệu đầy đủ của mọi frame không được gửi lên UI nên app vẫn nhẹ với mô phỏng lớn.
 - Trên biểu đồ BER, chọn **Copy** để copy ảnh PNG hoặc **PNG** để tải ảnh. Bảng **Results by SNR** hỗ trợ **Copy** (TSV), **CSV** và **PNG**, thuận tiện đưa vào báo cáo.
 - Thư viện có thêm Text Source, Text File Source, Image File Source, Differential Encoder/Decoder, Huffman, Shannon-Fano, Run-Length, ZIP/DEFLATE, Repetition-3, QPSK, Rayleigh Fading, Signal Scope, Constellation Sink và Power Meter. File Source cho phép chọn file trực tiếp trong panel Block; dữ liệu được lưu trong project dưới dạng base64 để chạy được cả desktop và dev server.
 - Các codec nguồn kinh điển làm việc trên stream bit: Encoder có cổng `reference` để nối vào BER, Decoder dùng cùng tham số codebook/codec để khôi phục stream. Huffman và Shannon-Fano dùng nhóm symbol 2-bit với trọng số có thể chỉnh; RLE dùng cặp count/value; ZIP dùng DEFLATE chuẩn.

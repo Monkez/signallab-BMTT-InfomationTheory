@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .block_registry import SPECS
-from .engine import gpu_status, validate_graph
+from .engine import gpu_status, run_once, validate_graph
 from .jobs import manager
 from .models import Graph, SimulationRequest
 
@@ -37,6 +37,14 @@ def create_job(request: SimulationRequest):
     if not validation.valid:
         raise HTTPException(422, detail=validation.errors)
     return {"job_id": manager.create(request)}
+
+
+@app.post("/api/run-once")
+def execute_once(request: SimulationRequest):
+    try:
+        return run_once(request.graph, request.config)
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc)) from exc
 
 
 @app.get("/api/jobs/{job_id}")

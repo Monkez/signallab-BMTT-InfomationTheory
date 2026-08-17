@@ -1,12 +1,25 @@
 import { useEffect } from 'react'
 import { Handle, Position, useUpdateNodeInternals, type NodeProps } from '@xyflow/react'
 import { Binary, Braces, Radio, Waves, Gauge, Box } from 'lucide-react'
-import type { FlowNode } from './types'
+import type { FlowNode, PortPreview } from './types'
 
 const icons: Record<string, typeof Box> = {
   bit_source: Binary, text_source: Binary, text_file_source: Binary, image_file_source: Binary,
   python: Braces, awgn: Waves, ber: Gauge,
   bpsk_mod: Radio, bpsk_demod: Radio,
+}
+
+const metric = (value?: number) => value === undefined ? '—' : Math.abs(value) >= 1000 || (Math.abs(value) > 0 && Math.abs(value) < .001) ? value.toExponential(3) : value.toPrecision(4)
+
+function PortTooltip({ direction, port, preview }: { direction: 'Input' | 'Output'; port: string; preview?: PortPreview }) {
+  return <div className="port-tooltip" role="tooltip">
+    <div className="port-tooltip-title"><span>{direction}</span><strong>{port}</strong></div>
+    {preview ? <>
+      <div className="port-tooltip-meta"><span>{preview.dtype}</span><span>{preview.shape.length ? `[${preview.shape.join(' × ')}]` : 'scalar'}</span><span>{preview.size.toLocaleString()} values</span></div>
+      {preview.mean !== undefined && <div className="port-tooltip-stats"><span>min <b>{metric(preview.min)}</b></span><span>mean <b>{metric(preview.mean)}</b></span><span>max <b>{metric(preview.max)}</b></span></div>}
+      <div className="port-tooltip-sample"><small>First samples</small><code>{preview.sample.length ? preview.sample.join(', ') : 'empty'}</code></div>
+    </> : <div className="port-tooltip-empty">Run once or Run Benchmark to inspect this port.</div>}
+  </div>
 }
 
 export function SignalNode({ id, data, selected }: NodeProps<FlowNode>) {
@@ -28,13 +41,13 @@ export function SignalNode({ id, data, selected }: NodeProps<FlowNode>) {
       <div className="node-header"><span className="node-icon"><Icon size={15} /></span><span>{data.label}</span></div>
       <div className="node-type">{data.blockType.replaceAll('_', ' ')}</div>
       {data.inputs.map((port, index) => (
-        <div className="port-label input" key={port} style={{ top: 52 + index * 22 }}>
-          <Handle type="target" position={inputPosition} id={port} />{port}
+        <div className="port-label input" key={port} style={{ top: 52 + index * 22 }} tabIndex={0}>
+          <Handle type="target" position={inputPosition} id={port} />{port}<PortTooltip direction="Input" port={port} preview={data.portPreviews?.inputs[port]} />
         </div>
       ))}
       {data.outputs.map((port, index) => (
-        <div className="port-label output" key={port} style={{ top: 52 + index * 22 }}>
-          {port}<Handle type="source" position={outputPosition} id={port} />
+        <div className="port-label output" key={port} style={{ top: 52 + index * 22 }} tabIndex={0}>
+          {port}<Handle type="source" position={outputPosition} id={port} /><PortTooltip direction="Output" port={port} preview={data.portPreviews?.outputs[port]} />
         </div>
       ))}
     </div>

@@ -51,6 +51,10 @@ PyWebView tạo cửa sổ native dùng WebView2. Một tiến trình Uvicorn n�
 
 Mỗi node nhận `inputs`, `params`, `context` và trả về dictionary các output. Graph được topological-sort một lần. Mỗi trial có seed sinh từ `SeedSequence`, vì vậy lịch worker thay đổi không làm mất khả năng tái lập. Metric của sink được giảm theo phép cộng; BER cuối cùng là tổng bit lỗi chia tổng bit đã so sánh, không phải trung bình BER từng trial.
 
+`POST /api/run-once` dùng cùng DAG runtime nhưng chỉ chạy một frame đồng bộ tại `snr_db_start`. Khi bật `capture_ports`, engine tóm tắt input/output của từng node thành dtype, shape, size, min/mean/max và tối đa 8 mẫu dạng JSON-safe. Frontend gắn các summary này vào node để tooltip port đọc trực tiếp; không truyền toàn bộ buffer tín hiệu qua REST.
+
+Job **Run Benchmark** vẫn chạy Monte-Carlo bất đồng bộ qua polling. Khi hoàn tất, engine chạy thêm một frame đại diện xác định bằng seed cấu hình tại SNR đầu tiên để trả `port_previews`. Preview này phục vụ quan sát luồng dữ liệu, không tham gia phép cộng metric và không làm thay đổi BER benchmark. Mọi chỉnh sửa topology hoặc tham số đều xóa preview phía frontend để tránh hiển thị dữ liệu hết hạn.
+
 ## Song song CPU/GPU
 
 - CPU: trial độc lập được chia thành chunk và chạy bằng `ProcessPoolExecutor`. `workers=0` nghĩa là tự chọn.

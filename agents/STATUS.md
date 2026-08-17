@@ -1,6 +1,6 @@
 # Trạng thái dự án
 
-- Ngày cập nhật: 2026-08-17
+- Ngày cập nhật: 2026-08-18
 - Giai đoạn: bản desktop Windows hoàn tất và đã kiểm thử
 - Kiến trúc: React/TypeScript + React Flow, FastAPI/Python, NumPy/CuPy tùy chọn.
 - Đã hoàn thành: đặc tả, engine DAG, Monte-Carlo CPU/GPU tùy chọn, REST jobs, canvas React Flow, editor Python, dashboard và script Windows.
@@ -36,3 +36,6 @@
 - Rà soát UX 2026-08-17: legend BER chuyển vào trong SVG ở góc trên phải cho cả preview/report và xuất ảnh; bỏ tiêu đề BER lặp; kết quả tự cuộn vào vùng nhìn sau khi job hoàn tất.
 - Experiment kiểm tra quan hệ Start/Stop/Step/Min/Max/Chunk trước khi chạy, khóa tham số trong lúc job hoạt động và diễn đạt tiến độ theo frame thực thi/max thay vì gây hiểu nhầm là luôn chạy đủ trials.
 - Sửa `run_dev.bat`/`scripts/run.ps1` không còn tự dừng vì log stderr bình thường của Uvicorn; inspector chặn horizontal overflow và các vùng cuộn có min-height rõ ràng.
+- Experiment có **Run once** ở đầu tab để chạy một frame qua chính DAG runtime; nút sweep Monte-Carlo đã đổi thành **Run Benchmark**.
+- Backend thu bản tóm tắt input/output theo từng port (dtype, shape, size, min/mean/max, tối đa 8 mẫu) sau Run once và một frame đại diện sau Benchmark. Frontend hiển thị tooltip sáng khi hover/focus port và tự xóa preview khi graph/tham số thay đổi.
+- Xác minh 2026-08-18: backend 7/7 pass, frontend production build pass; kiểm thử UI xác nhận Run once và tooltip dữ liệu hoạt động trên graph mẫu.

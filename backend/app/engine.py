@@ -9,7 +9,7 @@ from typing import Any, Callable
 import numpy as np
 
 from .block_registry import SPEC_BY_TYPE
-from .blocks import PROCESSORS, make_context, python_block
+from .blocks import PROCESSORS, make_context, python_block, to_numpy
 from .models import Graph, SimulationConfig, ValidationResult
 
 
@@ -87,13 +87,47 @@ def topological_order(graph_dict: dict[str, Any]) -> list[str]:
     return order
 
 
+def _preview_value(value: Any, sample_limit: int = 8) -> dict[str, Any]:
+    """Return a small JSON-safe signal summary; never send full frame buffers to UI."""
+    try:
+        array = np.asarray(to_numpy(value))
+    except Exception:
+        return {"dtype": type(value).__name__, "shape": [], "size": 1, "sample": [repr(value)[:120]]}
+    flat = array.reshape(-1)
+
+    def format_scalar(item: Any) -> str:
+        scalar = item.item() if hasattr(item, "item") else item
+        if isinstance(scalar, complex):
+            return f"{scalar.real:.5g}{scalar.imag:+.5g}j"
+        if isinstance(scalar, float):
+            return f"{scalar:.6g}"
+        return str(scalar)
+
+    preview: dict[str, Any] = {
+        "dtype": str(array.dtype),
+        "shape": list(array.shape),
+        "size": int(array.size),
+        "sample": [format_scalar(item) for item in flat[:sample_limit]],
+    }
+    if array.size and np.issubdtype(array.dtype, np.number):
+        numeric = np.abs(array) if np.iscomplexobj(array) else array.astype(float, copy=False)
+        preview.update({
+            "min": float(np.min(numeric)),
+            "max": float(np.max(numeric)),
+            "mean": float(np.mean(numeric)),
+            "stats_label": "|x|" if np.iscomplexobj(array) else "value",
+        })
+    return preview
+
+
 def execute_trial(
     graph_dict: dict[str, Any],
     trial_index: int,
     seed: int,
     device: str = "cpu",
     snr_db: float | None = None,
-) -> dict[str, float]:
+    capture_ports: bool = False,
+) -> dict[str, Any]:
     xp = np
     actual_device = "cpu"
     if device == "gpu":
@@ -107,6 +141,7 @@ def execute_trial(
     context = make_context(xp, rng, trial_index, seed, actual_device, snr_db)
     nodes = graph_dict.get("_node_map") or {node["id"]: node for node in graph_dict["nodes"]}
     outputs: dict[str, dict[str, Any]] = {}
+    port_previews: dict[str, dict[str, dict[str, Any]]] = {}
     metrics: dict[str, float] = {"bit_errors": 0, "total_bits": 0}
     incoming = graph_dict.get("_incoming_edges")
     if incoming is None:
@@ -119,6 +154,11 @@ def execute_trial(
         node_inputs = {}
         for edge in incoming[node_id]:
             node_inputs[edge.get("target_handle", "in")] = outputs[edge["source"]][edge.get("source_handle", "out")]
+        if capture_ports:
+            port_previews[node_id] = {
+                "inputs": {name: _preview_value(value) for name, value in node_inputs.items()},
+                "outputs": {},
+            }
         if node["type"] == "python":
             result = python_block(node_inputs, node.get("params", {}), context, node.get("code"))
         else:
@@ -128,7 +168,36 @@ def execute_trial(
             for key, value in node_metrics.items():
                 metrics[key] = metrics.get(key, 0) + float(value)
         outputs[node_id] = result
-    return metrics
+        if capture_ports:
+            port_previews[node_id]["outputs"] = {name: _preview_value(value) for name, value in result.items()}
+    return {"metrics": metrics, "port_previews": port_previews} if capture_ports else metrics
+
+
+def _execution_device(graph: Graph, requested: str) -> tuple[str, list[str]]:
+    gpu = gpu_status()
+    gpu_compatible = all(SPEC_BY_TYPE[node.type].gpu_compatible for node in graph.nodes)
+    if requested == "gpu" and not gpu["available"]:
+        raise ValueError("GPU was requested but CuPy/CUDA is unavailable")
+    device = "gpu" if requested in ("gpu", "auto") and gpu["available"] and gpu_compatible else "cpu"
+    warnings = ["GPU unavailable or graph incompatible; used CPU"] if requested == "auto" and device == "cpu" else []
+    return device, warnings
+
+
+def run_once(graph: Graph, config: SimulationConfig) -> dict[str, Any]:
+    validation = validate_graph(graph)
+    if not validation.valid:
+        raise ValueError("; ".join(validation.errors))
+    started = time.perf_counter()
+    device, device_warnings = _execution_device(graph, config.device)
+    captured = execute_trial(graph.model_dump(), 0, config.seed, device, config.snr_db_start, capture_ports=True)
+    return {
+        "device": device,
+        "snr_db": config.snr_db_start,
+        "elapsed_seconds": time.perf_counter() - started,
+        "metrics": captured["metrics"],
+        "port_previews": captured["port_previews"],
+        "warnings": validation.warnings + device_warnings,
+    }
 
 
 def _run_chunk(
@@ -184,11 +253,7 @@ def run_simulation(
     ]
     if not snr_values:
         snr_values = [round(float(config.snr_db_start), 6)]
-    gpu = gpu_status()
-    gpu_compatible = all(SPEC_BY_TYPE[node.type].gpu_compatible for node in graph.nodes)
-    if config.device == "gpu" and not gpu["available"]:
-        raise ValueError("GPU was requested but CuPy/CUDA is unavailable")
-    device = "gpu" if config.device in ("gpu", "auto") and gpu["available"] and gpu_compatible else "cpu"
+    device, device_warnings = _execution_device(graph, config.device)
     cpu_count = os.cpu_count() or 1
     # Auto mode avoids creating one OS process per frame on high-core machines
     # and keeps small vectorized jobs inline, where ProcessPool overhead wins.
@@ -287,6 +352,7 @@ def run_simulation(
         sink_metrics["constellation_mean_i"] = aggregate.get("constellation_i_sum", 0) / count
         sink_metrics["constellation_mean_q"] = aggregate.get("constellation_q_sum", 0) / count
         sink_metrics["constellation_mean_power"] = aggregate.get("constellation_power_sum", 0) / count
+    preview_capture = execute_trial(graph_dict, 0, config.seed, device, snr_values[0], capture_ports=True) if not was_cancelled else {"port_previews": {}}
     return {
         **aggregate,
         "ber": aggregate["bit_errors"] / bits if bits else None,
@@ -297,5 +363,6 @@ def run_simulation(
         "cancelled": was_cancelled,
         "snr_points": point_results,
         "sink_metrics": sink_metrics,
-        "warnings": validation.warnings + (["GPU unavailable or graph incompatible; used CPU"] if config.device == "auto" and device == "cpu" else []),
+        "port_previews": preview_capture["port_previews"],
+        "warnings": validation.warnings + device_warnings,
     }

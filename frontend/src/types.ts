@@ -9,7 +9,35 @@ export type BlockData = {
   inputs: string[]
   outputs: string[]
   portOrientation?: 'standard' | 'reversed'
+  portPreviews?: NodePortPreviews
   [key: string]: unknown
+}
+
+export type PortPreview = {
+  dtype: string
+  shape: number[]
+  size: number
+  sample: string[]
+  min?: number
+  max?: number
+  mean?: number
+  stats_label?: string
+}
+
+export type NodePortPreviews = {
+  inputs: Record<string, PortPreview>
+  outputs: Record<string, PortPreview>
+}
+
+export type PortPreviewMap = Record<string, NodePortPreviews>
+
+export type RunOnceResult = {
+  device: string
+  snr_db: number
+  elapsed_seconds: number
+  metrics: Record<string, number>
+  port_previews: PortPreviewMap
+  warnings: string[]
 }
 
 export type FlowNode = Node<BlockData, 'signal'>
@@ -69,6 +97,7 @@ export type Job = {
     workers: number
     warnings: string[]
     sink_metrics: Record<string, number>
+    port_previews: PortPreviewMap
     snr_points: Array<{
       snr_db: number
       bit_errors: number

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow, Background, Controls, MiniMap, addEdge, useNodesState, useEdgesState,
-  BackgroundVariant, MarkerType, type Connection, type NodeMouseHandler, type OnNodeDrag,
+  BackgroundVariant, MarkerType, type Connection, type EdgeChange, type NodeMouseHandler, type OnNodeDrag,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
@@ -9,9 +9,9 @@ import {
   Layers3, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Search, Terminal, Trash2, Upload, X,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
-import { cancelJob, createJob, getJob, graphPayload } from './api'
+import { cancelJob, createJob, getJob, graphPayload, runGraphOnce } from './api'
 import { initialEdges, initialNodes, pythonTemplate } from './sample'
-import type { BlockSpec, FlowNode, Job, SimulationConfig } from './types'
+import type { BlockSpec, FlowNode, Job, PortPreviewMap, SimulationConfig } from './types'
 import { BerChart } from './SinkChart'
 import { ResultsTable } from './ResultsTable'
 import { FlowMiniMapNode } from './components/FlowMiniMapNode'
@@ -30,6 +30,7 @@ function App() {
   const [search, setSearch] = useState('')
   const [config, setConfig] = useState<SimulationConfig>(defaultSimulationConfig)
   const [job, setJob] = useState<Job | null>(null)
+  const [runOnceActive, setRunOnceActive] = useState(false)
   const [error, setError] = useState('')
   const [rightTab, setRightTab] = useState<'block' | 'run'>('run')
   const [leftOpen, setLeftOpen] = useState(true)
@@ -47,6 +48,7 @@ function App() {
   const resizeRef = useRef<{ side: 'left' | 'right'; startX: number; startWidth: number } | null>(null)
   const selected = nodes.find(n => n.id === selectedId)
   const jobActive = job?.status === 'queued' || job?.status === 'running'
+  const executionActive = jobActive || runOnceActive
   const configIssue = validateSimulationConfig(config)
   const visibleParams = selected ? Object.entries(selected.data.params).filter(([key]) => {
     if (key === 'data_base64' || key === 'file_name') return false
@@ -57,6 +59,14 @@ function App() {
   const appendLog = useCallback((level: ConsoleLevel, message: string) => {
     setConsoleEntries(entries => [...entries.slice(-199), { id: Date.now() + Math.random(), time: new Date().toLocaleTimeString(), level, message }])
   }, [])
+  const applyPortPreviews = useCallback((previews: PortPreviewMap) => {
+    setNodes(items => items.map(node => ({ ...node, data: { ...node.data, portPreviews: previews[node.id] } })))
+  }, [setNodes])
+  const clearPortPreviews = useCallback(() => {
+    setNodes(items => items.map(node => node.data.portPreviews ? { ...node, data: { ...node.data, portPreviews: undefined } } : node))
+  }, [setNodes])
+
+  useEffect(() => { clearPortPreviews() }, [clearPortPreviews, config])
 
   useEffect(() => {
     if (bootLoggedRef.current) return
@@ -69,7 +79,7 @@ function App() {
       if (event.key !== 'Delete' || !selectedId) return
       const target = event.target as HTMLElement | null
       if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
-      setNodes(items => items.filter(node => node.id !== selectedId))
+      setNodes(items => items.filter(node => node.id !== selectedId).map(node => ({ ...node, data: { ...node.data, portPreviews: undefined } })))
       setEdges(items => items.filter(edge => edge.source !== selectedId && edge.target !== selectedId))
       setSelectedId(null)
       setRightTab('run')
@@ -85,10 +95,13 @@ function App() {
     return () => window.clearInterval(timer)
   }, [appendLog, job?.id, job?.status])
   useEffect(() => {
-    if (job?.status === 'completed' && job.result) appendLog('success', `Simulation completed · BER ${job.result.ber === null ? 'n/a' : job.result.ber.toExponential(3)} · ${job.result.snr_points.length} SNR points.`)
+    if (job?.status === 'completed' && job.result) {
+      applyPortPreviews(job.result.port_previews || {})
+      appendLog('success', `Benchmark completed · BER ${job.result.ber === null ? 'n/a' : job.result.ber.toExponential(3)} · ${job.result.snr_points.length} SNR points.`)
+    }
     if (job?.status === 'failed' && job.error) appendLog('error', job.error)
-    if (job?.status === 'cancelled') appendLog('warning', 'Simulation cancelled by the user.')
-  }, [appendLog, job?.status])
+    if (job?.status === 'cancelled') appendLog('warning', 'Benchmark cancelled by the user.')
+  }, [appendLog, applyPortPreviews, job?.status])
   useEffect(() => {
     if (job?.status !== 'completed') return
     window.setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
@@ -100,10 +113,14 @@ function App() {
     appendLog('info', `SNR ${job.snr_db.toFixed(2)} dB · point ${(job.snr_index ?? 0) + 1}/${job.snr_count ?? '?'}`)
   }, [appendLog, job?.snr_count, job?.snr_db, job?.snr_index, job?.status])
 
-  const onConnect = useCallback((connection: Connection) => setEdges(eds => addEdge({ ...connection, markerEnd: { type: MarkerType.ArrowClosed }, animated: true }, eds)), [setEdges])
+  const onConnect = useCallback((connection: Connection) => { clearPortPreviews(); setEdges(eds => addEdge({ ...connection, markerEnd: { type: MarkerType.ArrowClosed }, animated: true }, eds)) }, [clearPortPreviews, setEdges])
+  const onEdgesChangeWithPreview = useCallback((changes: EdgeChange[]) => {
+    if (changes.some(change => change.type === 'remove')) clearPortPreviews()
+    onEdgesChange(changes)
+  }, [clearPortPreviews, onEdgesChange])
   const onNodeClick: NodeMouseHandler<FlowNode> = (_, node) => { setSelectedId(node.id); setRightTab('block') }
   const onNodeDragStart: OnNodeDrag<FlowNode> = (_, node) => { setSelectedId(node.id); setRightTab('block') }
-  const updateSelected = (patch: Partial<FlowNode['data']>) => setNodes(items => items.map(n => n.id === selectedId ? { ...n, data: { ...n.data, ...patch } } : n))
+  const updateSelected = (patch: Partial<FlowNode['data']>) => setNodes(items => items.map(n => ({ ...n, data: { ...n.data, ...(n.id === selectedId ? patch : {}), portPreviews: undefined } })))
   const loadSourceFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || !selected) return
@@ -141,6 +158,7 @@ function App() {
   }
 
   const addBlock = (spec: BlockSpec) => {
+    clearPortPreviews()
     const id = `${spec.type}-${Date.now()}`
     const node: FlowNode = {
       id, type: 'signal', position: { x: 300 + Math.random() * 300, y: 140 + Math.random() * 300 },
@@ -149,10 +167,24 @@ function App() {
     setNodes(ns => [...ns, node]); setSelectedId(id); setRightTab('block')
   }
 
-  const run = async () => {
+  const runOnce = async () => {
+    if (configIssue) { setError(configIssue); return }
+    setError(''); setRightTab('run'); setRunOnceActive(true)
+    appendLog('info', `Running one frame at ${config.snr_db_start} dB…`)
+    try {
+      const snapshot = await runGraphOnce(nodes, edges, config)
+      applyPortPreviews(snapshot.port_previews)
+      appendLog('success', `Run once completed in ${(snapshot.elapsed_seconds * 1000).toFixed(1)} ms on ${snapshot.device.toUpperCase()} · hover any port to inspect data.`)
+    } catch (e) {
+      const message = (e as Error).message; setError(message); appendLog('error', message)
+    } finally { setRunOnceActive(false) }
+  }
+
+  const runBenchmark = async () => {
     if (configIssue) { setError(configIssue); return }
     setError(''); setRightTab('run'); lastSnrRef.current = null
-    appendLog('info', `Starting Monte-Carlo sweep ${config.snr_db_start}…${config.snr_db_stop} dB.`)
+    clearPortPreviews()
+    appendLog('info', `Starting Monte-Carlo benchmark ${config.snr_db_start}…${config.snr_db_stop} dB.`)
     try {
       const id = await createJob(nodes, edges, config)
       const totalTrials = snrPointCount(config) * config.max_frames
@@ -214,7 +246,7 @@ function App() {
 
       <main className="canvas-wrap">
         <div className="canvas-label"><span>FLOWGRAPH</span><span>{nodes.length} blocks · {edges.length} links</span></div>
-        <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running' }))} nodeTypes={{ signal: SignalNode }} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onNodeClick={onNodeClick} onNodeDragStart={onNodeDragStart} onPaneClick={() => setSelectedId(null)} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
+        <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running' }))} nodeTypes={{ signal: SignalNode }} onNodesChange={onNodesChange} onEdgesChange={onEdgesChangeWithPreview} onConnect={onConnect} onNodeClick={onNodeClick} onNodeDragStart={onNodeDragStart} onPaneClick={() => setSelectedId(null)} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
           <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#ccd3dc" />
           <Controls position="bottom-left" />
           <MiniMap position="bottom-right" pannable zoomable offsetScale={4} nodeColor={node => miniMapColor(String((node.data as Record<string, unknown>)?.blockType || ''))} nodeStrokeColor="#ffffff" nodeStrokeWidth={1} nodeBorderRadius={3} nodeComponent={FlowMiniMapNode} bgColor="#f9fbfd" maskColor="rgba(226,233,242,.62)" maskStrokeColor="#8ea8ca" maskStrokeWidth={1} style={{ width: 150, height: 92, border: '1px solid #cbd6e3', borderRadius: 8, boxShadow: '0 3px 12px rgba(36,55,78,.14)' }} />
@@ -224,7 +256,7 @@ function App() {
       <aside className={`inspector ${rightOpen ? '' : 'collapsed'}`}>
         <div className="tabs"><button className={rightTab === 'run' ? 'active' : ''} onClick={() => setRightTab('run')}>Experiment</button><button className={rightTab === 'block' ? 'active' : ''} onClick={() => setRightTab('block')}>Block</button></div>
         {rightTab === 'block' ? selected ? <div className="inspector-content">
-          <div className="selection-heading"><span className="large-icon">{selected.data.blockType === 'python' ? <Braces /> : <Box />}</span><div><small>SELECTED BLOCK</small><h3>{selected.data.label}</h3></div><button className="icon-danger" onClick={() => { setNodes(ns => ns.filter(n => n.id !== selected.id)); setEdges(es => es.filter(e => e.source !== selected.id && e.target !== selected.id)); setSelectedId(null) }}><X size={16} /></button></div>
+          <div className="selection-heading"><span className="large-icon">{selected.data.blockType === 'python' ? <Braces /> : <Box />}</span><div><small>SELECTED BLOCK</small><h3>{selected.data.label}</h3></div><button className="icon-danger" onClick={() => { setNodes(ns => ns.filter(n => n.id !== selected.id).map(n => ({ ...n, data: { ...n.data, portPreviews: undefined } }))); setEdges(es => es.filter(e => e.source !== selected.id && e.target !== selected.id)); setSelectedId(null) }}><X size={16} /></button></div>
           <label>Display name<input value={selected.data.label} onChange={e => updateSelected({ label: e.target.value })} /></label>
            <div className="port-layout-control"><div><span>Port layout</span><small>{selected.data.portOrientation === 'reversed' ? 'Input right · Output left' : 'Input left · Output right'}</small></div><button className={`port-toggle ${selected.data.portOrientation === 'reversed' ? 'active' : ''}`} onClick={() => updateSelected({ portOrientation: selected.data.portOrientation === 'reversed' ? 'standard' : 'reversed' })}><ArrowLeftRight size={15} /> {selected.data.portOrientation === 'reversed' ? 'Reversed' : 'Standard'}</button></div>
            <div className="section-rule"><span>PARAMETERS</span></div>
@@ -240,17 +272,17 @@ function App() {
           {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><textarea className="code-editor" spellCheck={false} value={selected.data.code || pythonTemplate} onChange={e => updateSelected({ code: e.target.value })} /><p className="code-hint">Write <code>process(signal, params)</code> and return a NumPy array. SignalLab automatically runs independent Monte-Carlo trials in parallel.</p></>}
         </div> : <div className="empty-state"><Box size={32} /><h3>No block selected</h3><p>Select a block on the canvas to edit its parameters and Python code.</p></div> :
         <div className="inspector-content">
-          <div className="experiment-title"><div><small>MONTE-CARLO</small><h2>Experiment</h2></div></div>
+          <div className="experiment-title"><div><small>MONTE-CARLO</small><h2>Experiment</h2></div><button className="run-once" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} title="Execute one frame and capture data at every port"><Play size={13} fill="currentColor" />{runOnceActive ? 'Running…' : 'Run once'}</button></div>
           <div className="section-rule"><span>SNR SWEEP (dB)</span></div>
-          <div className="form-grid"><label>Start<input disabled={jobActive} type="number" step="any" value={config.snr_db_start} onChange={e => setConfig({ ...config, snr_db_start: Number(e.target.value) })} /></label><label>Stop<input disabled={jobActive} type="number" step="any" value={config.snr_db_stop} onChange={e => setConfig({ ...config, snr_db_stop: Number(e.target.value) })} /></label></div>
-          <div className="form-grid"><label>Step<input disabled={jobActive} type="number" min="0.01" step="any" value={config.snr_db_step} onChange={e => setConfig({ ...config, snr_db_step: Number(e.target.value) })} /></label><label>Max frames / SNR<input disabled={jobActive} type="number" min="1" value={config.max_frames} onChange={e => { const value = Number(e.target.value); setConfig({ ...config, max_frames: value, trials: value }) }} /></label></div>
-          <div className="form-grid"><label>Min frames / SNR<input disabled={jobActive} type="number" min="1" value={config.min_frames} onChange={e => setConfig({ ...config, min_frames: Number(e.target.value) })} /></label><label>Min errors / SNR<input disabled={jobActive} type="number" min="0" value={config.min_errors} onChange={e => setConfig({ ...config, min_errors: Number(e.target.value) })} /></label></div>
+          <div className="form-grid"><label>Start<input disabled={executionActive} type="number" step="any" value={config.snr_db_start} onChange={e => setConfig({ ...config, snr_db_start: Number(e.target.value) })} /></label><label>Stop<input disabled={executionActive} type="number" step="any" value={config.snr_db_stop} onChange={e => setConfig({ ...config, snr_db_stop: Number(e.target.value) })} /></label></div>
+          <div className="form-grid"><label>Step<input disabled={executionActive} type="number" min="0.01" step="any" value={config.snr_db_step} onChange={e => setConfig({ ...config, snr_db_step: Number(e.target.value) })} /></label><label>Max frames / SNR<input disabled={executionActive} type="number" min="1" value={config.max_frames} onChange={e => { const value = Number(e.target.value); setConfig({ ...config, max_frames: value, trials: value }) }} /></label></div>
+          <div className="form-grid"><label>Min frames / SNR<input disabled={executionActive} type="number" min="1" value={config.min_frames} onChange={e => setConfig({ ...config, min_frames: Number(e.target.value) })} /></label><label>Min errors / SNR<input disabled={executionActive} type="number" min="0" value={config.min_errors} onChange={e => setConfig({ ...config, min_errors: Number(e.target.value) })} /></label></div>
           <div className="section-rule"><span>RUNTIME</span></div>
-          <div className="form-grid"><label>Workers<input disabled={jobActive} type="number" min="0" value={config.workers} onChange={e => setConfig({ ...config, workers: Number(e.target.value) })} /><small>0 = auto</small></label><label>Seed<input disabled={jobActive} type="number" value={config.seed} onChange={e => setConfig({ ...config, seed: Number(e.target.value) })} /></label></div>
-          <label>Chunk size<input disabled={jobActive} type="number" min="1" value={config.chunk_size} onChange={e => setConfig({ ...config, chunk_size: Number(e.target.value) })} /></label>
-          <label>Compute device<select disabled={jobActive} value={config.device} onChange={e => setConfig({ ...config, device: e.target.value as SimulationConfig['device'] })}><option value="auto">Auto · best available</option><option value="cpu">CPU · multiprocessing</option><option value="gpu">GPU · CUDA/CuPy</option></select></label>
+          <div className="form-grid"><label>Workers<input disabled={executionActive} type="number" min="0" value={config.workers} onChange={e => setConfig({ ...config, workers: Number(e.target.value) })} /><small>0 = auto</small></label><label>Seed<input disabled={executionActive} type="number" value={config.seed} onChange={e => setConfig({ ...config, seed: Number(e.target.value) })} /></label></div>
+          <label>Chunk size<input disabled={executionActive} type="number" min="1" value={config.chunk_size} onChange={e => setConfig({ ...config, chunk_size: Number(e.target.value) })} /></label>
+          <label>Compute device<select disabled={executionActive} value={config.device} onChange={e => setConfig({ ...config, device: e.target.value as SimulationConfig['device'] })}><option value="auto">Auto · best available</option><option value="cpu">CPU · multiprocessing</option><option value="gpu">GPU · CUDA/CuPy</option></select></label>
           {configIssue && <div className="config-issue" role="alert">{configIssue}</div>}
-          <button className="run-wide" onClick={run} disabled={jobActive || Boolean(configIssue)} title={configIssue || undefined}><Play size={16} fill="currentColor" /> {jobActive ? 'Simulation running…' : 'Run simulation'}</button>
+          <button className="run-wide" onClick={runBenchmark} disabled={executionActive || Boolean(configIssue)} title={configIssue || undefined}><Play size={16} fill="currentColor" /> {jobActive ? 'Benchmark running…' : 'Run Benchmark'}</button>
           {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} frames processed · {job.trials} max</span><span>{job.device || result?.device || 'preparing'}</span></div>{job.status === 'running' && <button className="cancel" onClick={() => cancelJob(job.id)}><CircleStop size={14} /> Cancel</button>}</div>}
           {error && <div className="error-box">{error}</div>}
           {(result || livePoints.length > 0) && <div className="results" ref={resultsRef}>

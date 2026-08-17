@@ -60,11 +60,13 @@ button { color: inherit; border: 0; cursor: pointer; }
 .react-flow__minimap { border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: #fff !important; box-shadow: 0 2px 8px rgba(25,35,48,.06); }
 .signal-node { width: 158px; min-height: 88px; border: 1px solid #cfd6df; border-radius: 7px; padding: 10px 11px; background: #fff; box-shadow: 0 2px 7px rgba(29,39,53,.08); position: relative; transition: .15s; }
 .signal-node:hover, .signal-node.selected { border-color: #4f7fd8; box-shadow: 0 0 0 2px rgba(37,99,235,.1), 0 4px 12px rgba(29,39,53,.1); }
+.react-flow__node:has(.port-label:hover), .react-flow__node:has(.port-label:focus-within) { z-index: 1000 !important; }
 .node-glow { display: none; }
 .node-header { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; }
 .node-icon { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 5px; background: #eef2f6; color: #354255; }
 .node-type { margin: 7px 0 15px 33px; font-family: Consolas, monospace; text-transform: uppercase; font-size: 7px; letter-spacing: .06em; color: #8a95a3; }
 .port-label { position: absolute; font-family: Consolas, monospace; font-size: 7px; color: #7c8795; transform: translateY(-50%); }
+.port-label:focus { outline: none; color: #1f57ba; }
 .port-label.input { left: 8px; padding-left: 1px; }
 .port-label.output { right: 8px; padding-right: 1px; }
 .react-flow__handle { width: 8px !important; height: 8px !important; border: 2px solid #fff !important; background: #5477a7 !important; }
@@ -74,6 +76,24 @@ button { color: inherit; border: 0; cursor: pointer; }
 .signal-node.ports-reversed .port-label.input .react-flow__handle { left: auto !important; right: -13px !important; }
 .signal-node.ports-reversed .port-label.output { right: auto; left: 8px; padding-right: 0; padding-left: 1px; text-align: left; }
 .signal-node.ports-reversed .port-label.output .react-flow__handle { right: auto !important; left: -13px !important; }
+.port-tooltip { position: absolute; top: 50%; z-index: 1000; width: 310px; padding: 13px; visibility: hidden; opacity: 0; transform: translateY(-50%) scale(.98); border: 1px solid #c9d4e2; border-radius: 8px; background: rgba(255,255,255,.98); box-shadow: 0 8px 24px rgba(24,39,60,.18); color: #344155; font-family: "Segoe UI", sans-serif; text-align: left; pointer-events: none; transition: opacity .12s ease, transform .12s ease; }
+.port-label.input .port-tooltip { right: calc(100% + 11px); }
+.port-label.output .port-tooltip { left: calc(100% + 11px); }
+.signal-node.ports-reversed .port-label.input .port-tooltip { right: auto; left: calc(100% + 11px); }
+.signal-node.ports-reversed .port-label.output .port-tooltip { right: calc(100% + 11px); left: auto; }
+.port-label:hover .port-tooltip, .port-label:focus-within .port-tooltip { visibility: visible; opacity: 1; transform: translateY(-50%) scale(1); }
+.port-tooltip-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 7px; border-bottom: 1px solid #e4e9ef; }
+.port-tooltip-title span { color: #758297; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+.port-tooltip-title strong { overflow: hidden; color: #213047; font: 600 14px Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.port-tooltip-meta { display: flex; flex-wrap: wrap; gap: 5px 9px; margin-top: 9px; color: #607086; font: 12px Consolas, monospace; }
+.port-tooltip-meta span + span { padding-left: 8px; border-left: 1px solid #dce3eb; }
+.port-tooltip-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; margin-top: 8px; }
+.port-tooltip-stats span { padding: 6px; border-radius: 4px; background: #f4f7fa; color: #718096; font-size: 11px; }
+.port-tooltip-stats b { display: block; margin-top: 2px; color: #344155; font: 600 12px Consolas, monospace; }
+.port-tooltip-sample { margin-top: 8px; }
+.port-tooltip-sample small { display: block; margin-bottom: 4px; color: #758297; font-size: 11px; }
+.port-tooltip-sample code { display: block; max-height: 58px; overflow: hidden; color: #1f57ba; font: 12px/1.45 Consolas, monospace; overflow-wrap: anywhere; }
+.port-tooltip-empty { color: #758297; font-size: 12px; line-height: 1.45; }
 .inspector { border-left: 1px solid var(--line); display: flex; flex-direction: column; }
 .tabs { height: 48px; display: grid; grid-template-columns: 1fr 1fr; padding: 0 14px; border-bottom: 1px solid var(--line); }
 .tabs button { background: transparent; color: #788493; border-bottom: 2px solid transparent; font-size: 10px; }
@@ -106,6 +126,9 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .empty-state p { font-size: 9px; line-height: 1.6; }
 .experiment-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 19px; }
 .experiment-title h2 { margin: 3px 0 0; font-size: 18px; letter-spacing: -.03em; }
+.run-once { min-height: 32px; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #a9c1e5; border-radius: 6px; background: #f3f7ff; color: #2459a6; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.run-once:hover { border-color: #769ed9; background: #e8f1ff; }
+.run-once:disabled { opacity: .5; cursor: default; }
 .engine-pill { display: flex; gap: 5px; align-items: center; border: 1px solid var(--line); border-radius: 20px; padding: 5px 8px; color: #6e7a89; background: #f7f8fa; font-size: 7px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .form-grid label small { position: absolute; right: 7px; top: 27px; font-size: 7px; color: #8b95a3; }

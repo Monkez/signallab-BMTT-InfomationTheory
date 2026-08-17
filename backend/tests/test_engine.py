@@ -1,7 +1,7 @@
 import base64
 
 from backend.app.blocks import PROCESSORS, make_context, python_block
-from backend.app.engine import execute_trial, run_simulation, validate_graph
+from backend.app.engine import execute_trial, run_once, run_simulation, validate_graph
 from backend.app.models import Edge, Graph, SimulationConfig
 import numpy as np
 
@@ -52,6 +52,17 @@ def test_simulation_is_reproducible():
     assert first["total_bits"] == second["total_bits"]
     assert [point["snr_db"] for point in first["snr_points"]] == [0.0, 2.0, 4.0]
     assert updates and updates[-1]["snr_points"][-1]["frames"] >= 1
+    assert first["port_previews"]["0"]["outputs"]["out"]["shape"] == [400]
+
+
+def test_run_once_captures_input_and_output_port_samples():
+    result = run_once(sample_graph(), SimulationConfig(seed=42, device="cpu"))
+    source = result["port_previews"]["0"]["outputs"]["out"]
+    decoder_input = result["port_previews"]["5"]["inputs"]["in"]
+    assert source["dtype"] == "int8"
+    assert source["shape"] == [400]
+    assert len(source["sample"]) == 8
+    assert decoder_input["size"] == 700
 
 
 def test_cycle_is_rejected():

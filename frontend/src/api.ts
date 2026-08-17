@@ -1,4 +1,4 @@
-import type { FlowEdge, FlowNode, Job, SimulationConfig } from './types'
+import type { FlowEdge, FlowNode, Job, RunOnceResult, SimulationConfig } from './types'
 
 const graphPayload = (nodes: FlowNode[], edges: FlowEdge[]) => ({
   version: '1.0',
@@ -23,6 +23,18 @@ export async function createJob(nodes: FlowNode[], edges: FlowEdge[], config: Si
     throw new Error(Array.isArray(body.detail) ? body.detail.join(' · ') : body.detail || 'Could not start simulation')
   }
   return (await response.json()).job_id as string
+}
+
+export async function runGraphOnce(nodes: FlowNode[], edges: FlowEdge[], config: SimulationConfig): Promise<RunOnceResult> {
+  const response = await fetch('/api/run-once', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ graph: graphPayload(nodes, edges), config }),
+  })
+  if (!response.ok) {
+    const body = await response.json()
+    throw new Error(Array.isArray(body.detail) ? body.detail.join(' · ') : body.detail || 'Could not run the graph')
+  }
+  return response.json()
 }
 
 export async function getJob(id: string): Promise<Job> {

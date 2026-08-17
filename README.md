@@ -2,6 +2,8 @@
 
 SignalLab is a local, visual digital-communications simulator inspired by Simulink and GNU Radio. Build a block graph in the browser, edit simple Python blocks, and run reproducible Monte-Carlo experiments on CPU or a compatible GPU.
 
+The interface uses a high-contrast light layout with a bundled SignalLab logo and app icon. Select a block and press `Delete` to remove it and its links.
+
 ## Quick start (Windows desktop)
 
 1. Run `setup.bat` once.

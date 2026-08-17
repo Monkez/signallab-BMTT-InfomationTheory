@@ -20,6 +20,13 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 4. Chọn số trial, số worker, seed và thiết bị.
 5. Nhấn **Run simulation**. Kết quả cập nhật trong panel bên phải.
 
+## Thao tác canvas
+
+- Click block để chọn và sửa trong panel **Block**.
+- Nhấn `Delete` để xóa block đang chọn cùng các đường nối của block đó.
+- Khi đang nhập trong ô text hoặc Python editor, `Delete` chỉ sửa nội dung đang nhập và không xóa block.
+- Dùng các nút zoom ở góc dưới canvas nếu sơ đồ lớn.
+
 ## Cấu hình Monte-Carlo
 
 - `Trials`: số lần lặp độc lập.

@@ -117,3 +117,44 @@ input:focus, select:focus, textarea:focus { border-color: #4d78cb; box-shadow: 0
   .signal-node { width: 145px; }
   .ghost.labeled { font-size: 0; gap: 0; padding: 0; width: 34px; }
 }
+
+/* Readability baseline: the canvas and inspector are designed for teaching use. */
+body { font-size: 13px; }
+.brand-mark { overflow: hidden; }
+.brand-mark img { width: 25px; height: 25px; display: block; }
+.brand strong { font-size: 17px; }
+.brand span { font-size: 10px; }
+.project-name { font-size: 13px; }
+.ghost.labeled, .run-button, .run-wide { font-size: 13px; }
+.panel-title { font-size: 13px; }
+.search input { font-size: 13px; }
+.library-list section h4 { font-size: 11px; }
+.block-item b { font-size: 13px; }
+.block-item small { font-size: 11px; }
+.compute-card b { font-size: 11px; }
+.compute-card small { font-size: 10px; }
+.canvas-label { font-size: 10px; }
+.signal-node { width: 174px; min-height: 102px; padding: 12px; }
+.node-header { font-size: 13px; }
+.node-icon { width: 29px; height: 29px; }
+.node-type { font-size: 9px; margin-top: 8px; }
+.port-label { font-size: 9px; }
+.tabs button { font-size: 13px; }
+.selection-heading small, .experiment-title small { font-size: 9px; }
+.selection-heading h3 { font-size: 16px; }
+label { font-size: 12px; }
+input, select { font-size: 13px; height: 38px; }
+.section-rule { font-size: 9px; }
+.muted, .code-hint { font-size: 12px; }
+.code-editor { font-size: 12px; min-height: 290px; }
+.empty-state h3 { font-size: 15px; }
+.empty-state p { font-size: 12px; }
+.experiment-title h2 { font-size: 21px; }
+.engine-pill { font-size: 9px; }
+.form-grid label small { font-size: 9px; top: 31px; }
+.job-line, .job-meta { font-size: 10px; }
+.job-line b { font-size: 11px; }
+.cancel { font-size: 10px; height: 31px; }
+.error-box, .warning { font-size: 10px; }
+.metric span { font-size: 9px; }
+.metric strong { font-size: 15px; }

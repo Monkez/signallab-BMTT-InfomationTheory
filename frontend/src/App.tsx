@@ -5,7 +5,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
-  Activity, Box, Braces, ChevronDown, CircleStop, Cpu, Download, Gauge,
+  Box, Braces, ChevronDown, CircleStop, Cpu, Download, Gauge,
   Layers3, Play, Plus, Radio, RotateCcw, Search, Upload, Waves, X, Zap,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
@@ -41,6 +41,19 @@ function App() {
   const selected = nodes.find(n => n.id === selectedId)
 
   useEffect(() => { fetch('/api/blocks').then(r => r.ok ? r.json() : fallbackSpecs).then(setSpecs).catch(() => {}) }, [])
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Delete' || !selectedId) return
+      const target = event.target as HTMLElement | null
+      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
+      setNodes(items => items.filter(node => node.id !== selectedId))
+      setEdges(items => items.filter(edge => edge.source !== selectedId && edge.target !== selectedId))
+      setSelectedId(null)
+      setRightTab('run')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectedId, setEdges, setNodes])
   useEffect(() => {
     if (!job || !['queued', 'running'].includes(job.status)) return
     const timer = window.setInterval(async () => {
@@ -94,7 +107,7 @@ function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand"><div className="brand-mark"><Activity size={18} /></div><div><strong>SignalLab</strong><span>Communications Studio</span></div></div>
+        <div className="brand"><div className="brand-mark"><img src="/app-icon.svg" alt="SignalLab logo" /></div><div><strong>SignalLab</strong><span>Communications Studio</span></div></div>
         <div className="project-name"><span className="status-dot" /> Hamming BPSK over AWGN <ChevronDown size={14} /></div>
         <div className="top-actions">
           <button className="ghost" onClick={() => { setNodes(initialNodes); setEdges(initialEdges); setSelectedId('channel') }} title="Reset sample"><RotateCcw size={16} /></button>

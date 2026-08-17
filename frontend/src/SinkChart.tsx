@@ -49,6 +49,16 @@ function persistReferences(references: BerReference[]) {
   window.dispatchEvent(new Event('signallab-ber-reference-change'))
 }
 
+function downloadReferenceFile(reference: BerReference) {
+  const payload = { format: 'signallab-ber-reference', version: 1, reference }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `${reference.name.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-|-$/g, '') || 'ber-reference'}.ber.json`
+  link.click()
+  URL.revokeObjectURL(link.href)
+}
+
 async function svgToPng(svg: SVGSVGElement): Promise<Blob> {
   const clone = svg.cloneNode(true) as SVGSVGElement
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
@@ -84,13 +94,14 @@ function plottedPoints(points: SinkPoint[]) {
 
 export function BerChart({ points, live = false }: { points: SinkPoint[]; live?: boolean }) {
   const svgRef = useRef<SVGSVGElement>(null)
+  const referenceFileRef = useRef<HTMLInputElement>(null)
   const [notice, setNotice] = useState('')
   const [curveName, setCurveName] = useState('Current run')
   const [curveColor, setCurveColor] = useState('#2563eb')
   const [curveStyle, setCurveStyle] = useState<BerLineStyle>('solid')
   const [references, setReferences] = useState<BerReference[]>([])
   const [visibleReferenceIds, setVisibleReferenceIds] = useState<string[]>([])
-  const [showReferencePicker, setShowReferencePicker] = useState(false)
+  const [selectedCurveId, setSelectedCurveId] = useState('current')
 
   useEffect(() => {
     const syncReferences = () => setReferences(readReferences())
@@ -101,6 +112,8 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
 
   const activeReferences = references.filter(reference => visibleReferenceIds.includes(reference.id))
   const current = plottedPoints(points)
+  const selectedReference = selectedCurveId === 'current' ? null : references.find(reference => reference.id === selectedCurveId)
+  const selectedCurve = selectedReference || { name: curveName, color: curveColor, style: curveStyle }
   const curves = [
     { id: 'current', name: curveName.trim() || 'Current run', color: curveColor, style: curveStyle, ...current },
     ...activeReferences.map(reference => ({ id: reference.id, name: reference.name, color: reference.color, style: reference.style, ...plottedPoints(reference.points) })),
@@ -128,27 +141,61 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   const labelStyle: CSSProperties = { fontSize: 9, fill: '#6b7788' }
   const yTicks = [0, 1, 2, 3].map(index => maxLog - (index * yRange) / 3)
 
-  const saveReference = () => {
-    if (!current.valid.length) return
-    const reference: BerReference = {
-      id: `ber-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      name: curveName.trim() || `Reference ${references.length + 1}`,
-      color: curveColor,
-      style: curveStyle,
-      points: current.valid.map(point => ({ ...point })),
-      createdAt: new Date().toISOString(),
+  const updateSelectedCurve = (patch: Partial<Pick<BerReference, 'name' | 'color' | 'style'>>) => {
+    if (selectedCurveId === 'current') {
+      if (patch.name !== undefined) setCurveName(patch.name)
+      if (patch.color !== undefined) setCurveColor(patch.color)
+      if (patch.style !== undefined) setCurveStyle(patch.style)
+      return
     }
-    const next = [...references, reference]
+    const next = references.map(reference => reference.id === selectedCurveId ? { ...reference, ...patch } : reference)
     setReferences(next)
-    setVisibleReferenceIds(ids => [...ids, reference.id])
     persistReferences(next)
-    setNotice(`Saved “${reference.name}”`)
   }
 
-  const loadReference = (id: string) => {
-    if (!id) return
-    setVisibleReferenceIds(ids => ids.includes(id) ? ids : [...ids, id])
-    setNotice(`Loaded “${references.find(reference => reference.id === id)?.name || 'reference'}”`)
+  const saveReferenceFile = () => {
+    let reference: BerReference | null = selectedReference ? { ...selectedReference, points: selectedReference.points.map(point => ({ ...point })) } : null
+    if (!reference && current.valid.length) {
+      reference = {
+        id: `ber-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: curveName.trim() || `Reference ${references.length + 1}`,
+        color: curveColor,
+        style: curveStyle,
+        points: current.valid.map(point => ({ ...point })),
+        createdAt: new Date().toISOString(),
+      }
+      const next = [...references, reference]
+      setReferences(next)
+      setVisibleReferenceIds(ids => [...ids, reference!.id])
+      setSelectedCurveId(reference.id)
+      persistReferences(next)
+    }
+    if (!reference) return
+    downloadReferenceFile(reference)
+    setNotice(`Saved file “${reference.name}”`)
+  }
+
+  const loadReferenceFile = async (file?: File) => {
+    if (!file) return
+    try {
+      const parsed = JSON.parse(await file.text())
+      const candidates = Array.isArray(parsed) ? parsed : [parsed.reference || parsed]
+      const imported = candidates.filter(item => item && typeof item.name === 'string' && Array.isArray(item.points) && item.points.length > 0).map(item => ({
+        id: `ber-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: item.name,
+        color: typeof item.color === 'string' ? item.color : '#d26782',
+        style: lineStyles.some(option => option.value === item.style) ? item.style : 'dash',
+        points: item.points,
+        createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString(),
+      } as BerReference))
+      if (!imported.length) throw new Error('No valid BER reference found in this file.')
+      const next = [...references, ...imported]
+      setReferences(next)
+      setVisibleReferenceIds(ids => [...ids, ...imported.map(reference => reference.id)])
+      setSelectedCurveId(imported[0].id)
+      persistReferences(next)
+      setNotice(`Loaded ${imported.length} reference file${imported.length > 1 ? 's' : ''}`)
+    } catch (error) { setNotice((error as Error).message || 'Could not load BER reference file.') }
   }
 
   const removeReference = (id: string) => setVisibleReferenceIds(ids => ids.filter(value => value !== id))
@@ -157,6 +204,7 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
     const next = references.filter(reference => reference.id !== id)
     setReferences(next)
     setVisibleReferenceIds(ids => ids.filter(value => value !== id))
+    if (selectedCurveId === id) setSelectedCurveId('current')
     persistReferences(next)
     setNotice('Reference deleted')
   }
@@ -174,14 +222,15 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
 
   return <div className="sink-chart">
     <div className="sink-chart-toolbar"><div className="sink-chart-title">BER vs SNR {live && <span className="live-badge">LIVE</span>}</div><div className="chart-actions"><button onClick={() => exportImage(true)} title="Copy chart as PNG" aria-label="Copy chart as PNG">Copy</button><button onClick={() => exportImage(false)} title="Export chart as PNG" aria-label="Export chart as PNG">PNG</button></div></div>
-    <div className="ber-curve-controls" title="Name and style the current BER curve">
-      <input className="ber-curve-name" value={curveName} onChange={event => setCurveName(event.target.value)} aria-label="BER curve name" placeholder="Curve name" />
-      <input className="ber-color-input" type="color" value={curveColor} onChange={event => setCurveColor(event.target.value)} aria-label="BER curve color" />
-      <select value={curveStyle} onChange={event => setCurveStyle(event.target.value as BerLineStyle)} aria-label="BER curve style">{lineStyles.map(style => <option key={style.value} value={style.value}>{style.label}</option>)}</select>
-      <button className="ber-save" onClick={saveReference} disabled={!current.valid.length} title="Save current curve as a reusable reference">Save reference</button>
-      <div className="ber-reference-loader">
-        <button className="ber-load" onClick={() => setShowReferencePicker(value => !value)} disabled={!references.length} title="Choose a saved BER reference" aria-label="Load BER reference">Load reference</button>
-        {showReferencePicker && references.length > 0 && <div className="ber-reference-picker">{references.map(reference => <button key={reference.id} onClick={() => { loadReference(reference.id); setShowReferencePicker(false) }}>{reference.name}</button>)}</div>}
+    <div className="ber-curve-controls" title="Choose a BER curve, then edit its name and style">
+      <select className="ber-curve-select" value={selectedCurveId} onChange={event => { const id = event.target.value; setSelectedCurveId(id); if (id !== 'current') setVisibleReferenceIds(ids => ids.includes(id) ? ids : [...ids, id]) }} aria-label="Select BER curve to edit"><option value="current">Current run</option>{references.map(reference => <option key={reference.id} value={reference.id}>{reference.name}</option>)}</select>
+      <div className="ber-curve-editor-row">
+        <input className="ber-curve-name" value={selectedCurve.name} onChange={event => updateSelectedCurve({ name: event.target.value })} aria-label="BER curve name" placeholder="Curve name" />
+        <input className="ber-color-input" type="color" value={selectedCurve.color} onChange={event => updateSelectedCurve({ color: event.target.value })} aria-label="BER curve color" />
+        <select value={selectedCurve.style} onChange={event => updateSelectedCurve({ style: event.target.value as BerLineStyle })} aria-label="BER curve style">{lineStyles.map(style => <option key={style.value} value={style.value}>{style.label}</option>)}</select>
+        <button className="ber-save" onClick={saveReferenceFile} disabled={selectedCurveId === 'current' && !current.valid.length} title="Save selected BER curve as a JSON file">Save .BER</button>
+        <button className="ber-load" onClick={() => referenceFileRef.current?.click()} title="Browse for a BER reference JSON file" aria-label="Browse BER reference file">Browse file</button>
+        <input ref={referenceFileRef} type="file" accept=".json,.ber.json,application/json" hidden onChange={event => { void loadReferenceFile(event.target.files?.[0]); event.target.value = '' }} />
       </div>
     </div>
     <svg ref={svgRef} viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="Bit error rate versus SNR chart">

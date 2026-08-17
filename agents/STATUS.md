@@ -25,5 +25,6 @@
 - Hàng điều khiển BER dùng flex-wrap và giới hạn min-width để Save/Browse không tràn khỏi chart khi inspector hẹp.
 - BER Details report đã thêm modal chuyên sâu: chọn đường, chỉnh style và dữ liệu từng điểm, thêm/xóa điểm, Save As qua File System Access API (fallback download), browse/load từng file reference.
 - Details modal ưu tiên đồ thị BER vs SNR lớn ở phía trên; bảng dữ liệu và editor nằm bên dưới như công cụ chuyên sâu.
+- Details modal dùng portal lên `document.body` để không bị Console đè; chia tab Chart mặc định và Edit & Data cho editor/save/load.
 - MiniMap đã thu nhỏ còn 150×92px, dùng node renderer có stripe/viền và màu theo nhóm block, mask sáng tương phản; vẫn hỗ trợ pan/zoom.
 - Bổ sung Text File Source và Image File Source có file picker/base64; thêm Huffman, Shannon-Fano, RLE và ZIP/DEFLATE Encoder/Decoder. Backend round-trip tests đã nâng lên 6/6 pass, frontend build pass.

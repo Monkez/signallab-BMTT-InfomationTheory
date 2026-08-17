@@ -164,17 +164,25 @@ input:focus, select:focus, textarea:focus { border-color: #4d78cb; box-shadow: 0
 .ber-legend-action:hover, .ber-legend-delete:hover { color: #1f57ba; }
 .ber-legend-delete { font-size: 13px; line-height: 12px; }
 .ber-report-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(20, 31, 46, .38); }
-.ber-report { width: min(880px, 100%); max-height: min(720px, 100%); overflow: hidden; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; box-shadow: 0 16px 50px rgba(15, 27, 44, .25); }
+.ber-report { width: min(920px, 100%); height: min(760px, 100%); max-height: 100%; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; box-shadow: 0 16px 50px rgba(15, 27, 44, .25); }
 .ber-report-header { display: flex; align-items: center; justify-content: space-between; padding: 15px 18px; border-bottom: 1px solid var(--line); }
 .ber-report-header small { color: #718096; font-size: 8px; letter-spacing: .12em; }
 .ber-report-header h2 { margin: 4px 0 0; color: #273346; font-size: 17px; }
 .ber-report-close { width: 28px; height: 28px; border-radius: 5px; background: transparent; color: #718096; font-size: 22px; line-height: 1; }
 .ber-report-close:hover { background: #f1f5f9; color: #1f57ba; }
+.ber-report-tabs { height: 42px; flex: 0 0 42px; display: flex; gap: 2px; padding: 0 18px; border-bottom: 1px solid var(--line); background: #fbfcfd; }
+.ber-report-tabs button { min-width: 110px; padding: 0 14px; border-bottom: 2px solid transparent; background: transparent; color: #718096; font-size: 11px; }
+.ber-report-tabs button:hover, .ber-report-tabs button.active { color: #1f57ba; border-bottom-color: #2563eb; background: #f3f7ff; }
 .ber-report-chart-wrap { padding: 12px 18px 10px; border-bottom: 1px solid var(--line); background: #fff; }
+.ber-report-chart-wrap.primary { min-height: 0; flex: 1; display: flex; flex-direction: column; padding: 16px 22px 14px; border-bottom: 0; overflow: auto; }
 .ber-report-chart-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 3px; color: #526174; font-size: 12px; }
 .ber-report-chart-title span { color: #7e8998; font-size: 9px; }
 .ber-report-plot { display: block; width: 100%; height: auto; max-height: 285px; }
-.ber-report-layout { display: grid; grid-template-columns: 190px minmax(0, 1fr); min-height: 360px; }
+.ber-report-chart-wrap.primary .ber-report-plot { min-height: 0; flex: 1; max-height: 560px; }
+.ber-report-chart-legend { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 18px; padding-top: 8px; color: #526174; font-size: 10px; }
+.ber-report-chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.ber-report-chart-legend i { width: 24px; height: 0; border-top-width: 3px; }
+.ber-report-layout { min-height: 0; flex: 1; display: grid; grid-template-columns: 190px minmax(0, 1fr); overflow: hidden; }
 .ber-report-curves { padding: 14px 10px; border-right: 1px solid var(--line); background: #f8fafc; overflow-y: auto; }
 .ber-report-section-title { padding: 0 7px 8px; color: #7b8796; font-size: 8px; letter-spacing: .12em; }
 .ber-report-curve { display: flex; align-items: center; gap: 7px; width: 100%; padding: 8px 7px; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; border-radius: 5px; background: transparent; color: #526174; font-size: 10px; }

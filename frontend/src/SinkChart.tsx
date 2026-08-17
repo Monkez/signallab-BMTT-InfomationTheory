@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
 
 export type SinkPoint = {
   snr_db: number
@@ -119,6 +120,7 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   const [selectedCurveId, setSelectedCurveId] = useState('current')
   const [editedCurrentPoints, setEditedCurrentPoints] = useState<SinkPoint[]>(points)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [detailsTab, setDetailsTab] = useState<'chart' | 'edit'>('chart')
 
   useEffect(() => {
     const syncReferences = () => setReferences(readReferences())
@@ -284,7 +286,7 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
   }
 
   return <div className="sink-chart">
-    <div className="sink-chart-toolbar"><div className="sink-chart-title">BER vs SNR {live && <span className="live-badge">LIVE</span>}</div><div className="chart-actions"><button onClick={() => exportImage(true)} title="Copy chart as PNG" aria-label="Copy chart as PNG">Copy</button><button onClick={() => exportImage(false)} title="Export chart as PNG" aria-label="Export chart as PNG">PNG</button><button onClick={() => setDetailsOpen(true)} title="Open detailed BER report" aria-label="Open detailed BER report">Details</button></div></div>
+    <div className="sink-chart-toolbar"><div className="sink-chart-title">BER vs SNR {live && <span className="live-badge">LIVE</span>}</div><div className="chart-actions"><button onClick={() => exportImage(true)} title="Copy chart as PNG" aria-label="Copy chart as PNG">Copy</button><button onClick={() => exportImage(false)} title="Export chart as PNG" aria-label="Export chart as PNG">PNG</button><button onClick={() => { setDetailsTab('chart'); setDetailsOpen(true) }} title="Open detailed BER report" aria-label="Open detailed BER report">Details</button></div></div>
     <div className="ber-curve-controls" title="Choose a BER curve, then edit its name and style">
       <select className="ber-curve-select" value={selectedCurveId} onChange={event => { const id = event.target.value; setSelectedCurveId(id); if (id !== 'current') setVisibleReferenceIds(ids => ids.includes(id) ? ids : [...ids, id]) }} aria-label="Select BER curve to edit"><option value="current">Current run</option>{references.map(reference => <option key={reference.id} value={reference.id}>{reference.name}</option>)}</select>
       <div className="ber-curve-editor-row">
@@ -308,10 +310,11 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
     <div className="ber-legend" aria-label="BER curve legend">{curves.map((curve, index) => <div className="ber-legend-item" key={curve.id}><span className="ber-legend-swatch" style={{ borderTopColor: curve.color, borderTopStyle: curve.style === 'dot' ? 'dotted' : curve.style === 'dash' || curve.style === 'dashdot' ? 'dashed' : 'solid' }} /><span className="ber-legend-name">{curve.name}</span>{index > 0 && <><button className="ber-legend-action" onClick={() => removeReference(curve.id)} title="Hide reference">Hide</button><button className="ber-legend-delete" onClick={() => deleteReference(curve.id)} title="Delete saved reference">×</button></>}</div>)}</div>
     {notice && <div className="chart-notice">{notice}</div>}
     <div className="sink-chart-label">{current.plotted.length} SNR points plotted · {current.plotted[current.plotted.length - 1]?.frames ?? 0} frames at last point</div>
-    {detailsOpen && <div className="ber-report-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDetailsOpen(false) }}>
+    {detailsOpen && createPortal(<div className="ber-report-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDetailsOpen(false) }}>
       <div className="ber-report" role="dialog" aria-modal="true" aria-label="BER details report">
         <div className="ber-report-header"><div><small>BER REPORT</small><h2>BER vs SNR details</h2></div><button className="ber-report-close" onClick={() => setDetailsOpen(false)} aria-label="Close report">×</button></div>
-        <div className="ber-report-chart-wrap"><div className="ber-report-chart-title"><strong>BER vs SNR</strong><span>{curves.length} curve{curves.length === 1 ? '' : 's'} · {allValid.length} measured points</span></div>{renderReportPlot(reportSvgRef)}</div>
+        <div className="ber-report-tabs"><button className={detailsTab === 'chart' ? 'active' : ''} onClick={() => setDetailsTab('chart')}>Chart</button><button className={detailsTab === 'edit' ? 'active' : ''} onClick={() => setDetailsTab('edit')}>Edit &amp; Data</button></div>
+        {detailsTab === 'chart' ? <div className="ber-report-chart-wrap primary"><div className="ber-report-chart-title"><strong>BER vs SNR</strong><span>{curves.length} curve{curves.length === 1 ? '' : 's'} · {allValid.length} measured points</span></div>{renderReportPlot(reportSvgRef)}<div className="ber-report-chart-legend">{curves.map(curve => <span key={`report-legend-${curve.id}`}><i style={{ borderTopColor: curve.color, borderTopStyle: curve.style === 'dot' ? 'dotted' : curve.style === 'solid' ? 'solid' : 'dashed' }} />{curve.name}</span>)}</div></div> :
         <div className="ber-report-layout">
           <aside className="ber-report-curves"><div className="ber-report-section-title">CURVES</div><button className={`ber-report-curve ${selectedCurveId === 'current' ? 'active' : ''}`} onClick={() => setSelectedCurveId('current')}><span className="ber-report-dot" style={{ background: curveColor }} />{curveName || 'Current run'}</button>{references.map(reference => <button key={reference.id} className={`ber-report-curve ${selectedCurveId === reference.id ? 'active' : ''}`} onClick={() => { setSelectedCurveId(reference.id); setVisibleReferenceIds(ids => ids.includes(reference.id) ? ids : [...ids, reference.id]) }}><span className="ber-report-dot" style={{ background: reference.color }} />{reference.name}</button>)}</aside>
           <section className="ber-report-editor">
@@ -320,8 +323,8 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
             <div className="ber-report-table-scroll"><table className="ber-report-table"><thead><tr><th>SNR (dB)</th><th>BER</th><th>Frames</th><th>Errors</th><th /></tr></thead><tbody>{selectedPoints.map((point, index) => <tr key={`${selectedCurveId}-${index}`}><td><input type="number" step="any" value={point.snr_db} onChange={event => updateSelectedPoint(index, 'snr_db', Number(event.target.value))} /></td><td><input type="number" step="any" min="0" max="1" value={point.ber ?? ''} onChange={event => updateSelectedPoint(index, 'ber', event.target.value === '' ? null : Number(event.target.value))} /></td><td><input type="number" min="0" value={point.frames} onChange={event => updateSelectedPoint(index, 'frames', Number(event.target.value))} /></td><td><input type="number" min="0" value={point.bit_errors} onChange={event => updateSelectedPoint(index, 'bit_errors', Number(event.target.value))} /></td><td><button className="ber-report-remove" onClick={() => removeSelectedPoint(index)} aria-label={`Remove point ${index + 1}`}>×</button></td></tr>)}</tbody></table></div>
             <div className="ber-report-footer"><button className="ber-save" onClick={() => void saveSelectedReference()} disabled={selectedCurveId === 'current' && !current.valid.length}>Save selected .BER</button><button className="ber-load" onClick={() => referenceFileRef.current?.click()}>Browse / load .BER</button>{selectedCurveId !== 'current' && <button className="ber-report-delete" onClick={() => deleteReference(selectedCurveId)}>Delete selected</button>}</div>
           </section>
-        </div>
+        </div>}
       </div>
-    </div>}
+    </div>, document.body)}
   </div>
 }

@@ -52,7 +52,7 @@ export function SinkResults({ nodes, metrics, berPoints = [], berLive = false }:
     if (type === 'ser' && metrics.ser !== undefined) return <div className="sink-result-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>Symbol error rate</span></div><div className="sink-result-value">{metrics.ser.toExponential(4)}<small>{metrics.symbol_errors} / {metrics.total_symbols} errors</small></div>{detail}</div>
     return null
   }).filter(Boolean)
-  return <>{(cards.length || hasBer) ? <div className="sink-results"><div className="sink-results-title">SINK RESULTS <span>{cards.length + (hasBer ? 1 : 0)} active</span></div>{hasBer && <div className="sink-ber-card"><div className="sink-result-heading"><Gauge size={15} /><strong>BER Meter</strong><span>BER vs SNR</span></div><BerChart points={berPoints} live={berLive} /><ResultsTable points={berPoints} /></div>}<div className="sink-results-grid">{cards}</div></div> : null}{activeNode && <SinkDetail node={activeNode} metrics={metrics} onClose={() => setDetailNodeId(null)} />}</>
+  return <>{(cards.length || hasBer) ? <div className="sink-results"><div className="sink-results-title">SINK RESULTS <span>{cards.length + (hasBer ? 1 : 0)} active</span></div>{hasBer && <div className="sink-ber-card"><BerChart points={berPoints} live={berLive} /><ResultsTable points={berPoints} /></div>}<div className="sink-results-grid">{cards}</div></div> : null}{activeNode && <SinkDetail node={activeNode} metrics={metrics} onClose={() => setDetailNodeId(null)} />}</>
 }
 
 function SinkDetail({ node, metrics, onClose }: { node: FlowNode; metrics: Record<string, number>; onClose: () => void }) {

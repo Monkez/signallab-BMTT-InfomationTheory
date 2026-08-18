@@ -34,6 +34,12 @@ if errorlevel 1 (
 echo.
 echo Desktop build complete:
 echo   %SIGNALLAB_RELEASE%
+echo [SignalLab] Creating instant native launcher...
+set "SIGNALLAB_DIR=%~dp0dist\SignalLab"
+for %%I in ("%SIGNALLAB_RELEASE%") do set "SIGNALLAB_DIR=%%~dpI"
+"%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /out:"%SIGNALLAB_DIR%\SignalLabLauncher.exe" /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll tools\SignalLabLauncher.cs
+if errorlevel 1 goto :error
+echo   %SIGNALLAB_DIR%\SignalLabLauncher.exe
 exit /b 0
 
 :error

@@ -72,6 +72,15 @@ def resource_path(*parts: str) -> Path:
     return root.joinpath(*parts)
 
 
+def launcher_ready_path() -> Path | None:
+    for index, argument in enumerate(sys.argv):
+        if argument == "--launcher-ready-file" and index + 1 < len(sys.argv):
+            return Path(sys.argv[index + 1])
+        if argument.startswith("--launcher-ready-file="):
+            return Path(argument.split("=", 1)[1])
+    return None
+
+
 class NativeSplash:
     """A tiny Tk window that appears before WebView2 and backend imports."""
 
@@ -177,6 +186,12 @@ def run() -> None:
         background_color="#f4f6f8",
         js_api=project_api,
     )
+    ready_file = launcher_ready_path()
+    if ready_file:
+        try:
+            ready_file.write_text("ready", encoding="ascii")
+        except OSError:
+            pass
     try:
         webview.start(
             func=lambda: threading.Thread(target=load_frontend_when_ready, args=(window, port, splash), daemon=True).start(),

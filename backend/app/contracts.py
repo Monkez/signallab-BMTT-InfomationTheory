@@ -6,6 +6,7 @@ from typing import Any
 import numpy as np
 
 from .variables import VariableDefinitionError, parse_variable_definitions
+from .python_ports import PythonPortDefinitionError
 
 
 class SignalContractError(ValueError):
@@ -96,7 +97,7 @@ def validate_parameters(block_type: str, params: dict[str, Any]) -> list[str]:
             expected = str(params.get("output_size", "same")).strip().lower()
             if expected not in {"same", "any"}:
                 _positive_integer(expected, "output_size")
-    except (SignalContractError, VariableDefinitionError, TypeError, ValueError) as exc:
+    except (SignalContractError, VariableDefinitionError, PythonPortDefinitionError, TypeError, ValueError) as exc:
         errors.append(str(exc))
     return errors
 
@@ -243,7 +244,11 @@ def validate_outputs(
         )
     if block_type == "python":
         expected = str(params.get("output_size", "same")).strip().lower()
-        if expected == "same" and out_size != in_size:
+        # Flexible PORTS declarations may have several named outputs (or no
+        # signal input). In that mode each declared output is validated for
+        # shape, while the legacy output_size contract remains available for
+        # the default single in -> out Python Block.
+        if len(declared_outputs) == 1 and declared_outputs == ["out"] and len(inputs) == 1 and "in" in inputs and expected == "same" and out_size != in_size:
             raise SignalContractError(f"Python output must match input size: expected {in_size}, received {out_size}")
-        if expected not in {"same", "any"} and out_size != _positive_integer(expected, "output_size"):
+        if len(declared_outputs) == 1 and declared_outputs == ["out"] and len(inputs) == 1 and "in" in inputs and expected not in {"same", "any"} and out_size != _positive_integer(expected, "output_size"):
             raise SignalContractError(f"Python output must contain {expected} values, received {out_size}")

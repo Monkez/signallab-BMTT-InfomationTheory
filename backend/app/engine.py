@@ -12,6 +12,7 @@ from .block_registry import SPEC_BY_TYPE
 from .blocks import PROCESSORS, make_context, python_block, to_numpy
 from .contracts import BlockExecutionError, validate_inputs, validate_outputs, validate_parameters
 from .models import Graph, SimulationConfig, ValidationResult
+from .python_ports import PythonPortDefinitionError, parse_python_ports
 from .variables import VariableDefinitionError, collect_global_variables
 
 
@@ -34,6 +35,7 @@ def validate_graph(graph: Graph) -> ValidationResult:
     warnings: list[str] = []
     node_errors: dict[str, list[str]] = {}
     node_map = {node.id: node for node in graph.nodes}
+    node_ports: dict[str, tuple[list[str], list[str]]] = {}
 
     def block_error(node_id: str, message: str) -> None:
         node = node_map.get(node_id)
@@ -49,6 +51,17 @@ def validate_graph(graph: Graph) -> ValidationResult:
     for node in graph.nodes:
         if node.type not in SPEC_BY_TYPE:
             block_error(node.id, f"unknown type '{node.type}'")
+            continue
+        if node.type == "python":
+            try:
+                python_ports = parse_python_ports(node.code)
+                node_ports[node.id] = (python_ports.inputs, python_ports.outputs)
+            except PythonPortDefinitionError as exc:
+                block_error(node.id, str(exc))
+                node_ports[node.id] = ([], [])
+        else:
+            spec = SPEC_BY_TYPE[node.type]
+            node_ports[node.id] = (spec.inputs, spec.outputs)
         for message in validate_parameters(node.type, node.params):
             block_error(node.id, message)
     incoming: dict[str, set[str]] = {node.id: set() for node in graph.nodes}
@@ -58,12 +71,12 @@ def validate_graph(graph: Graph) -> ValidationResult:
         if edge.source not in node_map or edge.target not in node_map:
             errors.append(f"Edge '{edge.id}' references a missing block")
             continue
-        source_spec = SPEC_BY_TYPE.get(node_map[edge.source].type)
-        target_spec = SPEC_BY_TYPE.get(node_map[edge.target].type)
-        if source_spec and edge.source_handle not in source_spec.outputs:
+        source_ports = node_ports.get(edge.source)
+        target_ports = node_ports.get(edge.target)
+        if source_ports and edge.source_handle not in source_ports[1]:
             block_error(edge.source, f"edge '{edge.id}' uses unknown output port '{edge.source_handle}'")
             continue
-        if target_spec and edge.target_handle not in target_spec.inputs:
+        if target_ports and edge.target_handle not in target_ports[0]:
             block_error(edge.target, f"edge '{edge.id}' uses unknown input port '{edge.target_handle}'")
             continue
         if edge.target_handle in incoming[edge.target]:
@@ -73,9 +86,9 @@ def validate_graph(graph: Graph) -> ValidationResult:
         adjacency[edge.source].append(edge.target)
         indegree[edge.target] += 1
     for node in graph.nodes:
-        spec = SPEC_BY_TYPE.get(node.type)
-        if spec:
-            for port in spec.inputs:
+        ports = node_ports.get(node.id)
+        if ports:
+            for port in ports[0]:
                 if port not in incoming[node.id]:
                     block_error(node.id, f"missing input '{port}'")
     queue = [node_id for node_id, degree in indegree.items() if degree == 0]
@@ -208,6 +221,13 @@ def execute_trial(
         node = nodes[node_id]
         context.node_id = node_id
         spec = SPEC_BY_TYPE[node["type"]]
+        declared_outputs = spec.outputs
+        if node["type"] == "python":
+            try:
+                python_ports = parse_python_ports(node.get("code"))
+                declared_outputs = python_ports.outputs
+            except PythonPortDefinitionError as exc:
+                raise BlockExecutionError(node_id, node.get("label", "Python Block"), str(exc)) from exc
         node_inputs = {}
         for edge in incoming[node_id]:
             node_inputs[edge.get("target_handle", "in")] = outputs[edge["source"]][edge.get("source_handle", "out")]
@@ -232,7 +252,7 @@ def execute_trial(
                 result = PROCESSORS[node["type"]](node_inputs, node.get("params", {}), context)
             if not isinstance(result, dict):
                 raise ValueError("processor must return a dictionary of output ports")
-            validate_outputs(node["type"], node_inputs, result, spec.outputs, node.get("params", {}))
+            validate_outputs(node["type"], node_inputs, result, declared_outputs, node.get("params", {}))
         except BlockExecutionError:
             raise
         except Exception as exc:

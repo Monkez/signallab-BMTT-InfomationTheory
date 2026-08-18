@@ -15,6 +15,8 @@ import scipy as sp
 
 import signallab as sl
 
+from .python_ports import parse_python_ports
+
 
 def _block_rng(params, context, backend=np, salt: int = 0):
     configured_seed = int(params.get("seed", -1))
@@ -489,7 +491,9 @@ def variables_block(inputs, params, context):
 def python_block(inputs, params, context, code):
     if not code:
         return {"out": inputs.get("in")}
+    ports = parse_python_ports(code)
     namespace = {
+        "PORTS": {"inputs": ports.inputs.copy(), "outputs": ports.outputs.copy()},
         "np": np,
         "numpy": np,
         "sp": sp,
@@ -526,6 +530,9 @@ def python_block(inputs, params, context, code):
     if has_varargs or len(positional) >= 3:
         # Backward-compatible form: process(inputs, params, context) -> {"out": ...}
         result = process(inputs, runtime_params, context)
+    elif ports.explicit:
+        # Explicit PORTS use a named input mapping, even when there is only one port.
+        result = process(inputs, runtime_params) if len(positional) >= 2 else process(inputs)
     elif len(positional) == 2:
         # Recommended form: process(signal, params) -> array
         result = process(signal, runtime_params)
@@ -534,12 +541,14 @@ def python_block(inputs, params, context, code):
     else:
         result = process()
     if isinstance(result, dict):
-        if "out" not in result:
-            raise ValueError("A Python block dictionary result must contain an 'out' key")
         return result
     if result is None:
-        raise ValueError("Python block process() must return a signal array")
-    return {"out": result}
+        if ports.outputs:
+            raise ValueError("Python block process() must return a signal array or output dictionary")
+        return {}
+    if len(ports.outputs) != 1:
+        raise ValueError("A Python Block with multiple output ports must return a dictionary keyed by port name")
+    return {ports.outputs[0]: result}
 
 
 PROCESSORS: dict[str, Callable] = {

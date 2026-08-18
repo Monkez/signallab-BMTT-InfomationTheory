@@ -1,4 +1,5 @@
 import type { BlockSpec, FlowEdge, FlowNode, SimulationConfig } from '../../types'
+import { parsePythonPorts } from '../pythonEditor/ports'
 
 export type SampleCategory = 'Digital communications' | 'Information theory' | 'Python labs'
 
@@ -47,6 +48,7 @@ export function materializeSample(sample: SampleProject, specs: BlockSpec[]) {
   const specMap = new Map(specs.map(spec => [spec.type, spec]))
   const nodes: FlowNode[] = sample.graph.nodes.map(node => {
     const spec = specMap.get(node.type)
+    const pythonPorts = node.type === 'python' ? parsePythonPorts(node.code || '') : undefined
     return {
       id: node.id,
       type: 'signal',
@@ -58,8 +60,8 @@ export function materializeSample(sample: SampleProject, specs: BlockSpec[]) {
         params: { ...(spec?.defaults || {}), ...(node.params || {}) },
         code: node.code,
         portOrientation: node.port_orientation || 'standard',
-        inputs: spec?.inputs || ['in'],
-        outputs: spec?.outputs || ['out'],
+        inputs: pythonPorts?.inputs || spec?.inputs || ['in'],
+        outputs: pythonPorts?.outputs || spec?.outputs || ['out'],
       },
     }
   })

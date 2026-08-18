@@ -22,6 +22,7 @@ import { HuffmanCodebookTable } from './features/sourceTheory/HuffmanCodebookTab
 import { SampleLibraryModal } from './features/samples/SampleLibraryModal'
 import { materializeSample, type SampleProject } from './features/samples/types'
 import { VariablesEditor } from './features/variables/VariablesEditor'
+import { parsePythonPorts } from './features/pythonEditor/ports'
 import {
   attachBrowserProjectFile, clearProjectFileTarget, openProjectFile, projectDisplayName,
   saveProjectFile, supportsProjectOpenDialog,
@@ -173,6 +174,16 @@ function App() {
   const onNodeClick: NodeMouseHandler<FlowNode> = (_, node) => { setSelectedId(node.id); setRightTab('block') }
   const onNodeDragStart: OnNodeDrag<FlowNode> = (_, node) => { setSelectedId(node.id); setRightTab('block') }
   const updateSelected = (patch: Partial<FlowNode['data']>) => setNodes(items => items.map(n => ({ ...n, data: { ...n.data, ...(n.id === selectedId ? patch : {}), portPreviews: undefined, runtimeError: undefined } })))
+  const updatePythonCode = (code: string) => {
+    if (!selected || selected.data.blockType !== 'python') return
+    const layout = parsePythonPorts(code)
+    const nextInputs = new Set(layout.inputs)
+    const nextOutputs = new Set(layout.outputs)
+    const removed = edges.filter(edge => (edge.source === selected.id && !nextOutputs.has(edge.sourceHandle || 'out')) || (edge.target === selected.id && !nextInputs.has(edge.targetHandle || 'in')))
+    if (removed.length) appendLog('warning', `${removed.length} connection${removed.length === 1 ? '' : 's'} removed because the Python port declaration changed.`)
+    if (removed.length) setEdges(items => items.filter(edge => !removed.some(item => item.id === edge.id)))
+    updateSelected({ code, inputs: layout.inputs, outputs: layout.outputs })
+  }
   const loadSourceFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || !selected) return
@@ -265,10 +276,13 @@ function App() {
       const project = JSON.parse(content)
       if (!project?.graph || !Array.isArray(project.graph.nodes) || !Array.isArray(project.graph.edges)) throw new Error('Missing graph data')
       const specMap = new Map(specs.map(s => [s.type, s]))
-      const importedNodes = project.graph.nodes.map((n: any) => ({
+      const importedNodes = project.graph.nodes.map((n: any) => {
+        const pythonPorts = n.type === 'python' ? parsePythonPorts(n.code || '') : undefined
+        return {
         id: n.id, type: 'signal', position: n.position,
-        data: { label: n.label, blockType: n.type, category: specMap.get(n.type)?.category || '', params: { ...(specMap.get(n.type)?.defaults || {}), ...(n.params || {}) }, code: n.code, portOrientation: n.port_orientation || 'standard', inputs: specMap.get(n.type)?.inputs || ['in'], outputs: specMap.get(n.type)?.outputs || ['out'] },
-      })) as FlowNode[]
+        data: { label: n.label, blockType: n.type, category: specMap.get(n.type)?.category || '', params: { ...(specMap.get(n.type)?.defaults || {}), ...(n.params || {}) }, code: n.code, portOrientation: n.port_orientation || 'standard', inputs: pythonPorts?.inputs || specMap.get(n.type)?.inputs || ['in'], outputs: pythonPorts?.outputs || specMap.get(n.type)?.outputs || ['out'] },
+        }
+      }) as FlowNode[]
       const importedEdges = project.graph.edges.map((e: any) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.source_handle, targetHandle: e.target_handle }))
       const imported = project.config || {}
       const importedMaxFrames = imported.max_frames ?? imported.trials ?? defaultSimulationConfig.max_frames
@@ -425,7 +439,7 @@ function App() {
         blockName={selected?.data.label || 'Python Block'}
         value={selected?.data.code || pythonTemplate}
         template={pythonTemplate}
-        onApply={code => updateSelected({ code })}
+        onApply={updatePythonCode}
         onClose={() => setPythonEditorOpen(false)}
         onOpenDocs={openDocuments}
       /></Suspense>}
@@ -472,7 +486,7 @@ function App() {
           {result?.sink_metrics && selected.data.blockType === 'constellation' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean I / Q</span><strong>{`${result.sink_metrics.constellation_mean_i?.toFixed(3) ?? '—'} / ${result.sink_metrics.constellation_mean_q?.toFixed(3) ?? '—'}`}</strong></div><div><span>Mean |x|</span><strong>{result.sink_metrics.constellation_mean_power?.toFixed(4) ?? '—'}</strong></div></div></>}
           {sourceTheoryMetrics && selected.data.blockType === 'source_analyzer' && <><div className="section-rule"><span>SOURCE THEORY RESULTS</span></div><div className="source-theory-result"><div><span>Entropy H(X)</span><strong>{sourceTheoryMetrics.source_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Average information</span><strong>{sourceTheoryMetrics.source_average_information?.toFixed(4)} bit/symbol</strong></div><div><span>Maximum entropy</span><strong>{sourceTheoryMetrics.source_max_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Source efficiency</span><strong>{sourceTheoryMetrics.source_efficiency_percent?.toFixed(2)}%</strong></div><div><span>Alphabet size</span><strong>{sourceTheoryMetrics.source_alphabet_size}</strong></div></div></>}
           {symbolMetrics && selected.data.blockType === 'ser' && <><div className="section-rule"><span>SYMBOL RESULT</span></div><div className="source-theory-result"><div><span>Symbol error rate</span><strong>{symbolMetrics.ser?.toExponential(3)}</strong></div><div><span>Symbol errors</span><strong>{symbolMetrics.symbol_errors} / {symbolMetrics.total_symbols}</strong></div></div></>}
-          {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><div className="python-editor-inline-toolbar"><div><Braces size={14} /><span><b>process.py</b><small>Python 3 · UTF-8</small></span></div><button type="button" onClick={() => setPythonEditorOpen(true)}><Maximize2 size={14} /> Open editor</button></div><Suspense fallback={<div className="python-editor-loading">Loading Python editor…</div>}><PythonCodeEditor value={selected.data.code || pythonTemplate} onChange={code => updateSelected({ code })} /></Suspense><p className="code-hint">Read the current sweep point with <code>params["snr_db"]</code>, the frame with <code>params["trial_index"]</code>, and Variables values with <code>params["name"]</code> or <code>params["variables"]</code>. Use <code>np</code>, <code>sp</code> and <code>sl</code> normally; SignalLab parallelizes independent frames. <button type="button" onClick={openDocuments}>Read Python API</button></p></>}
+          {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><div className="python-editor-inline-toolbar"><div><Braces size={14} /><span><b>process.py</b><small>Python 3 · UTF-8</small></span></div><button type="button" onClick={() => setPythonEditorOpen(true)}><Maximize2 size={14} /> Open editor</button></div><Suspense fallback={<div className="python-editor-loading">Loading Python editor…</div>}><PythonCodeEditor value={selected.data.code || pythonTemplate} onChange={updatePythonCode} /></Suspense><p className="code-hint">Read the current sweep point with <code>params["snr_db"]</code>. For flexible ports, declare <code>PORTS = {'{'}"inputs": ["signal", "noise"], "outputs": ["out", "residual"]{'}'}</code> and write <code>process(inputs, params)</code> returning a dictionary. <button type="button" onClick={openDocuments}>Read Python API</button></p></>}
         </div> : <div className="empty-state"><Box size={32} /><h3>No block selected</h3><p>Select a block on the canvas to edit its parameters and Python code.</p></div> :
         <div className="inspector-content">
           <div className="experiment-title"><div><small>MONTE-CARLO</small><h2>Experiment</h2></div><button className="run-once" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} title="Execute one frame and capture data at every port"><Play size={13} fill="currentColor" />{runOnceActive ? 'Running…' : 'Run once'}</button></div>

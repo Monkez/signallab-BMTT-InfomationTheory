@@ -56,6 +56,44 @@ Hỗ trợ `None`, boolean, số hữu hạn, chuỗi, list, tuple và dictionar
 
 Thứ tự ưu tiên là: Variables → tham số riêng của Python Block → khóa runtime. Vì vậy SNR và seed runtime không thể bị ghi đè ngoài ý muốn.
 
+## Python Block nhiều input/output
+
+Với block thông thường, không cần khai báo gì thêm: `process(signal, params)` nhận `in` và trả `out`. Khi cần nhiều cổng, khai báo `PORTS` bằng một dictionary literal ngay đầu file:
+
+```python
+PORTS = {
+    "inputs": ["signal", "noise"],
+    "outputs": ["out", "residual"],
+}
+
+def process(inputs, params):
+    signal = np.asarray(inputs["signal"])
+    noise = np.asarray(inputs["noise"])
+    return {
+        "out": signal + noise,
+        "residual": signal - noise,
+    }
+```
+
+Ngay khi lưu code, editor cập nhật handle trên block. Các kết nối dùng tên port; nếu đổi hoặc xóa tên, những dây không còn hợp lệ sẽ bị gỡ và ghi rõ trong Console. Backend cũng đọc lại `PORTS` độc lập để không phụ thuộc vào frontend.
+
+Quy tắc:
+
+- Tên port phải bắt đầu bằng chữ, sau đó dùng chữ, số hoặc `_`.
+- Không được trùng tên trong cùng nhóm; `__metrics__` là tên nội bộ.
+- `process(inputs, params)` nhận dictionary các mảng theo tên port và phải trả dictionary cùng tên output.
+- Nếu khai báo đúng một output, có thể trả trực tiếp mảng thay vì dictionary.
+- Có thể khai báo không có input cho block nguồn tùy biến hoặc không có output cho block sink tùy biến; khi đó trả `{}`.
+- `output_size` vẫn áp dụng cho API cũ một input `in` và một output `out`. Với nhiều output, mỗi output được kiểm tra là mảng 1-D không rỗng; contract kích thước riêng có thể đặt trong code.
+
+Metadata chỉ dùng literal, không chạy hàm hay biểu thức:
+
+```python
+PORTS = {"inputs": ["in", "side_info"], "outputs": ["out"]}
+```
+
+Không dùng Python module globals để truyền dữ liệu giữa frame. Mỗi frame/worker nhận một input mapping riêng, nên mô hình này vẫn tái lập và an toàn khi SignalLab song song hóa Monte-Carlo.
+
 ## Alias có sẵn
 
 | Alias | Giá trị |

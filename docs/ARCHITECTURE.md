@@ -75,6 +75,8 @@ Mỗi node nhận `inputs`, `params`, `context` và trả về dictionary các o
 
 `variables.py` parse khối cấu hình Variables bằng `ast.parse` + `ast.literal_eval`, chỉ chấp nhận một phép gán literal trên mỗi statement. Graph chỉ được có một Variables block. Engine compile dictionary global một lần trước Run once/Benchmark rồi truyền vào context serializable cho mọi worker. `python_block` tạo params theo precedence `globals < block params < runtime`, đồng thời cung cấp namespace `params["variables"]` và `params["experiment"]`; nhờ đó SNR step, trial, seed và device không thể bị global ghi đè.
 
+Python Block mặc định giữ contract `in/out`. Nếu code có `PORTS` literal, `python_ports.py` parse tên input/output ở backend; frontend dùng parser nhẹ tương ứng để cập nhật handles và lọc edge cũ. Engine dùng port map động khi kiểm tra cạnh, missing input và declared output; không cần thay đổi `BlockSpec` catalog cho từng số cổng.
+
 Random Bits, AWGN và Rayleigh có seed riêng. `seed = -1` lấy một entropy gốc mới đúng một lần khi bắt đầu Run once/Benchmark; runtime tiếp tục trộn entropy đó với seed frame và CRC32 của node để các node/frame có stream độc lập, ổn định trước thay đổi lịch multiprocessing. Với `seed >= 0`, entropy gốc của run bị bỏ qua nên cùng graph, Experiment seed và block seed sẽ tái lập; frame vẫn khác nhau vì seed frame vẫn tham gia phép trộn.
 
 `POST /api/run-once` dùng cùng DAG runtime nhưng chỉ chạy một frame đồng bộ tại `snr_db_start`. Khi bật `capture_ports`, engine tóm tắt input/output của từng node thành dtype, shape, size, min/mean/max và tối đa 8 mẫu dạng JSON-safe. Frontend gắn summary vào node để tooltip đọc trực tiếp; dữ liệu đầy đủ được giữ sau `snapshot_id` và chỉ truyền từng trang khi tab Block yêu cầu.

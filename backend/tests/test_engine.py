@@ -11,6 +11,7 @@ from backend.app.engine import execute_trial, run_once, run_simulation, validate
 from backend.app.models import Edge, Graph, SimulationConfig
 from backend.app.main import app
 from backend.app.variables import VariableDefinitionError, parse_variable_definitions
+from backend.app.python_ports import PythonPortDefinitionError, parse_python_ports
 import numpy as np
 
 
@@ -305,6 +306,36 @@ def test_python_block_receives_current_experiment_step_and_global_variables():
     assert validate_graph(graph).valid
     result = execute_trial(graph.model_dump(), trial_index=3, seed=42, snr_db=6.5, capture_ports=True)
     assert result["port_previews"]["custom"]["outputs"]["out"]["size"] == 8
+
+
+def test_python_block_supports_named_multiple_inputs_and_outputs_declared_in_code():
+    code = """PORTS = {"inputs": ["signal", "noise"], "outputs": ["out", "residual"]}
+def process(inputs, params):
+    signal = np.asarray(inputs["signal"])
+    noise = np.asarray(inputs["noise"])
+    return {"out": signal + noise, "residual": signal - noise}
+"""
+    graph = Graph(nodes=[
+        {"id": "signal", "type": "bit_source", "label": "Signal", "params": {"length": 8, "seed": 1}},
+        {"id": "noise", "type": "bit_source", "label": "Noise", "params": {"length": 8, "seed": 2}},
+        {"id": "custom", "type": "python", "label": "Two-input Python", "params": {"output_size": "same"}, "code": code},
+    ], edges=[
+        {"id": "signal-in", "source": "signal", "target": "custom", "source_handle": "out", "target_handle": "signal"},
+        {"id": "noise-in", "source": "noise", "target": "custom", "source_handle": "out", "target_handle": "noise"},
+    ])
+    assert parse_python_ports(code).inputs == ["signal", "noise"]
+    assert parse_python_ports(code).outputs == ["out", "residual"]
+    assert validate_graph(graph).valid
+    result = execute_trial(graph.model_dump(), 0, 42, capture_ports=True)
+    assert result["port_previews"]["custom"]["outputs"]["out"]["size"] == 8
+    assert result["port_previews"]["custom"]["outputs"]["residual"]["size"] == 8
+
+
+def test_python_ports_reject_invalid_declarations():
+    with pytest.raises(PythonPortDefinitionError, match="duplicate"):
+        parse_python_ports('PORTS = {"inputs": ["in", "in"]}')
+    with pytest.raises(PythonPortDefinitionError, match="literal dictionary"):
+        parse_python_ports("PORTS = make_ports()")
 
 
 def test_validation_highlights_duplicate_variables_blocks():

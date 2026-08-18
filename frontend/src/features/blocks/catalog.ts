@@ -42,7 +42,7 @@ export const fallbackSpecs: BlockSpec[] = [
   { type: 'constellation', label: 'Constellation Sink', category: 'Sinks', description: 'I/Q sample summary', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
   { type: 'power_meter', label: 'Power Meter', category: 'Sinks', description: 'Mean signal power', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
   { type: 'ber', label: 'BER Meter', category: 'Sinks', description: 'Measure bit error rate', defaults: {}, inputs: ['reference', 'estimate'], outputs: [], gpu_compatible: true },
-  { type: 'python', label: 'Python Block', category: 'Custom', description: 'Custom NumPy processing', defaults: { gain: 1, output_size: 'same' }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
+  { type: 'python', label: 'Python Block', category: 'Custom', description: 'Custom processing · PORTS enables named multi-I/O', defaults: { gain: 1, output_size: 'same' }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
 ]
 
 export function iconFor(type: string): LucideIcon {

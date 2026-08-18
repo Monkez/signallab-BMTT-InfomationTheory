@@ -30,6 +30,8 @@ import signallab as sl
 
 # Write ordinary Python code for one signal frame.
 # SignalLab runs separate Monte-Carlo frames in parallel for you.
+# Optional named ports (the editor updates the block handles automatically):
+# PORTS = {"inputs": ["signal", "noise"], "outputs": ["out", "residual"]}
 def process(signal, params):
     # Runtime values change automatically at every SNR/frame:
     snr_db = float(params["snr_db"])

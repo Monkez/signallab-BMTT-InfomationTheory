@@ -44,7 +44,7 @@ SIZE_CONTRACTS = {
     "power_meter": "in must be a non-empty 1-D signal",
     "ber": "reference and estimate must have exactly the same size",
     "ser": "reference and estimate must contain the same number of symbols",
-    "python": "out follows output_size: same (default), any, or an exact positive length",
+    "python": "Declare PORTS in code for flexible named inputs/outputs; output_size applies to the single default out port",
 }
 
 
@@ -103,7 +103,7 @@ SPECS = [
     BlockSpec("power_meter", "Power Meter", "Sinks", "Measure mean signal power.", {}, ["in"], []),
     BlockSpec("ber", "BER Meter", "Sinks", "Compare received bits with a reference stream.", {}, ["reference", "estimate"], []),
     BlockSpec("ser", "Symbol Error Rate", "Source theory", "Compare original and decoded text symbols.", {}, ["reference", "estimate"], [], False),
-    BlockSpec("python", "Python Block", "Custom", "Write process(signal, params); the runtime handles trial parallelism.", {"gain": 1.0, "output_size": "same"}, ["in"], ["out"], False),
+    BlockSpec("python", "Python Block", "Custom", "Write process(signal, params), or declare PORTS for named multi-input/output processing.", {"gain": 1.0, "output_size": "same"}, ["in"], ["out"], False),
 ]
 
 SPEC_BY_TYPE = {spec.type: spec for spec in SPECS}

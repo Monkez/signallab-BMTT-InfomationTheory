@@ -504,7 +504,10 @@ def python_block(inputs, params, context, code):
         "signal": inputs.get("in"),
         "__builtins__": __builtins__,
     }
-    exec(compile(code, "<python-block>", "exec"), namespace, namespace)
+    try:
+        exec(compile(code, "<python-block>", "exec"), namespace, namespace)
+    except Exception as exc:
+        raise ValueError(_python_process_error(exc, code, {}, ports.inputs)) from exc
     process = namespace.get("process")
     if not callable(process):
         raise ValueError("Python block must define process(signal, params)")

@@ -25,9 +25,8 @@ Runtime tạo lại các giá trị này cho **từng frame tại từng step SN
 def process(signal, params):
     snr_db = float(params["snr_db"])
     frame = int(params["trial_index"])
-    if frame == 0:
-        print(f"Starting SNR point {snr_db} dB")
-    return signal
+    adaptive_gain = 10 ** (snr_db / 20)
+    return np.asarray(signal) * adaptive_gain
 ```
 
 Không truyền SNR bằng biến global Python và không tự viết vòng lặp sweep trong block. **Run Benchmark** gọi block nhiều lần và cập nhật `params["snr_db"]` đúng step tự động. **Run once** dùng giá trị SNR Start.

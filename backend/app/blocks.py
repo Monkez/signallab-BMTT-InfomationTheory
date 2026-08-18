@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import heapq
 import inspect
+import secrets
 import zlib
 from io import BytesIO
 from types import SimpleNamespace
@@ -10,9 +11,25 @@ from typing import Any, Callable
 
 import numpy as np
 
+
+def _block_rng(params, context, backend=np, salt: int = 0):
+    configured_seed = int(params.get("seed", -1))
+    base_seed = context.random_seed_root if configured_seed == -1 else configured_seed
+    node_hash = zlib.crc32(str(getattr(context, "node_id", "")).encode("utf-8"))
+    entropy = [
+        int(base_seed) & 0xFFFFFFFF,
+        (int(base_seed) >> 32) & 0xFFFFFFFF,
+        int(context.seed) & 0xFFFFFFFF,
+        node_hash,
+        int(salt) & 0xFFFFFFFF,
+    ]
+    derived_seed = int(np.random.SeedSequence(entropy).generate_state(1, dtype=np.uint32)[0])
+    return backend.random.default_rng(derived_seed)
+
+
 def bit_source(inputs, params, context):
     length = max(1, int(params.get("length", 4096)))
-    return {"out": context.rng.integers(0, 2, length, dtype=np.int8)}
+    return {"out": _block_rng(params, context).integers(0, 2, length, dtype=np.int8)}
 
 
 def text_source(inputs, params, context):
@@ -235,10 +252,8 @@ def awgn(inputs, params, context):
     mode = params.get("snr_mode", "fixed")
     ebn0_db = float(params.get("ebn0_db", 4.0)) if mode == "fixed" or context.snr_db is None else float(context.snr_db)
     sigma = (1.0 / (2.0 * 10.0 ** (ebn0_db / 10.0))) ** 0.5
-    if context.device == "gpu":
-        noise = context.xp.random.default_rng(context.seed).normal(0.0, sigma, samples.shape)
-    else:
-        noise = context.rng.normal(0.0, sigma, samples.shape)
+    random = _block_rng(params, context, context.xp)
+    noise = random.normal(0.0, sigma, samples.shape)
     return {"out": samples + noise}
 
 
@@ -246,13 +261,9 @@ def rayleigh(inputs, params, context):
     samples = context.xp.asarray(inputs["in"])
     ebn0_db = float(params.get("ebn0_db", 4.0)) if params.get("snr_mode", "fixed") == "fixed" or context.snr_db is None else float(context.snr_db)
     sigma = (1.0 / (2.0 * 10.0 ** (ebn0_db / 10.0))) ** 0.5
-    if context.device == "gpu":
-        random = context.xp.random.default_rng(context.seed + 17)
-        fading = (random.normal(0.0, 1.0, samples.shape) + 1j * random.normal(0.0, 1.0, samples.shape)) / (2.0 ** 0.5)
-        noise = random.normal(0.0, sigma, samples.shape) + 1j * random.normal(0.0, sigma, samples.shape)
-    else:
-        fading = (context.rng.normal(0.0, 1.0, samples.shape) + 1j * context.rng.normal(0.0, 1.0, samples.shape)) / (2.0 ** 0.5)
-        noise = context.rng.normal(0.0, sigma, samples.shape) + 1j * context.rng.normal(0.0, sigma, samples.shape)
+    random = _block_rng(params, context, context.xp)
+    fading = (random.normal(0.0, 1.0, samples.shape) + 1j * random.normal(0.0, 1.0, samples.shape)) / (2.0 ** 0.5)
+    noise = random.normal(0.0, sigma, samples.shape) + 1j * random.normal(0.0, sigma, samples.shape)
     return {"out": samples * fading + noise}
 
 
@@ -388,5 +399,22 @@ def to_numpy(value):
     return np.asarray(value)
 
 
-def make_context(xp, rng, trial_index: int, seed: int, device: str, snr_db: float | None = None):
-    return SimpleNamespace(xp=xp, rng=rng, trial_index=trial_index, seed=seed, device=device, snr_db=snr_db)
+def make_context(
+    xp,
+    rng,
+    trial_index: int,
+    seed: int,
+    device: str,
+    snr_db: float | None = None,
+    random_seed_root: int | None = None,
+):
+    return SimpleNamespace(
+        xp=xp,
+        rng=rng,
+        trial_index=trial_index,
+        seed=seed,
+        device=device,
+        snr_db=snr_db,
+        random_seed_root=secrets.randbits(64) if random_seed_root is None else random_seed_root,
+        node_id="",
+    )

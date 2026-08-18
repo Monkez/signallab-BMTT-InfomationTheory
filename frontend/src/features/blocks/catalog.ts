@@ -3,7 +3,7 @@ import type { BlockSpec } from '../../types'
 
 /** Offline catalog used while the Python API starts. The backend registry remains authoritative. */
 export const fallbackSpecs: BlockSpec[] = [
-  { type: 'bit_source', label: 'Bit Source', category: 'Sources', description: 'Random binary messages', defaults: { length: 4096 }, inputs: [], outputs: ['out'], gpu_compatible: true },
+  { type: 'bit_source', label: 'Bit Source', category: 'Sources', description: 'Random bits · seed -1 is random', defaults: { length: 4096, seed: -1 }, inputs: [], outputs: ['out'], gpu_compatible: true },
   { type: 'text_source', label: 'Text Source', category: 'Sources', description: 'UTF-8 text to bits', defaults: { text: 'HELLO', repeat: 1 }, inputs: [], outputs: ['out', 'reference'], gpu_compatible: true },
   { type: 'text_file_source', label: 'Text File Source', category: 'Sources', description: 'Load a text file as bits', defaults: { file_name: '', data_base64: '', repeat: 1 }, inputs: [], outputs: ['out', 'reference'], gpu_compatible: false },
   { type: 'image_file_source', label: 'Image File Source', category: 'Sources', description: 'Load image pixels as bits', defaults: { file_name: '', data_base64: '', mode: 'grayscale' }, inputs: [], outputs: ['out', 'reference'], gpu_compatible: false },
@@ -22,8 +22,8 @@ export const fallbackSpecs: BlockSpec[] = [
   { type: 'repetition3_decode', label: 'Repetition-3 Decoder', category: 'Channel coding', description: 'Majority decode triples', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'bpsk_mod', label: 'BPSK Modulator', category: 'Modulation', description: 'Binary phase shift keying', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'qpsk_mod', label: 'QPSK Modulator', category: 'Modulation', description: 'Map bit pairs to I/Q', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
-  { type: 'awgn', label: 'AWGN Channel', category: 'Channels', description: 'Experiment SNR sweep or fixed SNR', defaults: { ebn0_db: 4, snr_mode: 'experiment' }, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
-  { type: 'rayleigh', label: 'Rayleigh Fading', category: 'Channels', description: 'Flat fading plus noise', defaults: { ebn0_db: 4, snr_mode: 'experiment' }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
+  { type: 'awgn', label: 'AWGN Channel', category: 'Channels', description: 'Seeded AWGN · -1 is random', defaults: { ebn0_db: 4, snr_mode: 'experiment', seed: -1 }, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
+  { type: 'rayleigh', label: 'Rayleigh Fading', category: 'Channels', description: 'Seeded fading · -1 is random', defaults: { ebn0_db: 4, snr_mode: 'experiment', seed: -1 }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
   { type: 'bpsk_demod', label: 'BPSK Demodulator', category: 'Receivers', description: 'Hard decision', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'qpsk_demod', label: 'QPSK Demodulator', category: 'Receivers', description: 'Hard decision I/Q', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'hamming74_decode', label: 'Hamming Decoder', category: 'Channel coding', description: 'Systematic decode · correct 1 bit', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },

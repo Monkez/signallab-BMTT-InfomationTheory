@@ -35,11 +35,25 @@ def _positive_integer(value: Any, name: str) -> int:
     return int(numeric)
 
 
+def _random_seed(value: Any) -> int:
+    if isinstance(value, bool):
+        raise SignalContractError("Parameter 'seed' must be -1 or an integer from 0 to 4294967295")
+    try:
+        numeric = float(value)
+    except (OverflowError, TypeError, ValueError) as exc:
+        raise SignalContractError("Parameter 'seed' must be -1 or an integer from 0 to 4294967295") from exc
+    if not math.isfinite(numeric) or not numeric.is_integer() or numeric < -1 or numeric > 2**32 - 1:
+        raise SignalContractError("Parameter 'seed' must be -1 or an integer from 0 to 4294967295")
+    return int(numeric)
+
+
 def validate_parameters(block_type: str, params: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     try:
         if block_type == "bit_source":
             _positive_integer(params.get("length", 4096), "length")
+        if block_type in {"bit_source", "awgn", "rayleigh"}:
+            _random_seed(params.get("seed", -1))
         if block_type in {"text_source", "text_file_source"}:
             _positive_integer(params.get("repeat", 1), "repeat")
         if block_type == "text_source" and not str(params.get("text", "HELLO")):

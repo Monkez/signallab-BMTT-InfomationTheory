@@ -167,7 +167,7 @@ def execute_trial(
         except Exception:
             pass
     rng = np.random.default_rng(seed)
-    context = make_context(xp, rng, trial_index, seed, actual_device, snr_db)
+    context = make_context(xp, rng, trial_index, seed, actual_device, snr_db, graph_dict.get("_random_seed_root"))
     nodes = graph_dict.get("_node_map") or {node["id"]: node for node in graph_dict["nodes"]}
     outputs: dict[str, dict[str, Any]] = {}
     port_previews: dict[str, dict[str, dict[str, Any]]] = {}
@@ -181,6 +181,7 @@ def execute_trial(
     order = graph_dict.get("_execution_order") or topological_order(graph_dict)
     for node_id in order:
         node = nodes[node_id]
+        context.node_id = node_id
         spec = SPEC_BY_TYPE[node["type"]]
         node_inputs = {}
         for edge in incoming[node_id]:
@@ -239,7 +240,9 @@ def run_once(graph: Graph, config: SimulationConfig) -> dict[str, Any]:
         raise ValueError("; ".join(validation.errors))
     started = time.perf_counter()
     device, device_warnings = _execution_device(graph, config.device)
-    captured = execute_trial(graph.model_dump(), 0, config.seed, device, config.snr_db_start, capture_ports=True)
+    graph_dict = graph.model_dump()
+    graph_dict["_random_seed_root"] = int.from_bytes(os.urandom(8), "little")
+    captured = execute_trial(graph_dict, 0, config.seed, device, config.snr_db_start, capture_ports=True)
     return {
         "device": device,
         "snr_db": config.snr_db_start,
@@ -287,6 +290,7 @@ def run_simulation(
         raise ValueError("; ".join(validation.errors))
     started = time.perf_counter()
     graph_dict = graph.model_dump()
+    graph_dict["_random_seed_root"] = int.from_bytes(os.urandom(8), "little")
     # Compile immutable graph lookups once. They are plain dictionaries/lists,
     # so the compiled plan is also serializable to ProcessPool workers.
     graph_dict["_node_map"] = {node["id"]: node for node in graph_dict["nodes"]}

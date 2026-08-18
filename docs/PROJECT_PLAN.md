@@ -50,7 +50,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 ## 4. Tiêu chí chất lượng
 
 - Một sơ đồ mẫu chạy được trong dưới 3 phút kể từ lần mở đầu tiên sau setup.
-- Kết quả lặp lại với cùng graph, seed và cấu hình.
+- Kết quả lặp lại với cùng graph/cấu hình khi mọi block ngẫu nhiên dùng seed cố định; `seed=-1` chủ ý tạo run mới, còn runtime vẫn tránh lặp cùng mẫu giữa các frame.
 - Lỗi graph/code được trả về có node cụ thể và thông báo dễ hiểu.
 - UI không bị khóa khi job đang chạy; có thể hủy job.
 - Không thực thi code tùy biến trên server công cộng nếu chưa có sandbox/container.

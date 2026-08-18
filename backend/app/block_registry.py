@@ -5,7 +5,7 @@ from typing import Any
 
 
 SIZE_CONTRACTS = {
-    "bit_source": "out = length values",
+    "bit_source": "out = length values; seed = -1 is random each run",
     "text_source": "out = reference = UTF-8 bits × repeat",
     "text_file_source": "out = reference = file bits × repeat",
     "image_file_source": "out = reference = pixel bits",
@@ -25,8 +25,8 @@ SIZE_CONTRACTS = {
     "repetition3_decode": "in must be divisible by 3; out = in / 3",
     "bpsk_mod": "out = in",
     "qpsk_mod": "in must be even; out = in / 2 complex symbols",
-    "awgn": "out = in",
-    "rayleigh": "out = in",
+    "awgn": "out = in; seed = -1 is random each run",
+    "rayleigh": "out = in; seed = -1 is random each run",
     "bpsk_demod": "out = in",
     "qpsk_demod": "out = in × 2 bits",
     "scope": "in must be a non-empty 1-D signal",
@@ -53,7 +53,7 @@ class BlockSpec:
 
 
 SPECS = [
-    BlockSpec("bit_source", "Bit Source", "Sources", "Generate random binary messages.", {"length": 4096}, [], ["out"]),
+    BlockSpec("bit_source", "Bit Source", "Sources", "Generate random binary messages; seed -1 is random each run.", {"length": 4096, "seed": -1}, [], ["out"]),
     BlockSpec("text_source", "Text Source", "Sources", "Convert UTF-8 text into a repeatable bit stream.", {"text": "HELLO", "repeat": 1}, [], ["out", "reference"]),
     BlockSpec("text_file_source", "Text File Source", "Sources", "Load a UTF-8/text file and emit its bytes as bits.", {"file_name": "", "data_base64": "", "repeat": 1}, [], ["out", "reference"], False),
     BlockSpec("image_file_source", "Image File Source", "Sources", "Load an image and emit grayscale or RGB pixel bits.", {"file_name": "", "data_base64": "", "mode": "grayscale"}, [], ["out", "reference"], False),
@@ -72,8 +72,8 @@ SPECS = [
     BlockSpec("repetition3_decode", "Repetition-3 Decoder", "Channel coding", "Majority decode groups of three bits.", {}, ["in"], ["out"]),
     BlockSpec("bpsk_mod", "BPSK Modulator", "Modulation", "Map 0 → +1 and 1 → -1.", {}, ["in"], ["out"]),
     BlockSpec("qpsk_mod", "QPSK Modulator", "Modulation", "Gray-free QPSK mapping of bit pairs.", {}, ["in"], ["out"]),
-    BlockSpec("awgn", "AWGN Channel", "Channels", "Add noise from the experiment SNR sweep or a fixed value.", {"ebn0_db": 4.0, "snr_mode": "experiment"}, ["in"], ["out"]),
-    BlockSpec("rayleigh", "Rayleigh Fading", "Channels", "Flat Rayleigh fading with AWGN noise.", {"ebn0_db": 4.0, "snr_mode": "experiment"}, ["in"], ["out"], False),
+    BlockSpec("awgn", "AWGN Channel", "Channels", "Add seeded noise; seed -1 is random each run.", {"ebn0_db": 4.0, "snr_mode": "experiment", "seed": -1}, ["in"], ["out"]),
+    BlockSpec("rayleigh", "Rayleigh Fading", "Channels", "Seeded flat fading plus noise; seed -1 is random each run.", {"ebn0_db": 4.0, "snr_mode": "experiment", "seed": -1}, ["in"], ["out"], False),
     BlockSpec("bpsk_demod", "BPSK Demodulator", "Receivers", "Hard-decision BPSK detector.", {}, ["in"], ["out"]),
     BlockSpec("qpsk_demod", "QPSK Demodulator", "Receivers", "Hard-decision QPSK detector.", {}, ["in"], ["out"]),
     BlockSpec("hamming74_decode", "Hamming (7,4) Decoder", "Channel coding", "Decode systematic [data parity] words and correct one bit.", {}, ["in"], ["out"]),

@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from backend.app.blocks import PROCESSORS, make_context, python_block
 from backend.app.block_registry import SPEC_BY_TYPE
 from backend.app.contracts import BlockExecutionError
-from backend.app.contracts import validate_inputs, validate_outputs
+from backend.app.contracts import validate_inputs, validate_outputs, validate_parameters
 from backend.app.engine import execute_trial, run_once, run_simulation, validate_graph
 from backend.app.models import Edge, Graph, SimulationConfig
 from backend.app.main import app
@@ -15,7 +15,7 @@ import numpy as np
 
 def sample_graph():
     node_types = ["bit_source", "hamming74_encode", "bpsk_mod", "awgn", "bpsk_demod", "hamming74_decode", "ber"]
-    nodes = [{"id": str(i), "type": kind, "label": kind, "params": {"length": 400, "ebn0_db": 20}} for i, kind in enumerate(node_types)]
+    nodes = [{"id": str(i), "type": kind, "label": kind, "params": {"length": 400, "ebn0_db": 20, "seed": 123}} for i, kind in enumerate(node_types)]
     edges = [
         {"id": "e01", "source": "0", "target": "1", "source_handle": "out", "target_handle": "in"},
         {"id": "e12", "source": "1", "target": "2", "source_handle": "out", "target_handle": "in"},
@@ -88,6 +88,46 @@ def test_run_once_snapshot_exposes_every_port_value_by_page():
     assert payload["total"] == 400
     assert payload["offset"] == 396
     assert len(payload["values"]) == 4
+
+
+def test_random_block_seed_defaults_and_validation():
+    for block_type in ("bit_source", "awgn", "rayleigh"):
+        assert SPEC_BY_TYPE[block_type].defaults["seed"] == -1
+        assert validate_parameters(block_type, {**SPEC_BY_TYPE[block_type].defaults, "seed": -2})
+        assert not validate_parameters(block_type, {**SPEC_BY_TYPE[block_type].defaults, "seed": 0})
+
+
+@pytest.mark.parametrize(("block_type", "inputs", "extra_params"), [
+    ("bit_source", {}, {"length": 256}),
+    ("awgn", {"in": np.ones(256, dtype=np.float32)}, {"ebn0_db": 4, "snr_mode": "fixed"}),
+    ("rayleigh", {"in": np.ones(256, dtype=np.float32)}, {"ebn0_db": 4, "snr_mode": "fixed"}),
+])
+def test_random_blocks_support_random_and_reproducible_seeds(block_type, inputs, extra_params):
+    def output(block_seed: int, root: int, trial_seed: int = 77):
+        context = make_context(np, np.random.default_rng(trial_seed), 0, trial_seed, "cpu", 4.0, root)
+        context.node_id = f"test-{block_type}"
+        return np.asarray(PROCESSORS[block_type](inputs, {**extra_params, "seed": block_seed}, context)["out"])
+
+    assert np.array_equal(output(2026, 11), output(2026, 99))
+    assert not np.array_equal(output(2026, 11, 77), output(2026, 11, 78))
+    assert not np.array_equal(output(-1, 11), output(-1, 99))
+
+
+def test_run_once_random_seed_changes_and_fixed_seed_repeats_port_data():
+    graph = sample_graph()
+    graph.nodes[0].params["seed"] = -1
+    graph.nodes[3].params["seed"] = -1
+    first_random = run_once(graph, SimulationConfig(seed=42, device="cpu"))
+    second_random = run_once(graph, SimulationConfig(seed=42, device="cpu"))
+    assert not np.array_equal(first_random["_port_values"]["0"]["outputs"]["out"], second_random["_port_values"]["0"]["outputs"]["out"])
+    assert not np.array_equal(first_random["_port_values"]["3"]["outputs"]["out"], second_random["_port_values"]["3"]["outputs"]["out"])
+
+    graph.nodes[0].params["seed"] = 1001
+    graph.nodes[3].params["seed"] = 2002
+    first_fixed = run_once(graph, SimulationConfig(seed=42, device="cpu"))
+    second_fixed = run_once(graph, SimulationConfig(seed=42, device="cpu"))
+    assert np.array_equal(first_fixed["_port_values"]["0"]["outputs"]["out"], second_fixed["_port_values"]["0"]["outputs"]["out"])
+    assert np.array_equal(first_fixed["_port_values"]["3"]["outputs"]["out"], second_fixed["_port_values"]["3"]["outputs"]["out"])
 
 
 def test_hamming_rejects_input_that_would_be_silently_padded():

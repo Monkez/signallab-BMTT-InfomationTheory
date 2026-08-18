@@ -88,7 +88,7 @@ def process(signal, params):
 
 ## Định dạng dự án
 
-Project là JSON versioned với định dạng `signallab-simulation`, chứa graph và toàn bộ cấu hình Experiment. File mặc định có đuôi `.slab.json`, nhưng vẫn mở được project `.json` cũ. UI theo dõi chữ ký chỉ của dữ liệu có thể lưu (không gồm preview/runtime error) để hiện trạng thái Unsaved chính xác.
+Project là JSON versioned với định dạng `signallab-simulation`, chứa graph và toàn bộ cấu hình Experiment. File mặc định có đuôi `.slab.json`, nhưng vẫn mở được project `.json` cũ. UI theo dõi chữ ký chỉ của dữ liệu có thể lưu (không gồm preview/runtime error) để hiện trạng thái Unsaved chính xác. Lệnh New tạo graph rỗng, khôi phục cấu hình Experiment mặc định, xóa snapshot/kết quả và gọi `clearProjectFileTarget()` để lần Save đầu tiên luôn đi qua Save As.
 
 Mỗi node có `port_orientation` (`standard` hoặc `reversed`). Đây là thuộc tính trình bày của canvas: `standard` đặt input bên trái/output bên phải, còn `reversed` đặt input bên phải/output bên trái. Engine chỉ dùng id/handle nên kết quả mô phỏng không thay đổi.
 

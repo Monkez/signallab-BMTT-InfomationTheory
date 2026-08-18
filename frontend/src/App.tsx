@@ -5,7 +5,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
-  Activity, ArrowLeftRight, Box, Braces, CircleStop, FolderOpen,
+  Activity, ArrowLeftRight, Box, Braces, CircleStop, FilePlus2, FolderOpen,
   Layers3, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Save, SaveAll, Search, Terminal, Trash2, X,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
@@ -299,6 +299,24 @@ function App() {
     applyProject(opened.content, opened.name)
   }
 
+  const newSimulation = () => {
+    if (projectDirty && !window.confirm('Discard unsaved changes and create a new simulation?')) return
+    clearDiagnostics()
+    setNodes([])
+    setEdges([])
+    setConfig({ ...defaultSimulationConfig })
+    setSelectedId(null)
+    setJob(null)
+    setSnapshotId(null)
+    setError('')
+    setRightTab('run')
+    setProjectName('Untitled simulation')
+    setSavedSignature('')
+    lastSnrRef.current = null
+    void clearProjectFileTarget()
+    appendLog('info', 'New blank simulation created. Use Save to choose a project file.')
+  }
+
   const resetSample = () => {
     if (projectDirty && !window.confirm('Discard unsaved changes and reset the sample simulation?')) return
     clearDiagnostics(); setNodes(initialNodes); setEdges(initialEdges); setSelectedId('channel'); setJob(null)
@@ -330,6 +348,7 @@ function App() {
           <button className="ghost" onClick={() => setRightOpen(value => !value)} title={rightOpen ? 'Hide inspector' : 'Show inspector'}><PanelRight size={16} /></button>
           <button className={`ghost ${consoleOpen ? 'active' : ''}`} onClick={() => setConsoleOpen(value => !value)} title={consoleOpen ? 'Hide console' : 'Show console'}><PanelBottom size={16} /></button>
           <button className="ghost" onClick={resetSample} title="Reset sample"><RotateCcw size={16} /></button>
+          <button className="ghost labeled" onClick={newSimulation} disabled={executionActive} title="Create a blank simulation"><FilePlus2 size={15} /> New</button>
           <button className="ghost labeled" onClick={() => void openProject()} title="Open a SignalLab simulation"><FolderOpen size={15} /> Open</button>
           <input ref={fileRef} type="file" accept=".slab.json,.json,application/json" hidden onChange={e => { void importProject(e.target.files?.[0]); e.target.value = '' }} />
           <button className="ghost labeled save-action" onClick={() => void saveProject(false)} disabled={savingProject} title="Save simulation (Ctrl+S)"><Save size={15} /> {savingProject ? 'Saving…' : 'Save'}</button>

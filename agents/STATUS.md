@@ -54,3 +54,5 @@
 - Random Bits, AWGN và Rayleigh có block seed mặc định `-1`: mỗi Run once/Benchmark dùng entropy mới; seed `0+` tái lập nhưng vẫn tách độc lập theo node/frame. Contract chặn seed ngoài `[-1, 2^32-1]`; loader trộn defaults mới vào project cũ để field seed luôn xuất hiện.
 - Xác minh seed: backend 33/33 pass, gồm cả ba block ngẫu nhiên, random giữa hai run, tái lập với seed cố định và khác nhau giữa frame; frontend build pass, browser xác nhận Random Bits/AWGN hiện seed `-1`, helper text, Unsaved và không có console warning/error.
 - EXE chứa cơ chế block seed mới đã build và smoke test thành công tại `dist\SignalLab\SignalLab.exe`.
+- Topbar có **New** để tạo simulation trống: reset Experiment, kết quả và port snapshot, bỏ liên kết file hiện hành, đặt tên `Untitled simulation`/Unsaved và bảo vệ thay đổi chưa lưu bằng hộp thoại xác nhận. Save đầu tiên sau New yêu cầu chọn tên và vị trí file.
+- Xác minh New: backend 33/33 pass, frontend production build pass, browser xác nhận `0 blocks · 0 links` và cấu hình mặc định. Vì EXE chuẩn đang bị Windows khóa, bản cập nhật đã build/smoke test tại `dist-update\SignalLab\SignalLab.exe` mà không tự đóng phiên người dùng.

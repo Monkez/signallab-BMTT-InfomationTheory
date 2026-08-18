@@ -134,6 +134,10 @@ def process(signal, params):
 
 Python Block nạp sẵn `np/numpy`, `sp/scipy` và `sl/signallab`; các dòng import vẫn hoạt động và giúp code dễ mang sang notebook. Chỉ cần xử lý một frame và trả về mảng; runtime tự song song hóa các frame Monte-Carlo. API cũ có `inputs, params, context` vẫn được giữ tương thích. Xem tài liệu đầy đủ trong Documents hoặc thư mục `docs/python`. Không lưu code tùy biến từ nguồn không tin cậy rồi chạy.
 
+Để đọc Experiment tại frame hiện tại, dùng `params["snr_db"]`, `params["trial_index"]`, `params["frame_seed"]`, `params["device"]` hoặc dictionary `params["experiment"]`. Khi benchmark chuyển sang step SNR tiếp theo, runtime tự cập nhật các khóa này; Python Block không cần vòng lặp sweep.
+
+Khối **Configuration → Variables** khai báo tham số dùng chung bằng các phép gán literal như `symbol_rate = 1_000_000`, `rolloff = 0.35` hoặc `taps = [1.0, 0.5]`. Khối không có port và không cần nối dây; mỗi simulation chỉ dùng một khối. Trong Python Block, đọc trực tiếp `params["symbol_rate"]` hoặc đọc namespace đầy đủ `params["variables"]`. Biểu thức thực thi, import và gọi hàm bị từ chối; khai báo sai sẽ highlight block và in lỗi vào Console.
+
 Trong tab **Block**, vùng `process.py` là Python IDE editor thật với:
 
 - line number, syntax highlighting, active line và fold gutter;

@@ -31,6 +31,13 @@ import signallab as sl
 # Write ordinary Python code for one signal frame.
 # SignalLab runs separate Monte-Carlo frames in parallel for you.
 def process(signal, params):
+    # Runtime values change automatically at every SNR/frame:
+    snr_db = float(params["snr_db"])
+    trial_index = int(params["trial_index"])
+
+    # Values declared by a Variables block are available both ways:
+    # symbol_rate = params["symbol_rate"]
+    # all_globals = params["variables"]
     gain = float(params.get("gain", 1.0))
     return sl.signals.normalize_power(signal * gain)
 `

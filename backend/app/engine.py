@@ -12,6 +12,7 @@ from .block_registry import SPEC_BY_TYPE
 from .blocks import PROCESSORS, make_context, python_block, to_numpy
 from .contracts import BlockExecutionError, validate_inputs, validate_outputs, validate_parameters
 from .models import Graph, SimulationConfig, ValidationResult
+from .variables import VariableDefinitionError, collect_global_variables
 
 
 def gpu_status() -> dict[str, Any]:
@@ -41,6 +42,10 @@ def validate_graph(graph: Graph) -> ValidationResult:
 
     if not graph.nodes:
         errors.append("Graph has no blocks")
+    variable_nodes = [node for node in graph.nodes if node.type == "variables"]
+    if len(variable_nodes) > 1:
+        for node in variable_nodes:
+            block_error(node.id, "only one Variables block is allowed in a simulation")
     for node in graph.nodes:
         if node.type not in SPEC_BY_TYPE:
             block_error(node.id, f"unknown type '{node.type}'")
@@ -167,7 +172,27 @@ def execute_trial(
         except Exception:
             pass
     rng = np.random.default_rng(seed)
-    context = make_context(xp, rng, trial_index, seed, actual_device, snr_db, graph_dict.get("_random_seed_root"))
+    try:
+        global_variables = graph_dict.get("_global_variables")
+        if global_variables is None:
+            global_variables = collect_global_variables(graph_dict["nodes"])
+    except VariableDefinitionError as exc:
+        variable_node = next((node for node in graph_dict["nodes"] if node["type"] == "variables"), None)
+        raise BlockExecutionError(
+            variable_node["id"] if variable_node else "variables",
+            variable_node.get("label", "Variables") if variable_node else "Variables",
+            str(exc),
+        ) from exc
+    context = make_context(
+        xp,
+        rng,
+        trial_index,
+        seed,
+        actual_device,
+        snr_db,
+        graph_dict.get("_random_seed_root"),
+        global_variables,
+    )
     nodes = graph_dict.get("_node_map") or {node["id"]: node for node in graph_dict["nodes"]}
     outputs: dict[str, dict[str, Any]] = {}
     port_previews: dict[str, dict[str, dict[str, Any]]] = {}
@@ -241,6 +266,7 @@ def run_once(graph: Graph, config: SimulationConfig) -> dict[str, Any]:
     started = time.perf_counter()
     device, device_warnings = _execution_device(graph, config.device)
     graph_dict = graph.model_dump()
+    graph_dict["_global_variables"] = collect_global_variables(graph_dict["nodes"])
     graph_dict["_random_seed_root"] = int.from_bytes(os.urandom(8), "little")
     captured = execute_trial(graph_dict, 0, config.seed, device, config.snr_db_start, capture_ports=True)
     return {
@@ -290,6 +316,7 @@ def run_simulation(
         raise ValueError("; ".join(validation.errors))
     started = time.perf_counter()
     graph_dict = graph.model_dump()
+    graph_dict["_global_variables"] = collect_global_variables(graph_dict["nodes"])
     graph_dict["_random_seed_root"] = int.from_bytes(os.urandom(8), "little")
     # Compile immutable graph lookups once. They are plain dictionaries/lists,
     # so the compiled plan is also serializable to ProcessPool workers.

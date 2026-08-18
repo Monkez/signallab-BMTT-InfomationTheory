@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import heapq
 import inspect
 import secrets
@@ -481,6 +482,10 @@ def power_meter(inputs, params, context):
     return {"__metrics__": {"power_count": int(len(samples)), "power_sum": float(np.abs(samples).astype(float).dot(np.abs(samples).astype(float))) if len(samples) else 0.0}}
 
 
+def variables_block(inputs, params, context):
+    return {}
+
+
 def python_block(inputs, params, context, code):
     if not code:
         return {"out": inputs.get("in")}
@@ -499,14 +504,31 @@ def python_block(inputs, params, context, code):
     if not callable(process):
         raise ValueError("Python block must define process(signal, params)")
     signal = inputs.get("in")
+    global_values = copy.deepcopy(getattr(context, "global_variables", {}))
+    experiment = {
+        "snr_db": context.snr_db,
+        "trial_index": context.trial_index,
+        "seed": context.seed,
+        "device": context.device,
+    }
+    runtime_params = {
+        **global_values,
+        **copy.deepcopy(params),
+        "snr_db": context.snr_db,
+        "trial_index": context.trial_index,
+        "frame_seed": context.seed,
+        "device": context.device,
+        "experiment": experiment,
+        "variables": copy.deepcopy(global_values),
+    }
     positional = [parameter for parameter in inspect.signature(process).parameters.values() if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)]
     has_varargs = any(parameter.kind == parameter.VAR_POSITIONAL for parameter in inspect.signature(process).parameters.values())
     if has_varargs or len(positional) >= 3:
         # Backward-compatible form: process(inputs, params, context) -> {"out": ...}
-        result = process(inputs, params, context)
+        result = process(inputs, runtime_params, context)
     elif len(positional) == 2:
         # Recommended form: process(signal, params) -> array
-        result = process(signal, params)
+        result = process(signal, runtime_params)
     elif len(positional) == 1:
         result = process(signal)
     else:
@@ -521,6 +543,7 @@ def python_block(inputs, params, context, code):
 
 
 PROCESSORS: dict[str, Callable] = {
+    "variables": variables_block,
     "bit_source": bit_source,
     "text_source": text_source,
     "text_file_source": text_file_source,
@@ -578,6 +601,7 @@ def make_context(
     device: str,
     snr_db: float | None = None,
     random_seed_root: int | None = None,
+    global_variables: dict[str, Any] | None = None,
 ):
     return SimpleNamespace(
         xp=xp,
@@ -587,5 +611,6 @@ def make_context(
         device=device,
         snr_db=snr_db,
         random_seed_root=secrets.randbits(64) if random_seed_root is None else random_seed_root,
+        global_variables={} if global_variables is None else global_variables,
         node_id="",
     )

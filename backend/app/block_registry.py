@@ -5,6 +5,7 @@ from typing import Any
 
 
 SIZE_CONTRACTS = {
+    "variables": "configuration-only block; declares globals and has no signal ports",
     "bit_source": "out = length values; seed = -1 is random each run",
     "text_source": "out = reference = UTF-8 bits × repeat",
     "text_file_source": "out = reference = file bits × repeat",
@@ -63,6 +64,7 @@ class BlockSpec:
 
 
 SPECS = [
+    BlockSpec("variables", "Variables", "Configuration", "Declare typed global values available to every Python Block.", {"definitions": "symbol_rate = 1_000_000\nrolloff = 0.35\nlabel = 'Experiment A'"}, [], [], True),
     BlockSpec("bit_source", "Bit Source", "Sources", "Generate random binary messages; seed -1 is random each run.", {"length": 4096, "seed": -1}, [], ["out"]),
     BlockSpec("text_source", "Text Source", "Sources", "Convert UTF-8 text into a repeatable bit stream.", {"text": "HELLO", "repeat": 1}, [], ["out", "reference"]),
     BlockSpec("text_file_source", "Text File Source", "Sources", "Load a UTF-8/text file and emit its bytes as bits.", {"file_name": "", "data_base64": "", "repeat": 1}, [], ["out", "reference"], False),

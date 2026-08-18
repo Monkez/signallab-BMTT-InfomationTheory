@@ -10,6 +10,7 @@ from backend.app.contracts import validate_inputs, validate_outputs, validate_pa
 from backend.app.engine import execute_trial, run_once, run_simulation, validate_graph
 from backend.app.models import Edge, Graph, SimulationConfig
 from backend.app.main import app
+from backend.app.variables import VariableDefinitionError, parse_variable_definitions
 import numpy as np
 
 
@@ -258,6 +259,63 @@ def test_python_block_supports_natural_and_legacy_apis():
     assert (python_block({"in": signal}, {"gain": 3}, context, natural)["out"] == [3.0, 6.0]).all()
     legacy = "def process(inputs, params, context):\n    return {'out': inputs['in'] + 1}"
     assert (python_block({"in": signal}, {}, context, legacy)["out"] == [2.0, 3.0]).all()
+
+
+def test_variables_parser_accepts_typed_literals_and_rejects_executable_code():
+    parsed = parse_variable_definitions("""
+# Course parameters
+symbol_rate = 1_000_000
+rolloff = 0.35
+enabled = True
+label = 'Lab A'
+taps = [1.0, 0.5, 0.25]
+metadata = {'unit': 'baud'}
+""")
+    assert parsed == {
+        "symbol_rate": 1_000_000,
+        "rolloff": 0.35,
+        "enabled": True,
+        "label": "Lab A",
+        "taps": [1.0, 0.5, 0.25],
+        "metadata": {"unit": "baud"},
+    }
+    with pytest.raises(VariableDefinitionError, match="literal value"):
+        parse_variable_definitions("danger = __import__('os').getcwd()")
+    with pytest.raises(VariableDefinitionError, match="reserved"):
+        parse_variable_definitions("snr_db = 10")
+
+
+def test_python_block_receives_current_experiment_step_and_global_variables():
+    code = """def process(signal, params):
+    assert params['snr_db'] == 6.5
+    assert params['trial_index'] == 3
+    assert params['frame_seed'] == 42
+    assert params['device'] == 'cpu'
+    assert params['experiment']['snr_db'] == 6.5
+    assert params['experiment']['trial_index'] == 3
+    assert params['symbol_rate'] == 1_000_000
+    assert params['variables']['rolloff'] == 0.35
+    return signal
+"""
+    graph = Graph(nodes=[
+        {"id": "globals", "type": "variables", "label": "Variables", "params": {"definitions": "symbol_rate = 1_000_000\nrolloff = 0.35"}},
+        {"id": "source", "type": "bit_source", "label": "Source", "params": {"length": 8, "seed": 1}},
+        {"id": "custom", "type": "python", "label": "Custom", "params": {"output_size": "same"}, "code": code},
+    ], edges=[{"id": "edge", "source": "source", "target": "custom"}])
+    assert validate_graph(graph).valid
+    result = execute_trial(graph.model_dump(), trial_index=3, seed=42, snr_db=6.5, capture_ports=True)
+    assert result["port_previews"]["custom"]["outputs"]["out"]["size"] == 8
+
+
+def test_validation_highlights_duplicate_variables_blocks():
+    graph = Graph(nodes=[
+        {"id": "first", "type": "variables", "label": "Variables A", "params": {"definitions": "rate = 1"}},
+        {"id": "second", "type": "variables", "label": "Variables B", "params": {"definitions": "rate = 2"}},
+    ], edges=[])
+    validation = validate_graph(graph)
+    assert not validation.valid
+    assert "first" in validation.node_errors
+    assert "second" in validation.node_errors
 
 
 def test_file_source_and_classic_source_codecs_round_trip():

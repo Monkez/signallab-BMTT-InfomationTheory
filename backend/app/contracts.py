@@ -5,6 +5,8 @@ from typing import Any
 
 import numpy as np
 
+from .variables import VariableDefinitionError, parse_variable_definitions
+
 
 class SignalContractError(ValueError):
     """A block received or produced a signal with an invalid stream size."""
@@ -62,6 +64,8 @@ def _validate_symbol_model(params: dict[str, Any]) -> None:
 def validate_parameters(block_type: str, params: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     try:
+        if block_type == "variables":
+            parse_variable_definitions(params.get("definitions", ""))
         if block_type == "bit_source":
             _positive_integer(params.get("length", 4096), "length")
         if block_type in {"bit_source", "discrete_symbol_source", "awgn", "rayleigh"}:
@@ -92,7 +96,7 @@ def validate_parameters(block_type: str, params: dict[str, Any]) -> list[str]:
             expected = str(params.get("output_size", "same")).strip().lower()
             if expected not in {"same", "any"}:
                 _positive_integer(expected, "output_size")
-    except (SignalContractError, TypeError, ValueError) as exc:
+    except (SignalContractError, VariableDefinitionError, TypeError, ValueError) as exc:
         errors.append(str(exc))
     return errors
 

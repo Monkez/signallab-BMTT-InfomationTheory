@@ -7,7 +7,55 @@ def process(signal, params):
     return output
 ```
 
-`signal` là dữ liệu cổng `in` của một frame. `params` là dictionary tham số block. `output` có thể là list hoặc mảng NumPy một chiều; runtime bọc thành cổng `out`.
+`signal` là dữ liệu cổng `in` của một frame. `params` là dictionary gồm tham số block, trạng thái Experiment hiện tại và biến toàn cục. `output` có thể là list hoặc mảng NumPy một chiều; runtime bọc thành cổng `out`.
+
+## Đọc SNR và trạng thái Experiment
+
+Runtime tạo lại các giá trị này cho **từng frame tại từng step SNR**:
+
+| Khóa | Ý nghĩa |
+|---|---|
+| `params["snr_db"]` | SNR dB của step đang chạy |
+| `params["trial_index"]` | Chỉ số frame trong step, bắt đầu từ 0 |
+| `params["frame_seed"]` | Seed thực tế của frame hiện tại |
+| `params["device"]` | `"cpu"` hoặc `"gpu"` |
+| `params["experiment"]` | Dictionary gộp `snr_db`, `trial_index`, `seed`, `device` |
+
+```python
+def process(signal, params):
+    snr_db = float(params["snr_db"])
+    frame = int(params["trial_index"])
+    if frame == 0:
+        print(f"Starting SNR point {snr_db} dB")
+    return signal
+```
+
+Không truyền SNR bằng biến global Python và không tự viết vòng lặp sweep trong block. **Run Benchmark** gọi block nhiều lần và cập nhật `params["snr_db"]` đúng step tự động. **Run once** dùng giá trị SNR Start.
+
+## Khối Variables
+
+Thêm **Configuration → Variables** vào canvas và khai báo mỗi dòng một biến bằng Python literal:
+
+```python
+symbol_rate = 1_000_000
+rolloff = 0.35
+modulation = "QPSK"
+pilot_indices = [7, 21, 43]
+metadata = {"course": "Digital Communications", "group": 2}
+```
+
+Mỗi simulation chỉ có một Variables block và không cần nối dây. Engine đọc nó trước khi thực thi graph, bất kể vị trí block trên canvas. Python Block đọc biến theo hai cách tương đương:
+
+```python
+def process(signal, params):
+    fs = float(params["symbol_rate"])
+    rolloff = float(params["variables"]["rolloff"])
+    return signal
+```
+
+Hỗ trợ `None`, boolean, số hữu hạn, chuỗi, list, tuple và dictionary có khóa chuỗi. Để file simulation an toàn và tái lập, Variables không chạy biểu thức, import, gọi hàm hoặc tham chiếu biến khác. Các tên runtime `snr_db`, `trial_index`, `frame_seed`, `device`, `experiment`, `variables` được dành riêng. Nếu khai báo sai, block Variables được highlight đỏ và lỗi có số dòng xuất hiện trong Console.
+
+Thứ tự ưu tiên là: Variables → tham số riêng của Python Block → khóa runtime. Vì vậy SNR và seed runtime không thể bị ghi đè ngoài ý muốn.
 
 ## Alias có sẵn
 

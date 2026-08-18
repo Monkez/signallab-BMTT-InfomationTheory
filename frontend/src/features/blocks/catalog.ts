@@ -1,8 +1,9 @@
-import { Activity, Binary, Box, Braces, Gauge, Radio, Waves, type LucideIcon } from 'lucide-react'
+import { Activity, Binary, Box, Braces, Gauge, Radio, Settings2, Waves, type LucideIcon } from 'lucide-react'
 import type { BlockSpec } from '../../types'
 
 /** Offline catalog used while the Python API starts. The backend registry remains authoritative. */
 export const fallbackSpecs: BlockSpec[] = [
+  { type: 'variables', label: 'Variables', category: 'Configuration', description: 'Global parameters for every Python Block', defaults: { definitions: "symbol_rate = 1_000_000\nrolloff = 0.35\nlabel = 'Experiment A'" }, inputs: [], outputs: [], gpu_compatible: true, size_contract: 'configuration-only block; declares globals and has no signal ports' },
   { type: 'bit_source', label: 'Bit Source', category: 'Sources', description: 'Random bits · seed -1 is random', defaults: { length: 4096, seed: -1 }, inputs: [], outputs: ['out'], gpu_compatible: true },
   { type: 'text_source', label: 'Text Source', category: 'Sources', description: 'UTF-8 text to bits', defaults: { text: 'HELLO', repeat: 1 }, inputs: [], outputs: ['out', 'reference'], gpu_compatible: true },
   { type: 'text_file_source', label: 'Text File Source', category: 'Sources', description: 'Load a text file as bits', defaults: { file_name: '', data_base64: '', repeat: 1 }, inputs: [], outputs: ['out', 'reference'], gpu_compatible: false },
@@ -45,9 +46,9 @@ export const fallbackSpecs: BlockSpec[] = [
 ]
 
 export function iconFor(type: string): LucideIcon {
-  return type.includes('source') ? Binary : type.includes('awgn') || type.includes('rayleigh') ? Waves : type.includes('bpsk') || type.includes('qpsk') ? Radio : type === 'ber' ? Gauge : type === 'scope' || type === 'constellation' || type === 'power_meter' ? Activity : type === 'python' ? Braces : Box
+  return type === 'variables' ? Settings2 : type.includes('source') ? Binary : type.includes('awgn') || type.includes('rayleigh') ? Waves : type.includes('bpsk') || type.includes('qpsk') ? Radio : type === 'ber' ? Gauge : type === 'scope' || type === 'constellation' || type === 'power_meter' ? Activity : type === 'python' ? Braces : Box
 }
 
 export function miniMapColor(type: string) {
-  return type.includes('source') ? '#5b8def' : type.includes('encode') || type.includes('decode') ? '#8b72d9' : type.includes('mod') || type.includes('demod') ? '#e49a45' : type.includes('awgn') || type.includes('rayleigh') ? '#41a987' : type === 'ber' || type.includes('meter') || type === 'scope' || type === 'constellation' ? '#d26782' : type === 'python' ? '#65748b' : '#8493a8'
+  return type === 'variables' ? '#3d6f9e' : type.includes('source') ? '#5b8def' : type.includes('encode') || type.includes('decode') ? '#8b72d9' : type.includes('mod') || type.includes('demod') ? '#e49a45' : type.includes('awgn') || type.includes('rayleigh') ? '#41a987' : type === 'ber' || type.includes('meter') || type === 'scope' || type === 'constellation' ? '#d26782' : type === 'python' ? '#65748b' : '#8493a8'
 }

@@ -149,3 +149,12 @@ Trong tab **Block**, vùng `process.py` là Python IDE editor thật với:
 - font lập trình và màu cú pháp rõ ràng trên nền editor tối.
 
 Nhấn **Open editor** để mở cửa sổ code lớn. Cửa sổ này giữ một bản nháp riêng: **Cancel** đóng mà không thay đổi block, **Apply changes** mới đưa code về simulation. Có thể dùng `Ctrl+S` hoặc `Ctrl+Enter` ngay trong editor để Apply; các phím này không ghi file project khi cửa sổ code đang mở. Thanh trạng thái hiển thị Python 3, UTF-8, số dòng, số ký tự và trạng thái Modified. Các nút **API docs**, **Copy** và **Reset** giúp mở tài liệu, sao chép toàn bộ hoặc khôi phục code template.
+## Experiment modes
+
+The Experiment tab starts with a mode selector so the same canvas can be used for BER lessons, signal measurements, and other sink-based exercises:
+
+- **Specific steps** runs exactly the comma-separated SNR values entered in `SNR points` (for example `-4, -2, 0, 3, 6`). Each point uses the exact `Frames / SNR` count.
+- **BER benchmark** is the adaptive Monte-Carlo mode. Each SNR point runs until `Min frames / SNR` and `Min errors / SNR` are reached, or until the frame limit is reached. Use this for BER curves.
+- **Signal sweep** runs a regular Start/Stop/Step sweep with a fixed number of frames at every point. It is suitable for power, constellation, scope, source-theory, or custom Python sinks even when no BER Meter exists.
+
+The selected SNR is exposed to channels and Python Blocks as `params["snr_db"]`. Results are rendered from the sinks present in the graph, so non-BER experiments do not show BER-specific controls or charts.

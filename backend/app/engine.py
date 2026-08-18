@@ -288,10 +288,11 @@ def run_once(graph: Graph, config: SimulationConfig) -> dict[str, Any]:
     graph_dict = graph.model_dump()
     graph_dict["_global_variables"] = collect_global_variables(graph_dict["nodes"])
     graph_dict["_random_seed_root"] = int.from_bytes(os.urandom(8), "little")
-    captured = execute_trial(graph_dict, 0, config.seed, device, config.snr_db_start, capture_ports=True)
+    snr_db = float(config.snr_db_points[0] if config.mode == "specific_steps" else config.snr_db_start)
+    captured = execute_trial(graph_dict, 0, config.seed, device, snr_db, capture_ports=True)
     return {
         "device": device,
-        "snr_db": config.snr_db_start,
+        "snr_db": snr_db,
         "elapsed_seconds": time.perf_counter() - started,
         "metrics": captured["metrics"],
         "sink_metrics": _sink_metrics(captured["metrics"]),
@@ -376,14 +377,19 @@ def run_simulation(
     graph_dict["_execution_order"] = topological_order(graph_dict)
     max_frames = config.max_frames or config.trials
     min_frames = min(config.min_frames, max_frames)
-    if config.snr_db_stop < config.snr_db_start:
-        raise ValueError("SNR stop must be greater than or equal to SNR start")
-    snr_values = [
-        round(float(value), 6)
-        for value in np.arange(config.snr_db_start, config.snr_db_stop + config.snr_db_step * 0.5, config.snr_db_step)
-    ]
-    if not snr_values:
-        snr_values = [round(float(config.snr_db_start), 6)]
+    if config.mode == "specific_steps":
+        snr_values = [round(float(value), 6) for value in config.snr_db_points]
+        if len(set(snr_values)) != len(snr_values):
+            raise ValueError("Specific SNR steps must be unique")
+    else:
+        if config.snr_db_stop < config.snr_db_start:
+            raise ValueError("SNR stop must be greater than or equal to SNR start")
+        snr_values = [
+            round(float(value), 6)
+            for value in np.arange(config.snr_db_start, config.snr_db_stop + config.snr_db_step * 0.5, config.snr_db_step)
+        ]
+        if not snr_values:
+            snr_values = [round(float(config.snr_db_start), 6)]
     device, device_warnings = _execution_device(graph, config.device)
     cpu_count = os.cpu_count() or 1
     # Auto mode avoids creating one OS process per frame on high-core machines
@@ -453,9 +459,11 @@ def run_simulation(
                         "snr_count": len(snr_values),
                         "snr_points": live_points,
                     })
-                stop_criteria_met = point["frames"] >= min_frames and (
-                    point["bit_errors"] >= config.min_errors or point["frames"] >= max_frames
-                )
+                stop_criteria_met = point["frames"] >= max_frames
+                if config.mode == "ber_benchmark":
+                    stop_criteria_met = point["frames"] >= min_frames and (
+                        point["bit_errors"] >= config.min_errors or point["frames"] >= max_frames
+                    )
                 if was_cancelled or stop_criteria_met:
                     break
             point_results.append({

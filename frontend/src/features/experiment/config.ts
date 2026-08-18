@@ -1,6 +1,7 @@
 import type { SimulationConfig } from '../../types'
 
 export const defaultSimulationConfig: SimulationConfig = {
+  mode: 'ber_benchmark',
   trials: 100,
   max_frames: 100,
   min_frames: 20,
@@ -8,6 +9,7 @@ export const defaultSimulationConfig: SimulationConfig = {
   snr_db_start: -2,
   snr_db_stop: 10,
   snr_db_step: 2,
+  snr_db_points: [-2, 0, 2, 4, 6, 8, 10],
   workers: 0,
   seed: 2026,
   device: 'auto',
@@ -15,10 +17,17 @@ export const defaultSimulationConfig: SimulationConfig = {
 }
 
 export function snrPointCount(config: SimulationConfig) {
+  if (config.mode === 'specific_steps') return Math.max(1, config.snr_db_points.length)
   return Math.max(1, Math.floor((config.snr_db_stop - config.snr_db_start) / config.snr_db_step + 1e-9) + 1)
 }
 
 export function validateSimulationConfig(config: SimulationConfig) {
+  if (!['specific_steps', 'ber_benchmark', 'parameter_sweep'].includes(config.mode)) return 'Choose a valid experiment mode.'
+  if (config.mode === 'specific_steps') {
+    if (!Array.isArray(config.snr_db_points) || !config.snr_db_points.length) return 'Specific steps must contain at least one SNR point.'
+    if (config.snr_db_points.some(value => !Number.isFinite(value))) return 'Specific SNR steps must be finite numbers.'
+    if (new Set(config.snr_db_points).size !== config.snr_db_points.length) return 'Specific SNR steps must be unique.'
+  }
   if (!Number.isFinite(config.snr_db_start) || !Number.isFinite(config.snr_db_stop)) return 'SNR start and stop must be finite numbers.'
   if (!Number.isFinite(config.snr_db_step) || config.snr_db_step <= 0) return 'SNR step must be greater than 0.'
   if (config.snr_db_stop < config.snr_db_start) return 'SNR stop must be greater than or equal to start.'

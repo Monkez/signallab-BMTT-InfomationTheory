@@ -64,6 +64,23 @@ def test_simulation_is_reproducible():
     assert first["port_previews"]["0"]["outputs"]["out"]["shape"] == [400]
 
 
+def test_specific_steps_mode_runs_exact_points_with_fixed_frames():
+    config = SimulationConfig(
+        mode="specific_steps",
+        max_frames=2,
+        min_frames=1,
+        min_errors=999999,
+        snr_db_points=[3.5, -1.0, 8.0],
+        workers=1,
+        seed=7,
+        chunk_size=1,
+        device="cpu",
+    )
+    result = run_simulation(sample_graph(), config)
+    assert [point["snr_db"] for point in result["snr_points"]] == [3.5, -1.0, 8.0]
+    assert all(point["frames"] == 2 for point in result["snr_points"])
+
+
 def test_run_once_captures_input_and_output_port_samples():
     result = run_once(sample_graph(), SimulationConfig(seed=42, device="cpu"))
     source = result["port_previews"]["0"]["outputs"]["out"]

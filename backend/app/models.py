@@ -43,6 +43,7 @@ class Graph(BaseModel):
 
 
 class SimulationConfig(BaseModel):
+    mode: Literal["specific_steps", "ber_benchmark", "parameter_sweep"] = "ber_benchmark"
     trials: int = Field(default=100, ge=1, le=1_000_000)
     max_frames: int | None = Field(default=None, ge=1, le=1_000_000)
     min_frames: int = Field(default=100, ge=1, le=1_000_000)
@@ -50,6 +51,7 @@ class SimulationConfig(BaseModel):
     snr_db_start: float = -2.0
     snr_db_stop: float = 10.0
     snr_db_step: float = Field(default=2.0, gt=0)
+    snr_db_points: list[float] = Field(default_factory=lambda: [-2.0, 0.0, 2.0, 4.0, 6.0, 8.0, 10.0], min_length=1, max_length=10_000)
     workers: int = Field(default=0, ge=0, le=256)
     seed: int = Field(default=2026, ge=0, le=2**32 - 1)
     device: Literal["auto", "cpu", "gpu"] = "auto"

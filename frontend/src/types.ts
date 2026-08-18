@@ -72,6 +72,7 @@ export type BlockSpec = {
 }
 
 export type SimulationConfig = {
+  mode: 'specific_steps' | 'ber_benchmark' | 'parameter_sweep'
   trials: number
   max_frames: number
   min_frames: number
@@ -79,6 +80,7 @@ export type SimulationConfig = {
   snr_db_start: number
   snr_db_stop: number
   snr_db_step: number
+  snr_db_points: number[]
   workers: number
   seed: number
   device: 'auto' | 'cpu' | 'gpu'

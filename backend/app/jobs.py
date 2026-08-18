@@ -23,7 +23,10 @@ class JobManager:
         job_id = uuid.uuid4().hex
         event = threading.Event()
         max_frames = request.config.max_frames or request.config.trials
-        snr_count = max(1, math.floor((request.config.snr_db_stop - request.config.snr_db_start) / request.config.snr_db_step + 1e-9) + 1)
+        if request.config.mode == "specific_steps":
+            snr_count = len(request.config.snr_db_points)
+        else:
+            snr_count = max(1, math.floor((request.config.snr_db_stop - request.config.snr_db_start) / request.config.snr_db_step + 1e-9) + 1)
         with self.lock:
             self.cancel_events[job_id] = event
             self.jobs[job_id] = {

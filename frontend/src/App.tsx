@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow, Background, Controls, MiniMap, addEdge, useNodesState, useEdgesState,
   BackgroundVariant, MarkerType, type Connection, type EdgeChange, type NodeMouseHandler, type OnNodeDrag,
@@ -6,7 +6,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import {
   Activity, ArrowLeftRight, BookOpen, Box, Braces, CircleStop, FilePlus2, FolderOpen,
-  Layers3, LibraryBig, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Save, SaveAll, Search, Terminal, Trash2, X,
+  Layers3, LibraryBig, Maximize2, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Save, SaveAll, Search, Terminal, Trash2, X,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
 import { cancelJob, createJob, getJob, graphPayload, GraphApiError, runGraphOnce } from './api'
@@ -40,6 +40,9 @@ const openDocuments = () => {
   window.open(url.toString(), 'signallab-documents', 'popup=yes,width=1240,height=820,resizable=yes,scrollbars=yes')?.focus()
 }
 
+const PythonCodeEditor = lazy(() => import('./features/pythonEditor/PythonCodeEditor').then(module => ({ default: module.PythonCodeEditor })))
+const PythonEditorModal = lazy(() => import('./features/pythonEditor/PythonEditorModal').then(module => ({ default: module.PythonEditorModal })))
+
 function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
@@ -64,6 +67,7 @@ function App() {
   const [savedSignature, setSavedSignature] = useState(() => projectSignature(initialNodes, initialEdges, defaultSimulationConfig))
   const [savingProject, setSavingProject] = useState(false)
   const [samplesOpen, setSamplesOpen] = useState(false)
+  const [pythonEditorOpen, setPythonEditorOpen] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
   const bootLoggedRef = useRef(false)
@@ -363,7 +367,7 @@ function App() {
 
   useEffect(() => {
     const onSaveShortcut = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 's') return
+      if (event.defaultPrevented || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 's') return
       event.preventDefault()
       void saveProject(event.shiftKey)
     }
@@ -398,16 +402,25 @@ function App() {
           <button className="ghost" onClick={() => setRightOpen(value => !value)} title={rightOpen ? 'Hide inspector' : 'Show inspector'}><PanelRight size={16} /></button>
           <button className={`ghost ${consoleOpen ? 'active' : ''}`} onClick={() => setConsoleOpen(value => !value)} title={consoleOpen ? 'Hide console' : 'Show console'}><PanelBottom size={16} /></button>
           <button className="ghost" onClick={resetSample} title="Reset sample"><RotateCcw size={16} /></button>
-          <button className="ghost labeled" onClick={newSimulation} disabled={executionActive} title="Create a blank simulation"><FilePlus2 size={15} /> New</button>
-          <button className="ghost labeled" onClick={() => void openProject()} title="Open a SignalLab simulation"><FolderOpen size={15} /> Open</button>
+          <button className="ghost labeled compact-label" onClick={newSimulation} disabled={executionActive} title="Create a blank simulation"><FilePlus2 size={15} /><span>New</span></button>
+          <button className="ghost labeled compact-label" onClick={() => void openProject()} title="Open a SignalLab simulation"><FolderOpen size={15} /><span>Open</span></button>
           <button className="ghost labeled samples-action" onClick={() => setSamplesOpen(true)} title="Open a complete learning sample"><LibraryBig size={15} /><span>Open Samples</span></button>
           <input ref={fileRef} type="file" accept=".slab.json,.json,application/json" hidden onChange={e => { void importProject(e.target.files?.[0]); e.target.value = '' }} />
-          <button className="ghost labeled save-action" onClick={() => void saveProject(false)} disabled={savingProject} title="Save simulation (Ctrl+S)"><Save size={15} /> {savingProject ? 'Saving…' : 'Save'}</button>
-          <button className="ghost labeled" onClick={() => void saveProject(true)} disabled={savingProject} title="Save simulation as a new file (Ctrl+Shift+S)"><SaveAll size={15} /> Save As</button>
+          <button className="ghost labeled save-action compact-label" onClick={() => void saveProject(false)} disabled={savingProject} title="Save simulation (Ctrl+S)"><Save size={15} /><span>{savingProject ? 'Saving…' : 'Save'}</span></button>
+          <button className="ghost labeled compact-label" onClick={() => void saveProject(true)} disabled={savingProject} title="Save simulation as a new file (Ctrl+Shift+S)"><SaveAll size={15} /><span>Save As</span></button>
           <button className="ghost labeled documents-action" onClick={openDocuments} title="Open SignalLab documentation in a separate window"><BookOpen size={15} /><span>Documents</span></button>
         </div>
       </header>
       <SampleLibraryModal open={samplesOpen} onClose={() => setSamplesOpen(false)} onOpenSample={openCatalogSample} />
+      {pythonEditorOpen && selected?.data.blockType === 'python' && <Suspense fallback={null}><PythonEditorModal
+        open={pythonEditorOpen && selected?.data.blockType === 'python'}
+        blockName={selected?.data.label || 'Python Block'}
+        value={selected?.data.code || pythonTemplate}
+        template={pythonTemplate}
+        onApply={code => updateSelected({ code })}
+        onClose={() => setPythonEditorOpen(false)}
+        onOpenDocs={openDocuments}
+      /></Suspense>}
 
       <aside className={`library ${leftOpen ? '' : 'collapsed'}`}>
         <div className="panel-title"><Layers3 size={16} /><span>Block library</span><small>{specs.length} blocks</small></div>
@@ -450,7 +463,7 @@ function App() {
           {result?.sink_metrics && selected.data.blockType === 'constellation' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean I / Q</span><strong>{`${result.sink_metrics.constellation_mean_i?.toFixed(3) ?? '—'} / ${result.sink_metrics.constellation_mean_q?.toFixed(3) ?? '—'}`}</strong></div><div><span>Mean |x|</span><strong>{result.sink_metrics.constellation_mean_power?.toFixed(4) ?? '—'}</strong></div></div></>}
           {sourceTheoryMetrics && selected.data.blockType === 'source_analyzer' && <><div className="section-rule"><span>SOURCE THEORY RESULTS</span></div><div className="source-theory-result"><div><span>Entropy H(X)</span><strong>{sourceTheoryMetrics.source_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Average information</span><strong>{sourceTheoryMetrics.source_average_information?.toFixed(4)} bit/symbol</strong></div><div><span>Maximum entropy</span><strong>{sourceTheoryMetrics.source_max_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Source efficiency</span><strong>{sourceTheoryMetrics.source_efficiency_percent?.toFixed(2)}%</strong></div><div><span>Alphabet size</span><strong>{sourceTheoryMetrics.source_alphabet_size}</strong></div></div></>}
           {symbolMetrics && selected.data.blockType === 'ser' && <><div className="section-rule"><span>SYMBOL RESULT</span></div><div className="source-theory-result"><div><span>Symbol error rate</span><strong>{symbolMetrics.ser?.toExponential(3)}</strong></div><div><span>Symbol errors</span><strong>{symbolMetrics.symbol_errors} / {symbolMetrics.total_symbols}</strong></div></div></>}
-          {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><textarea className="code-editor" spellCheck={false} value={selected.data.code || pythonTemplate} onChange={e => updateSelected({ code: e.target.value })} /><p className="code-hint">Use <code>np</code>, <code>sp</code> and <code>sl</code> for NumPy, SciPy and SignalLab. Write <code>process(signal, params)</code> and return a 1-D array. Keep <code>output_size=same</code> for normal processing. SignalLab runs independent Monte-Carlo trials in parallel. <button type="button" onClick={openDocuments}>Read Python API</button></p></>}
+          {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><div className="python-editor-inline-toolbar"><div><Braces size={14} /><span><b>process.py</b><small>Python 3 · UTF-8</small></span></div><button type="button" onClick={() => setPythonEditorOpen(true)}><Maximize2 size={14} /> Open editor</button></div><Suspense fallback={<div className="python-editor-loading">Loading Python editor…</div>}><PythonCodeEditor value={selected.data.code || pythonTemplate} onChange={code => updateSelected({ code })} /></Suspense><p className="code-hint">Use <code>np</code>, <code>sp</code> and <code>sl</code> for NumPy, SciPy and SignalLab. Write <code>process(signal, params)</code> and return a 1-D array. Keep <code>output_size=same</code> for normal processing. SignalLab runs independent Monte-Carlo trials in parallel. <button type="button" onClick={openDocuments}>Read Python API</button></p></>}
         </div> : <div className="empty-state"><Box size={32} /><h3>No block selected</h3><p>Select a block on the canvas to edit its parameters and Python code.</p></div> :
         <div className="inspector-content">
           <div className="experiment-title"><div><small>MONTE-CARLO</small><h2>Experiment</h2></div><button className="run-once" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} title="Execute one frame and capture data at every port"><Play size={13} fill="currentColor" />{runOnceActive ? 'Running…' : 'Run once'}</button></div>

@@ -8,7 +8,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 
 - Canvas kéo-thả, nối cổng, phóng to/thu nhỏ, lưu/mở file mô phỏng `.slab.json`; Save ghi lại file hiện tại và hỗ trợ `Ctrl+S`.
 - Thư viện khối: nguồn bit, Hamming(7,4), BPSK, AWGN, giải điều chế, giải mã, BER và Python tùy biến.
-- Panel thuộc tính và trình soạn Python có mẫu NumPy.
+- Panel thuộc tính có Python IDE editor với syntax highlighting, line number và cửa sổ chỉnh sửa lớn chuyên biệt; code mẫu dùng NumPy/SciPy/SignalLab.
 - Kiểm tra DAG, cổng kết nối và tham số trước khi chạy.
 - Job Monte-Carlo bất đồng bộ, seed tái lập, chạy tuần tự hoặc đa tiến trình.
 - Chế độ `auto`, `cpu`, `gpu`; tự phát hiện CuPy/CUDA và tự hạ cấp an toàn về CPU.

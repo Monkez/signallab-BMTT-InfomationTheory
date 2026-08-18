@@ -2,6 +2,8 @@
 
 SignalLab is a local, visual digital-communications simulator inspired by Simulink and GNU Radio. Build a block graph in the browser, edit simple Python blocks, and run reproducible Monte-Carlo experiments on CPU or a compatible GPU.
 
+Python Blocks include a CodeMirror-based IDE editor with Python syntax highlighting, line numbers, bracket matching and a large draft-based editing window.
+
 The interface uses a high-contrast light layout with a bundled SignalLab logo and app icon. Select a block and press `Delete` to remove it and its links.
 
 Use **Open Samples** on the top bar to browse nine complete learning labs for BPSK/QPSK, channel coding, source entropy, Huffman/Shannon–Fano and custom Python blocks. Every sample includes learning objectives, guided steps and expected observations before it is opened as an editable simulation.

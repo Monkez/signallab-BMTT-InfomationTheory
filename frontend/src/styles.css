@@ -25,13 +25,15 @@ button { color: inherit; border: 0; cursor: pointer; }
 .ghost:hover, .ghost.active { background: #eef4ff; color: #1f57ba; border-color: #cbdaf7; }
 .ghost:disabled { opacity: .55; cursor: default; }
 .ghost.labeled { padding: 0 10px; font-size: 11px; }
+.top-actions .ghost { flex: 0 0 auto; white-space: nowrap; }
 .ghost.save-action { color: #184fae; border-color: #cbdaf7; background: #f4f7ff; }
 .samples-action { color: #284f7d; border-color: #d5dfeb; background: #f8fafc; }
 .documents-action { border-left-color: var(--line); border-radius: 0 6px 6px 0; margin-left: 2px; }
 .run-wide { background: var(--accent); color: #fff; border-radius: 6px; height: 35px; padding: 0 15px; display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; }
 .run-wide:hover { background: #1d4ed8; }
 .run-wide:disabled { opacity: .55; cursor: default; }
-@media (max-width: 1200px) { .samples-action span, .documents-action span { display: none; } .samples-action, .documents-action { padding: 0; min-width: 34px; border-radius: 6px; } }
+@media (max-width: 1450px) { .samples-action span, .documents-action span { display: none; } .samples-action, .documents-action { padding: 0; min-width: 34px; border-radius: 6px; } }
+@media (max-width: 1320px) { .compact-label span { display: none; } .compact-label { padding: 0 !important; min-width: 34px; } }
 
 /* Built-in learning samples */
 .samples-overlay { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; padding: 24px; background: rgba(26, 35, 48, .42); backdrop-filter: blur(3px); }
@@ -227,7 +229,17 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .section-rule:after { content: ''; height: 1px; background: var(--line); flex: 1; }
 .section-rule em { font-style: normal; color: #8792a0; letter-spacing: 0; order: 2; }
 .muted, .code-hint { font-size: 9px; color: #788493; line-height: 1.6; }
-.code-editor { width: 100%; min-height: 260px; resize: vertical; border: 1px solid var(--line-strong); background: #f8fafc; border-radius: 6px; padding: 11px; color: #283548; font: 9px/1.7 Consolas, monospace; outline: none; tab-size: 4; }
+.python-editor-inline-toolbar { min-height: 39px; padding: 0 8px 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid #29384b; border-bottom: 0; border-radius: 7px 7px 0 0; background: #172231; color: #aebed2; }
+.python-editor-inline-toolbar > div { min-width: 0; display: flex; align-items: center; gap: 7px; }
+.python-editor-inline-toolbar span { min-width: 0; }
+.python-editor-inline-toolbar b, .python-editor-inline-toolbar small { display: block; }
+.python-editor-inline-toolbar b { overflow: hidden; color: #dbe6f3; font: 600 10px "Cascadia Code", Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.python-editor-inline-toolbar small { margin-top: 2px; color: #708198; font-size: 7px; }
+.python-editor-inline-toolbar button { min-height: 27px; padding: 0 8px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid #3b4e68; border-radius: 5px; background: #202f42; color: #c4d4e8; font-size: 9px; white-space: nowrap; }
+.python-editor-inline-toolbar button:hover { border-color: #6389bd; background: #29405e; color: #fff; }
+.python-code-editor { overflow: hidden; border: 1px solid #29384b; border-radius: 0 0 7px 7px; box-shadow: 0 4px 12px rgba(20, 31, 45, .12); }
+.python-code-editor .cm-editor { width: 100%; }
+.python-editor-loading { height: 290px; display: grid; place-items: center; border: 1px solid #29384b; border-radius: 0 0 7px 7px; background: #101823; color: #7f91a8; font: 10px Consolas, monospace; }
 .code-hint code { color: #2459b8; }
 .code-hint button { padding: 0; color: #1f57ba; background: transparent; font-weight: 600; text-decoration: underline; }
 .code-hint button:hover { color: #123f8d; }
@@ -430,7 +442,6 @@ label { font-size: 12px; }
 input, select { font-size: 13px; height: 38px; }
 .section-rule { font-size: 9px; }
 .muted, .code-hint { font-size: 12px; }
-.code-editor { font-size: 12px; min-height: 290px; }
 .empty-state h3 { font-size: 15px; }
 .empty-state p { font-size: 12px; }
 .experiment-title h2 { font-size: 21px; }
@@ -442,3 +453,52 @@ input, select { font-size: 13px; height: 38px; }
 .error-box, .warning { font-size: 10px; }
 .metric span { font-size: 9px; }
 .metric strong { font-size: 15px; }
+
+/* Professional Python Block editor */
+.python-editor-overlay { position: fixed; inset: 0; z-index: 6500; display: grid; place-items: center; padding: 24px; background: rgba(20, 29, 41, .48); backdrop-filter: blur(4px); }
+.python-editor-modal { width: min(1280px, calc(100vw - 48px)); height: min(860px, calc(100vh - 48px)); min-height: 560px; overflow: hidden; display: grid; grid-template-rows: 72px minmax(0, 1fr) 64px; border: 1px solid #bfc9d6; border-radius: 11px; background: #f6f8fb; box-shadow: 0 28px 80px rgba(13, 22, 35, .34); }
+.python-editor-modal-header { padding: 0 17px 0 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #d7dee7; background: #fff; }
+.python-editor-file-icon { flex: 0 0 auto; width: 39px; height: 39px; display: grid; place-items: center; border-radius: 8px; background: #eaf1fb; color: #285ea9; }
+.python-editor-file-title { min-width: 0; }
+.python-editor-file-title > span { display: block; color: #718198; font-size: 8px; letter-spacing: .12em; }
+.python-editor-file-title h2 { margin: 3px 0 0; overflow: hidden; color: #263448; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.python-editor-file-title small { display: block; margin-top: 2px; color: #8a96a6; font: 9px Consolas, monospace; }
+.python-editor-modal-actions { margin-left: auto; display: flex; align-items: center; gap: 5px; }
+.python-editor-modal-actions button { min-height: 32px; padding: 0 9px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid #d2dae4; border-radius: 6px; background: #fff; color: #59697e; font-size: 10px; white-space: nowrap; }
+.python-editor-modal-actions button:hover:not(:disabled) { border-color: #91add1; background: #f1f6fd; color: #285ea9; }
+.python-editor-modal-actions button:disabled { opacity: .42; cursor: default; }
+.python-editor-modal-actions .python-editor-close { width: 34px; padding: 0; margin-left: 4px; border-color: transparent; background: transparent; }
+.python-editor-modal-actions .python-editor-close:hover { border-color: #e2c4c8; background: #fff1f2; color: #b12e43; }
+.python-editor-workbench { min-width: 0; min-height: 0; margin: 13px 15px 0; overflow: hidden; display: grid; grid-template-rows: 37px minmax(0, 1fr) 28px; border: 1px solid #29384b; border-radius: 8px; background: #101823; box-shadow: 0 8px 22px rgba(17, 27, 40, .16); }
+.python-editor-tabbar { display: flex; align-items: flex-end; border-bottom: 1px solid #29384b; background: #0c131d; }
+.python-editor-tabbar > div { height: 36px; min-width: 160px; padding: 0 14px; display: inline-flex; align-items: center; gap: 7px; border-right: 1px solid #29384b; color: #9aacbf; font: 10px "Cascadia Code", Consolas, monospace; }
+.python-editor-tabbar > div.active { border-top: 2px solid #4f8edc; background: #101823; color: #d8e2ef; }
+.python-editor-tabbar i { margin-left: auto; color: #e0a343; font-size: 8px; font-style: normal; }
+.python-dot { width: 9px; height: 9px; border-radius: 3px; background: linear-gradient(135deg, #4e91df 50%, #f0c04f 50%); }
+.python-code-editor-large { min-height: 0; border: 0; border-radius: 0; box-shadow: none; }
+.python-code-editor-large .cm-editor, .python-code-editor-large .cm-scroller { height: 100%; }
+.python-code-editor-large .cm-scroller { overflow: auto; }
+.python-code-editor-large .cm-editor { font-size: 14px; }
+.python-editor-statusbar { min-width: 0; padding: 0 11px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #29384b; background: #142032; color: #8699b2; font-size: 9px; }
+.python-editor-statusbar > div { min-width: 0; display: flex; align-items: center; gap: 13px; }
+.python-editor-statusbar span { white-space: nowrap; }
+.python-editor-statusbar span + span { position: relative; }
+.python-editor-statusbar span + span:before { content: ''; position: absolute; left: -7px; top: 50%; width: 2px; height: 2px; border-radius: 50%; background: #52657e; }
+.python-editor-modal-footer { min-width: 0; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; border-top: 1px solid #d7dee7; background: #fff; }
+.python-editor-modal-footer p { min-width: 0; margin: 0; overflow: hidden; color: #6c7a8d; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.python-editor-modal-footer code { color: #285ea9; font: 10px Consolas, monospace; }
+.python-editor-modal-footer kbd { min-width: 25px; padding: 2px 5px; border: 1px solid #cfd7e1; border-bottom-width: 2px; border-radius: 4px; background: #f7f9fb; color: #53657c; font: 8px "Segoe UI", sans-serif; }
+.python-editor-modal-footer > div { flex: 0 0 auto; display: flex; gap: 7px; }
+.python-editor-modal-footer button { min-height: 35px; padding: 0 13px; border-radius: 6px; font-size: 10px; font-weight: 600; }
+.python-editor-modal-footer button.secondary { border: 1px solid #cfd8e3; background: #fff; color: #5b687a; }
+.python-editor-modal-footer button.secondary:hover { background: #f2f5f8; }
+.python-editor-modal-footer button.primary { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #1f57c5; background: #2563eb; color: #fff; }
+.python-editor-modal-footer button.primary:hover { background: #1d55ce; }
+@media (max-width: 800px), (max-height: 650px) {
+  .python-editor-overlay { padding: 8px; }
+  .python-editor-modal { width: calc(100vw - 16px); height: calc(100vh - 16px); min-height: 0; grid-template-rows: 64px minmax(0, 1fr) 55px; }
+  .python-editor-workbench { margin: 8px 8px 0; }
+  .python-editor-modal-actions button:not(.python-editor-close) { width: 32px; padding: 0; font-size: 0; }
+  .python-editor-modal-footer p { display: none; }
+  .python-editor-modal-footer { justify-content: flex-end; }
+}

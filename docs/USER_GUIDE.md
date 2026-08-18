@@ -133,3 +133,12 @@ def process(signal, params):
 ```
 
 Python Block nạp sẵn `np/numpy`, `sp/scipy` và `sl/signallab`; các dòng import vẫn hoạt động và giúp code dễ mang sang notebook. Chỉ cần xử lý một frame và trả về mảng; runtime tự song song hóa các frame Monte-Carlo. API cũ có `inputs, params, context` vẫn được giữ tương thích. Xem tài liệu đầy đủ trong Documents hoặc thư mục `docs/python`. Không lưu code tùy biến từ nguồn không tin cậy rồi chạy.
+
+Trong tab **Block**, vùng `process.py` là Python IDE editor thật với:
+
+- line number, syntax highlighting, active line và fold gutter;
+- tự đóng ngoặc, bracket matching, autocomplete và lịch sử undo/redo;
+- phím `Tab` thụt bốn spaces như Python;
+- font lập trình và màu cú pháp rõ ràng trên nền editor tối.
+
+Nhấn **Open editor** để mở cửa sổ code lớn. Cửa sổ này giữ một bản nháp riêng: **Cancel** đóng mà không thay đổi block, **Apply changes** mới đưa code về simulation. Có thể dùng `Ctrl+S` hoặc `Ctrl+Enter` ngay trong editor để Apply; các phím này không ghi file project khi cửa sổ code đang mở. Thanh trạng thái hiển thị Python 3, UTF-8, số dòng, số ký tự và trạng thái Modified. Các nút **API docs**, **Copy** và **Reset** giúp mở tài liệu, sao chép toàn bộ hoặc khôi phục code template.

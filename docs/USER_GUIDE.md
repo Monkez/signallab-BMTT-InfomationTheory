@@ -8,7 +8,7 @@
 
 Nếu SignalLab đang mở trong lúc build, `build_app.bat` tự chuyển sang `dist-update\SignalLab\SignalLab.exe` thay vì báo thất bại hoặc tự đóng ứng dụng. `run.bat` sẽ chọn bản update này ở lần mở tiếp theo.
 
-Bản desktop dùng `SignalLabLauncher.exe` native để tạo cửa sổ loading ngay sau khi double-click, trước khi Python/PyInstaller bắt đầu nạp. Launcher tự mở `SignalLab.exe` và đóng splash khi cửa sổ chính sẵn sàng. App chỉ mở một cửa sổ SignalLab, không cần Node.js/Vite khi sử dụng và không mở terminal. Khi sao chép sang máy khác, phải sao chép cả thư mục `dist\SignalLab`, bao gồm launcher và `_internal`; không chỉ sao chép riêng EXE. Máy Windows đích cần Microsoft Edge WebView2 Runtime, vốn có sẵn trên Windows 10/11 được cập nhật.
+Bản desktop dùng `SignalLab.exe` làm launcher native .NET để tạo cửa sổ loading ngay sau khi double-click, trước khi Python/PyInstaller bắt đầu nạp. Launcher khởi chạy `SignalLabCore.exe` (runtime Python đóng gói) và tự đóng splash khi cửa sổ chính sẵn sàng. App chỉ mở một cửa sổ SignalLab, không cần Node.js/Vite khi sử dụng và không mở terminal. Khi sao chép sang máy khác, phải sao chép cả thư mục `dist\SignalLab`, gồm `SignalLab.exe`, `SignalLabCore.exe` và `_internal`; không chỉ sao chép riêng một EXE. Máy Windows đích cần Microsoft Edge WebView2 Runtime, vốn có sẵn trên Windows 10/11 được cập nhật.
 
 `run_dev.bat` chỉ dành cho lập trình viên. Nó chạy Vite tại port 5173, nên nếu đóng cửa sổ dev server thì trình duyệt sẽ báo WebSocket mất kết nối và `ERR_CONNECTION_REFUSED`. Đây không phải cơ chế chạy của bản EXE.
 

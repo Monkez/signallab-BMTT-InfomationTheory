@@ -53,10 +53,10 @@ internal static class Program
     {
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        var corePath = Path.Combine(AppContext.BaseDirectory, "SignalLab.exe");
+        var corePath = Path.Combine(AppContext.BaseDirectory, "SignalLabCore.exe");
         if (!File.Exists(corePath))
         {
-            MessageBox.Show("SignalLab.exe was not found next to the launcher.", "SignalLab", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show("SignalLabCore.exe was not found next to the launcher.", "SignalLab", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
         var readyPath = Path.Combine(AppContext.BaseDirectory, ".signallab-ready-" + Process.GetCurrentProcess().Id);

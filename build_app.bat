@@ -37,9 +37,12 @@ echo   %SIGNALLAB_RELEASE%
 echo [SignalLab] Creating instant native launcher...
 set "SIGNALLAB_DIR=%~dp0dist\SignalLab"
 for %%I in ("%SIGNALLAB_RELEASE%") do set "SIGNALLAB_DIR=%%~dpI"
+if exist "%SIGNALLAB_DIR%\SignalLab.exe" move /Y "%SIGNALLAB_DIR%\SignalLab.exe" "%SIGNALLAB_DIR%\SignalLabCore.exe" >nul
 "%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /out:"%SIGNALLAB_DIR%\SignalLabLauncher.exe" /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll tools\SignalLabLauncher.cs
 if errorlevel 1 goto :error
-echo   %SIGNALLAB_DIR%\SignalLabLauncher.exe
+move /Y "%SIGNALLAB_DIR%\SignalLabLauncher.exe" "%SIGNALLAB_DIR%\SignalLab.exe" >nul
+echo   %SIGNALLAB_DIR%\SignalLab.exe (instant native launcher)
+echo   %SIGNALLAB_DIR%\SignalLabCore.exe (Python runtime)
 exit /b 0
 
 :error

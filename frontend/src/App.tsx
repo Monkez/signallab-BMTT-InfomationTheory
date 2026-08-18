@@ -47,10 +47,10 @@ const PythonCodeEditor = lazy(() => import('./features/pythonEditor/PythonCodeEd
 const PythonEditorModal = lazy(() => import('./features/pythonEditor/PythonEditorModal').then(module => ({ default: module.PythonEditorModal })))
 
 function App() {
-  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initialNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([])
   const [specs, setSpecs] = useState<BlockSpec[]>(fallbackSpecs)
-  const [selectedId, setSelectedId] = useState<string | null>('channel')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [config, setConfig] = useState<SimulationConfig>(defaultSimulationConfig)
   const [job, setJob] = useState<Job | null>(null)
@@ -68,8 +68,9 @@ function App() {
   const [consoleHeight, setConsoleHeight] = useState(156)
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([])
   const [consoleCopied, setConsoleCopied] = useState(false)
-  const [projectName, setProjectName] = useState('Hamming BPSK over AWGN')
-  const [savedSignature, setSavedSignature] = useState(() => projectSignature(initialNodes, initialEdges, defaultSimulationConfig))
+  const [projectName, setProjectName] = useState('Untitled simulation')
+  const [savedSignature, setSavedSignature] = useState(() => projectSignature([], [], defaultSimulationConfig))
+  const [splashVisible, setSplashVisible] = useState(true)
   const [savingProject, setSavingProject] = useState(false)
   const [samplesOpen, setSamplesOpen] = useState(false)
   const [pythonEditorOpen, setPythonEditorOpen] = useState(false)
@@ -131,6 +132,10 @@ function App() {
 
   useEffect(() => { clearDiagnostics() }, [clearDiagnostics, config])
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSplashVisible(false), 900)
+    return () => window.clearTimeout(timer)
+  }, [])
   useEffect(() => {
     if (bootLoggedRef.current) return
     bootLoggedRef.current = true
@@ -418,7 +423,7 @@ function App() {
   const activeSinkMetrics = result?.sink_metrics || runOnceSinkMetrics
   const hasBerSink = nodes.some(node => node.data.blockType === 'ber')
   const sinkNodes = nodes.filter(node => ['ber', 'power_meter', 'constellation', 'scope', 'source_analyzer', 'ser'].includes(node.data.blockType))
-  const hasSinkResults = sinkNodes.some(node => node.data.blockType !== 'ber') && Object.keys(activeSinkMetrics).length > 0
+  const hasVisibleSinkResults = Object.keys(activeSinkMetrics).length > 0 || (hasBerSink && livePoints.length > 0)
   const sourceFrames = runOnceMetrics.source_frame_count || 0
   const sourceSymbols = runOnceMetrics.source_symbol_count || 0
   const sourceTheoryMetrics = activeSinkMetrics.source_entropy !== undefined ? activeSinkMetrics : sourceFrames ? {
@@ -435,7 +440,7 @@ function App() {
   } : undefined
 
   return (
-    <div className="app-shell" style={{ gridTemplateRows: `60px minmax(0, 1fr) ${consoleOpen ? consoleHeight : 0}px`, gridTemplateColumns: `${leftOpen ? leftWidth : 0}px minmax(0, 1fr) ${rightOpen ? rightWidth : 0}px` }}>
+    <><div className={`startup-splash ${splashVisible ? '' : 'hidden'}`} aria-hidden={!splashVisible}><div className="startup-logo"><img src="/app-icon.svg" alt="" /></div><strong>SignalLab</strong><span>Digital Communications Studio</span><i /></div><div className="app-shell" style={{ gridTemplateRows: `60px minmax(0, 1fr) ${consoleOpen ? consoleHeight : 0}px`, gridTemplateColumns: `${leftOpen ? leftWidth : 0}px minmax(0, 1fr) ${rightOpen ? rightWidth : 0}px` }}>
       <header className="topbar">
         <div className="brand"><div className="brand-mark"><img src="/app-icon.svg" alt="SignalLab logo" /></div><div><strong>SignalLab</strong><span>Communications Studio</span></div></div>
         <div className={`project-name ${projectDirty ? 'dirty' : ''}`} title={projectDirty ? 'Unsaved changes' : 'All changes saved'}><span className="status-dot" /><span>{projectName}</span>{projectDirty && <small>Unsaved</small>}</div>
@@ -522,11 +527,11 @@ function App() {
           <button className="run-wide" onClick={runBenchmark} disabled={executionActive || Boolean(configIssue)} title={configIssue || undefined}><Play size={16} fill="currentColor" /> {jobActive ? 'Benchmark running…' : 'Run Benchmark'}</button>
           {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} frames processed · {job.trials} max</span><span>{job.device || result?.device || 'preparing'}</span></div>{job.status === 'running' && <button className="cancel" onClick={() => cancelJob(job.id)}><CircleStop size={14} /> Cancel</button>}</div>}
           {error && <div className="error-box">{error}</div>}
-          {((hasBerSink && (result || livePoints.length > 0)) || hasSinkResults) && <div className="results" ref={resultsRef}>
+          {(result || hasVisibleSinkResults) && <div className="results" ref={resultsRef}>
             <div className="section-rule"><span>{job?.status === 'running' ? 'LIVE RESULTS' : 'RESULTS'}</span></div>
-            {hasBerSink && <><div className="ber-plot-section"><BerChart points={livePoints} live={job?.status === 'running'} /></div><ResultsTable points={livePoints} /></>}
-            <SinkResults nodes={sinkNodes} metrics={activeSinkMetrics} />
-            {result && <><div className="metric-row"><div className="metric"><span>Elapsed</span><strong>{result.elapsed_seconds.toFixed(2)} s</strong></div><div className="metric"><span>Throughput</span><strong>{formatNumber(result.throughput_bps / 1000)} kb/s</strong></div></div>{result.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}</>}
+            {result && <div className="metric-row results-runtime"><div className="metric"><span>Elapsed</span><strong>{result.elapsed_seconds.toFixed(2)} s</strong></div><div className="metric"><span>Throughput</span><strong>{formatNumber(result.throughput_bps / 1000)} kb/s</strong></div></div>}
+            <SinkResults nodes={sinkNodes} metrics={activeSinkMetrics} berPoints={livePoints} berLive={job?.status === 'running'} />
+            {result?.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}
           </div>}
         </div>}
         {rightOpen && <div className="sidebar-resizer right-resizer" onPointerDown={event => startResize('right', event)} title="Resize inspector" />}
@@ -539,7 +544,7 @@ function App() {
           {consoleEntries.length ? consoleEntries.map(entry => <div className={`console-line ${entry.level}`} key={entry.id}><time>{entry.time}</time><b>{entry.level}</b><span>{entry.message}</span></div>) : <div className="console-empty">No messages yet.</div>}
         </div>
       </section>}
-    </div>
+    </div></>
   )
 }
 

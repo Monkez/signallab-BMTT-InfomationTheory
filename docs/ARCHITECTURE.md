@@ -6,6 +6,7 @@
 React + React Flow
   ├─ block library / canvas / property editor
   ├─ Python code editor
+  ├─ Documents window / full-text search
   ├─ experiment dashboard
   └─ console dock (job/runtime events)
              │ REST + polling
@@ -19,6 +20,12 @@ FastAPI job service
        block runtime + metric reducer
 ```
 
+## Package Python SignalLab
+
+`signallab/` là lớp API giáo dục nằm trên NumPy/SciPy, tách theo miền `sources`, `signals`, `filters`, `modulation`, `channels`, `coding` và `metrics`. Các hàm đều nhận array-like một chiều, trả mảng NumPy/scalar chuẩn và dùng cùng quy tắc validation về bit, kích thước, seed và đơn vị. Package không thay thế thư viện nền: Python Block nạp sẵn đồng thời `np/numpy`, `sp/scipy` và `sl/signallab`, nên người dùng có thể trộn API mức cao với NumPy/SciPy trực tiếp.
+
+`frontend/src/features/documents/` nhập trực tiếp Markdown canonical trong `docs/python/` tại build time. Cửa sổ `#/documents` dùng entry React riêng trong cùng bundle, có menu theo nhóm, tìm kiếm full-text và renderer Markdown an toàn không chèn HTML. Nút Documents mở route này bằng `window.open`, vì vậy tài liệu độc lập với workspace mô phỏng và vẫn hoạt động hoàn toàn offline trong EXE.
+
 ## Ranh giới module
 
 Frontend được tổ chức theo feature thay vì dồn dữ liệu và thuật toán vào component màn hình:
@@ -31,6 +38,7 @@ frontend/src/
   features/experiment/config.ts   mặc định và phép tính SNR sweep
   features/projects/projectFiles.ts Save/Open đa nền tảng và desktop bridge
   features/sourceTheory/           codebook Huffman và bảng giảng dạy live
+  features/documents/              cửa sổ tài liệu, search và Markdown renderer
   features/ber/
     BerPlot.tsx                   SVG plot dùng chung preview/report
     BerLegend.tsx                 legend dùng chung preview/report
@@ -87,11 +95,10 @@ Huffman symbol dùng quy tắc phá hòa xác định: hàng đợi ưu tiên th
 
 ```python
 def process(signal, params):
-    gain = float(params.get("gain", 1.0))
-    return signal * gain
+    return sl.signals.normalize_power(signal)
 ```
 
-Đây là API khuyến nghị: block nhận một mảng NumPy của một frame và trả về một mảng. Runtime tự bọc kết quả thành output `out`, tự chạy các frame độc lập trên worker CPU; người dùng không cần viết multiprocessing, batch scheduler hay mã GPU. API cũ `process(inputs, params, context) -> {"out": ...}` vẫn được hỗ trợ cho project trước đây. Code tùy biến hiện chạy với quyền của người dùng local; khi chạy dưới dịch vụ dùng chung, bắt buộc thêm sandbox, giới hạn CPU/RAM/thời gian và allowlist import.
+Đây là API khuyến nghị: block nhận một mảng NumPy của một frame và trả về một mảng. Namespace nạp sẵn `np`, `sp`, `sl` nhưng vẫn cho phép import trực tiếp NumPy, SciPy và SignalLab. Runtime tự bọc kết quả thành output `out`, tự chạy các frame độc lập trên worker CPU; người dùng không cần viết multiprocessing, batch scheduler hay mã GPU. API cũ `process(inputs, params, context) -> {"out": ...}` vẫn được hỗ trợ cho project trước đây. Code tùy biến hiện chạy với quyền của người dùng local; khi chạy dưới dịch vụ dùng chung, bắt buộc thêm sandbox, giới hạn CPU/RAM/thời gian và allowlist import.
 
 ## Định dạng dự án
 

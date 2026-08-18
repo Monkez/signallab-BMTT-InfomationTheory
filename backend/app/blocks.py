@@ -10,6 +10,9 @@ from types import SimpleNamespace
 from typing import Any, Callable
 
 import numpy as np
+import scipy as sp
+
+import signallab as sl
 
 
 def _block_rng(params, context, backend=np, salt: int = 0):
@@ -474,11 +477,20 @@ def power_meter(inputs, params, context):
 def python_block(inputs, params, context, code):
     if not code:
         return {"out": inputs.get("in")}
-    namespace = {"np": np, "numpy": np, "signal": inputs.get("in"), "__builtins__": __builtins__}
+    namespace = {
+        "np": np,
+        "numpy": np,
+        "sp": sp,
+        "scipy": sp,
+        "sl": sl,
+        "signallab": sl,
+        "signal": inputs.get("in"),
+        "__builtins__": __builtins__,
+    }
     exec(compile(code, "<python-block>", "exec"), namespace, namespace)
     process = namespace.get("process")
     if not callable(process):
-        raise ValueError("Python block must define process(inputs, params, context)")
+        raise ValueError("Python block must define process(signal, params)")
     signal = inputs.get("in")
     positional = [parameter for parameter in inspect.signature(process).parameters.values() if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)]
     has_varargs = any(parameter.kind == parameter.VAR_POSITIONAL for parameter in inspect.signature(process).parameters.values())

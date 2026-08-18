@@ -24,9 +24,13 @@ export const initialEdges: FlowEdge[] = [
   { id: 'e7', source: 'decoder', target: 'meter', sourceHandle: 'out', targetHandle: 'estimate' },
 ]
 
-export const pythonTemplate = `# Write ordinary NumPy code for one signal frame.
+export const pythonTemplate = `import numpy as np
+import scipy as sp
+import signallab as sl
+
+# Write ordinary Python code for one signal frame.
 # SignalLab runs separate Monte-Carlo frames in parallel for you.
 def process(signal, params):
     gain = float(params.get("gain", 1.0))
-    return signal * gain
+    return sl.signals.normalize_power(signal * gain)
 `

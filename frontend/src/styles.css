@@ -26,9 +26,11 @@ button { color: inherit; border: 0; cursor: pointer; }
 .ghost:disabled { opacity: .55; cursor: default; }
 .ghost.labeled { padding: 0 10px; font-size: 11px; }
 .ghost.save-action { color: #184fae; border-color: #cbdaf7; background: #f4f7ff; }
+.documents-action { border-left-color: var(--line); border-radius: 0 6px 6px 0; margin-left: 2px; }
 .run-wide { background: var(--accent); color: #fff; border-radius: 6px; height: 35px; padding: 0 15px; display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; }
 .run-wide:hover { background: #1d4ed8; }
 .run-wide:disabled { opacity: .55; cursor: default; }
+@media (max-width: 1320px) { .documents-action span { display: none; } .documents-action { padding: 0; min-width: 34px; border-radius: 6px; } }
 .config-issue { margin: 2px 0 8px; padding: 8px 9px; border: 1px solid #efbdc5; border-radius: 6px; background: #fff2f4; color: #ad2e44; font-size: 11px; line-height: 1.4; }
 .library, .inspector { grid-row: 2 / 4; background: var(--panel); min-height: 0; z-index: 5; position: relative; transition: opacity .15s ease; }
 .library { grid-column: 1; }
@@ -151,6 +153,8 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .muted, .code-hint { font-size: 9px; color: #788493; line-height: 1.6; }
 .code-editor { width: 100%; min-height: 260px; resize: vertical; border: 1px solid var(--line-strong); background: #f8fafc; border-radius: 6px; padding: 11px; color: #283548; font: 9px/1.7 Consolas, monospace; outline: none; tab-size: 4; }
 .code-hint code { color: #2459b8; }
+.code-hint button { padding: 0; color: #1f57ba; background: transparent; font-weight: 600; text-decoration: underline; }
+.code-hint button:hover { color: #123f8d; }
 .empty-state { margin: auto; padding: 25px; text-align: center; color: #8a95a3; }
 .empty-state h3 { color: #536071; font-size: 13px; }
 .empty-state p { font-size: 9px; line-height: 1.6; }

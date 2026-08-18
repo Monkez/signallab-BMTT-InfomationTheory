@@ -20,6 +20,8 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 - Dashboard realtime cập nhật BER theo SNR khi simulation đang chạy; biểu đồ và bảng có thao tác copy/export PNG, TSV và CSV.
 - Engine tối ưu graph lookup, seed theo batch và tái sử dụng process pool; auto mode tránh multiprocessing cho workload nhỏ để giảm độ trễ.
 - Python Block dùng API đơn giản `process(signal, params) -> array`; scheduler đảm nhiệm song song hóa các frame, không bắt người dùng viết mã multiprocessing/GPU.
+- Package `signallab` trên NumPy/SciPy cung cấp API nhất quán cho nguồn, tín hiệu, lọc, điều chế, kênh, mã và metric; NumPy/SciPy trực tiếp vẫn được hỗ trợ.
+- Menu Documents mở cửa sổ offline độc lập, có tìm kiếm full-text và tài liệu hàm/quickstart chi tiết cho người học.
 - Thư viện mở rộng với Text Source, differential source coding, repetition code, QPSK, Rayleigh fading, Scope, Constellation và Power Meter.
 - Bổ sung Text File Source và Image File Source (file picker, base64 project payload), cùng các codec nguồn kinh điển Huffman, Shannon-Fano, RLE và ZIP/DEFLATE theo cặp Encoder/Decoder.
 - Script Windows một lần bấm cho cài đặt, chạy và build.

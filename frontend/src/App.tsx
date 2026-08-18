@@ -5,7 +5,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
-  Activity, ArrowLeftRight, Box, Braces, CircleStop, FilePlus2, FolderOpen,
+  Activity, ArrowLeftRight, BookOpen, Box, Braces, CircleStop, FilePlus2, FolderOpen,
   Layers3, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Save, SaveAll, Search, Terminal, Trash2, X,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
@@ -30,6 +30,12 @@ type ConsoleEntry = { id: number; time: string; level: ConsoleLevel; message: st
 
 const projectSignature = (nodes: FlowNode[], edges: FlowEdge[], config: SimulationConfig) =>
   JSON.stringify({ graph: graphPayload(nodes, edges), config })
+
+const openDocuments = () => {
+  const url = new URL(window.location.href)
+  url.hash = '/documents'
+  window.open(url.toString(), 'signallab-documents', 'popup=yes,width=1240,height=820,resizable=yes,scrollbars=yes')?.focus()
+}
 
 function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initialNodes)
@@ -372,6 +378,7 @@ function App() {
           <input ref={fileRef} type="file" accept=".slab.json,.json,application/json" hidden onChange={e => { void importProject(e.target.files?.[0]); e.target.value = '' }} />
           <button className="ghost labeled save-action" onClick={() => void saveProject(false)} disabled={savingProject} title="Save simulation (Ctrl+S)"><Save size={15} /> {savingProject ? 'Saving…' : 'Save'}</button>
           <button className="ghost labeled" onClick={() => void saveProject(true)} disabled={savingProject} title="Save simulation as a new file (Ctrl+Shift+S)"><SaveAll size={15} /> Save As</button>
+          <button className="ghost labeled documents-action" onClick={openDocuments} title="Open SignalLab documentation in a separate window"><BookOpen size={15} /><span>Documents</span></button>
         </div>
       </header>
 
@@ -416,7 +423,7 @@ function App() {
           {result?.sink_metrics && selected.data.blockType === 'constellation' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean I / Q</span><strong>{`${result.sink_metrics.constellation_mean_i?.toFixed(3) ?? '—'} / ${result.sink_metrics.constellation_mean_q?.toFixed(3) ?? '—'}`}</strong></div><div><span>Mean |x|</span><strong>{result.sink_metrics.constellation_mean_power?.toFixed(4) ?? '—'}</strong></div></div></>}
           {sourceTheoryMetrics && selected.data.blockType === 'source_analyzer' && <><div className="section-rule"><span>SOURCE THEORY RESULTS</span></div><div className="source-theory-result"><div><span>Entropy H(X)</span><strong>{sourceTheoryMetrics.source_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Average information</span><strong>{sourceTheoryMetrics.source_average_information?.toFixed(4)} bit/symbol</strong></div><div><span>Maximum entropy</span><strong>{sourceTheoryMetrics.source_max_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Source efficiency</span><strong>{sourceTheoryMetrics.source_efficiency_percent?.toFixed(2)}%</strong></div><div><span>Alphabet size</span><strong>{sourceTheoryMetrics.source_alphabet_size}</strong></div></div></>}
           {symbolMetrics && selected.data.blockType === 'ser' && <><div className="section-rule"><span>SYMBOL RESULT</span></div><div className="source-theory-result"><div><span>Symbol error rate</span><strong>{symbolMetrics.ser?.toExponential(3)}</strong></div><div><span>Symbol errors</span><strong>{symbolMetrics.symbol_errors} / {symbolMetrics.total_symbols}</strong></div></div></>}
-          {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><textarea className="code-editor" spellCheck={false} value={selected.data.code || pythonTemplate} onChange={e => updateSelected({ code: e.target.value })} /><p className="code-hint">Write <code>process(signal, params)</code> and return a 1-D NumPy array. Keep <code>output_size=same</code> for normal processing, use a positive length or <code>any</code> only for an intentional size change. SignalLab runs independent Monte-Carlo trials in parallel.</p></>}
+          {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><textarea className="code-editor" spellCheck={false} value={selected.data.code || pythonTemplate} onChange={e => updateSelected({ code: e.target.value })} /><p className="code-hint">Use <code>np</code>, <code>sp</code> and <code>sl</code> for NumPy, SciPy and SignalLab. Write <code>process(signal, params)</code> and return a 1-D array. Keep <code>output_size=same</code> for normal processing. SignalLab runs independent Monte-Carlo trials in parallel. <button type="button" onClick={openDocuments}>Read Python API</button></p></>}
         </div> : <div className="empty-state"><Box size={32} /><h3>No block selected</h3><p>Select a block on the canvas to edit its parameters and Python code.</p></div> :
         <div className="inspector-content">
           <div className="experiment-title"><div><small>MONTE-CARLO</small><h2>Experiment</h2></div><button className="run-once" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} title="Execute one frame and capture data at every port"><Play size={13} fill="currentColor" />{runOnceActive ? 'Running…' : 'Run once'}</button></div>

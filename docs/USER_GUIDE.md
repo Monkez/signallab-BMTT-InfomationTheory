@@ -16,6 +16,8 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 
 ## Tạo mô phỏng
 
+Nút **Documents** trên topbar mở trung tâm tài liệu trong một cửa sổ riêng. Ô tìm kiếm hỗ trợ tên hàm, khái niệm và ví dụ; menu chia tài liệu thành Python API, tham chiếu hàm và cách làm việc trong app. Nhấn `Ctrl+K` trong cửa sổ Documents để chuyển nhanh tới ô tìm kiếm. Nội dung được đóng gói cùng SignalLab nên đọc được khi offline.
+
 1. Chọn khối trong thanh bên hoặc dùng sơ đồ mẫu. Khi bắt đầu kéo block, block được chọn ngay.
 2. Kéo từ cổng bên phải của một khối sang cổng bên trái khối kế tiếp.
 3. Chọn khối để sửa tên và tham số. Với Python Block, sửa hàm `process` theo mẫu.
@@ -93,8 +95,13 @@ Các tham số `length`, `repeat`, `weights`, SNR và `output_size` được ki�
 Với Python Block, viết tự nhiên theo mẫu:
 
 ```python
+import numpy as np
+import scipy as sp
+import signallab as sl
+
 def process(signal, params):
-    return signal * float(params.get("gain", 1.0))
+    gain = float(params.get("gain", 1.0))
+    return sl.signals.normalize_power(signal * gain)
 ```
 
-Chỉ cần xử lý một frame và trả về mảng; runtime tự song song hóa các frame Monte-Carlo. API cũ có `inputs, params, context` vẫn được giữ tương thích. Không lưu code tùy biến từ nguồn không tin cậy rồi chạy.
+Python Block nạp sẵn `np/numpy`, `sp/scipy` và `sl/signallab`; các dòng import vẫn hoạt động và giúp code dễ mang sang notebook. Chỉ cần xử lý một frame và trả về mảng; runtime tự song song hóa các frame Monte-Carlo. API cũ có `inputs, params, context` vẫn được giữ tương thích. Xem tài liệu đầy đủ trong Documents hoặc thư mục `docs/python`. Không lưu code tùy biến từ nguồn không tin cậy rồi chạy.

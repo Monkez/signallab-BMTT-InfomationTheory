@@ -64,3 +64,7 @@
 - Huffman Symbol Encoder có bảng codebook live trong inspector: symbol, P(x) chuẩn hóa, I(x), codeword, length, H(X), average length và efficiency. Backend/frontend dùng cùng tie-break ổn định theo weight + insertion order; sửa probabilities cập nhật bảng ngay.
 - Xác minh codebook: backend 40/40 pass; frontend build pass; browser xác nhận mặc định `A/B/C/D → 0/10/110/111`, đổi P(x) sang `0.4,0.3,0.2,0.1` cập nhật code và efficiency 97.18% không cần Run once.
 - `build_app.bat` có fallback side-by-side khi EXE chuẩn bị Windows khóa. Bản codebook mới đã build/smoke test tại `dist-update\SignalLab\SignalLab.exe`; `run.bat --print-path` chọn đúng update mới nhất.
+- Package `signallab` đã tách API giáo dục trên NumPy/SciPy thành `sources`, `signals`, `filters`, `modulation`, `channels`, `coding`, `metrics`; Python Block nạp sẵn `np/sp/sl` nhưng vẫn import trực tiếp được. SciPy 1.16.1 đã được thêm vào runtime/EXE.
+- Topbar có **Documents** mở cửa sổ `#/documents` độc lập, có menu theo nhóm, full-text search, `Ctrl+K`, mục lục và renderer Markdown. Tài liệu chi tiết canonical nằm ở `docs/python/` và được đóng gói offline vào frontend.
+- Xác minh mốc package/Documents: backend 49/49 pass, frontend production build pass; browser UI xác nhận menu Documents, nội dung API, code/table, search `Hamming sửa lỗi` và bố cục ba cột rõ ràng.
+- PyInstaller đã nhận hook NumPy/SciPy, đóng gói thành công package và tài liệu offline tại `dist\SignalLab\SignalLab.exe`; smoke test xác nhận EXE duy trì tiến trình ổn định.

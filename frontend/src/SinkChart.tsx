@@ -5,7 +5,7 @@ import { plottedPoints } from './features/ber/chartMath'
 import { lineStyles } from './features/ber/constants'
 import { copyPng, svgToPng } from './features/ber/imageExport'
 import { parseReferenceFile, saveReferenceFile } from './features/ber/referenceFiles'
-import { persistReferences, readReferences, referenceChangeEvent } from './features/ber/referenceStore'
+import { dedupeReferences, persistReferences, readReferences, referenceChangeEvent } from './features/ber/referenceStore'
 import type { BerCurve, BerLineStyle, BerReference, SinkPoint } from './features/ber/types'
 
 export type { BerLineStyle, BerReference, SinkPoint } from './features/ber/types'
@@ -91,9 +91,9 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
     try {
       const imported = await parseReferenceFile(file)
       if (!imported.length) throw new Error('No valid BER reference found in this file.')
-      const next = [...references, ...imported]
+      const next = dedupeReferences([...references, ...imported])
       setReferences(next)
-      setVisibleReferenceIds(ids => [...ids, ...imported.map(reference => reference.id)])
+      setVisibleReferenceIds(ids => [...new Set([...ids.filter(id => next.some(reference => reference.id === id)), ...imported.map(reference => reference.id).filter(id => next.some(item => item.id === id))])])
       setSelectedCurveId(imported[0].id)
       persistReferences(next)
       setNotice(`Loaded ${imported.length} reference file${imported.length > 1 ? 's' : ''}`)

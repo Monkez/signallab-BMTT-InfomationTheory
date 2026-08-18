@@ -76,7 +76,7 @@ Hai bài Python minh họa đúng mô hình lập trình của SignalLab: ngư�
 - Random Bits, AWGN và Rayleigh có thêm `seed` riêng ở tab **Block**. Giá trị mặc định `-1` sinh dữ liệu/nhiễu mới ở mỗi lần Run once hoặc Run Benchmark. Đặt số nguyên từ `0` đến `4294967295` để tái lập kết quả; runtime vẫn tự tạo stream khác nhau cho từng block và từng frame.
 - Muốn benchmark tái lập hoàn toàn, đặt seed cụ thể cho tất cả block ngẫu nhiên và giữ nguyên Seed trong Experiment. Chỉ cần một block còn `-1` thì lần chạy sau có thể cho chuỗi mẫu/BER khác.
 - `Auto`: chọn GPU nếu có và phù hợp, nếu không dùng CPU.
-- Sau khi chạy, mỗi sink hiển thị kết quả thuộc về chính nó; BER Meter hiển thị đồ thị BER theo SNR cùng số frame/lỗi từng điểm.
+- Sau khi chạy, chọn từng sink trên canvas để xem kết quả ngay trong tab **Block**. Constellation Sink hiển thị đồ thị I/Q từ mẫu tín hiệu đã capture; Scope, Power Meter, Source Analyzer và SER hiển thị các chỉ số tương ứng. Tab **Experiment** chỉ tổng hợp lại các sink results này; BER Meter vẫn sở hữu đồ thị BER theo SNR cùng số frame/lỗi từng điểm.
 - **Run Benchmark** là nút chạy thí nghiệm theo mode hiện tại. Sau khi hoàn tất, port preview đại diện được lấy từ một frame xác định tại SNR đầu tiên; dữ liệu đầy đủ của mọi frame không được gửi lên UI nên app vẫn nhẹ với mô phỏng lớn.
 - Reference BER được lưu theo tên trong trình duyệt; khi Browse/load một đường có cùng tên, đường cũ được thay thế để legend không xuất hiện các curve trùng tên.
 - Trên biểu đồ BER, chọn **Copy** để copy ảnh PNG hoặc **PNG** để tải ảnh. Bảng **Results by SNR** hỗ trợ **Copy** (TSV), **CSV** và **PNG**, thuận tiện đưa vào báo cáo.

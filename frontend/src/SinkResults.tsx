@@ -22,7 +22,7 @@ function complexValue(value: string): [number, number] | null {
   return Number.isFinite(scalar) ? [scalar, 0] : null
 }
 
-function ConstellationPreview({ values, large = false, color = '#2d6be4' }: { values: string[]; large?: boolean; color?: string }) {
+export function ConstellationPreview({ values, large = false, color = '#2d6be4' }: { values: string[]; large?: boolean; color?: string }) {
   const points = values.map(complexValue).filter((point): point is [number, number] => Boolean(point)).slice(0, 512)
   if (!points.length) return <div className="sink-visual-empty">No complex samples captured.</div>
   const extent = Math.max(1, ...points.flatMap(([i, q]) => [Math.abs(i), Math.abs(q)]))

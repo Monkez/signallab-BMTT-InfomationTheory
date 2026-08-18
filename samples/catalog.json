@@ -1,0 +1,196 @@
+[
+  {
+    "format": "signallab-simulation", "version": "1.0",
+    "sample": {
+      "id": "bpsk-awgn-baseline", "title": "BPSK không mã hóa qua AWGN", "subtitle": "Đường chuẩn BER và ảnh hưởng của Eb/N0", "category": "Digital communications", "level": "Cơ bản", "duration_minutes": 20,
+      "summary": "Bài mở đầu xây dựng tuyến truyền bit nhị phân dùng BPSK, kênh AWGN và quyết định cứng. Đây là đường chuẩn để so sánh với các hệ thống có mã kênh.",
+      "concepts": ["BPSK", "AWGN", "Eb/N0", "BER", "Monte-Carlo"], "uses_python": false,
+      "learning_objectives": ["Hiểu ánh xạ bit 0/1 thành +1/-1", "Đo BER thực nghiệm theo Eb/N0", "Phân biệt Run once và Run Benchmark"],
+      "instructions": ["Run once tại SNR Start và hover các port để theo dõi bit, symbol và quyết định thu.", "Mở tab Block của AWGN, xác nhận SNR mode đang tham chiếu Experiment sweep.", "Run Benchmark từ -2 đến 10 dB; quan sát BER giảm theo SNR.", "Tăng Max frames tại vùng BER thấp và so sánh độ ổn định của đường cong."],
+      "expected_observations": ["BPSK giữ nguyên số phần tử từ nguồn đến bộ giải điều chế.", "BER giảm nhanh khi Eb/N0 tăng; điểm BER = 0 chỉ có nghĩa chưa ghi nhận lỗi trong số frame đã chạy."]
+    },
+    "graph": { "version": "1.0", "nodes": [
+      {"id":"src","type":"bit_source","label":"Random bits","position":{"x":40,"y":170},"params":{"length":4096,"seed":-1}},
+      {"id":"mod","type":"bpsk_mod","label":"BPSK modulator","position":{"x":260,"y":170}},
+      {"id":"ch","type":"awgn","label":"AWGN channel","position":{"x":480,"y":170},"params":{"ebn0_db":4,"snr_mode":"experiment","seed":-1}},
+      {"id":"demod","type":"bpsk_demod","label":"Hard decision","position":{"x":700,"y":170}},
+      {"id":"ber","type":"ber","label":"BER meter","position":{"x":700,"y":360},"port_orientation":"reversed"}
+    ], "edges": [
+      {"id":"e1","source":"src","target":"mod"},{"id":"e2","source":"mod","target":"ch"},{"id":"e3","source":"ch","target":"demod"},
+      {"id":"e4","source":"src","target":"ber","target_handle":"reference"},{"id":"e5","source":"demod","target":"ber","target_handle":"estimate"}
+    ]},
+    "config": {"trials":300,"max_frames":300,"min_frames":40,"min_errors":200,"snr_db_start":-2,"snr_db_stop":10,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","chunk_size":20}
+  },
+  {
+    "format": "signallab-simulation", "version": "1.0",
+    "sample": {
+      "id": "hamming74-bpsk-awgn", "title": "Hamming (7,4) hệ thống qua AWGN", "subtitle": "Sửa một lỗi và khảo sát coding gain", "category": "Digital communications", "level": "Trung cấp", "duration_minutes": 35,
+      "summary": "Mô hình hoàn chỉnh sử dụng mã Hamming hệ thống c=[d1 d2 d3 d4 p1 p2 p3], BPSK và AWGN. Nhánh reference đi thẳng từ encoder giúp BER so sánh đúng dữ liệu nguồn sau giải mã.",
+      "concepts": ["Hamming (7,4)", "Mã hệ thống", "Syndrome", "Coding gain", "BER"], "uses_python": false,
+      "learning_objectives": ["Kiểm tra quan hệ kích thước 4 bit vào và 7 bit ra", "Quan sát sửa lỗi đơn bằng syndrome", "So sánh với tuyến BPSK không mã hóa"],
+      "instructions": ["Run once, chọn Hamming encoder và kiểm tra reference 4 bit, codeword 7 bit theo từng nhóm.", "Theo dõi output decoder; xác nhận kích thước quay về đúng số bit nguồn.", "Run Benchmark với cấu hình có sẵn và lưu đường BER thành reference.", "Mở sample BPSK không mã hóa, load reference vừa lưu để thảo luận coding gain và overhead."],
+      "expected_observations": ["Với 4096 bit, encoder sinh 7168 bit vì 4096 chia hết cho 4.", "Decoder sửa được tối đa một lỗi trong mỗi codeword; nhiều lỗi cùng codeword có thể làm sai dữ liệu."]
+    },
+    "graph": { "version": "1.0", "nodes": [
+      {"id":"src","type":"bit_source","label":"Random bits","position":{"x":30,"y":90},"params":{"length":4096,"seed":-1}},
+      {"id":"enc","type":"hamming74_encode","label":"Systematic Hamming (7,4)","position":{"x":230,"y":90}},
+      {"id":"mod","type":"bpsk_mod","label":"BPSK","position":{"x":440,"y":90}},
+      {"id":"ch","type":"awgn","label":"AWGN","position":{"x":650,"y":90},"params":{"ebn0_db":4,"snr_mode":"experiment","seed":-1}},
+      {"id":"demod","type":"bpsk_demod","label":"Hard decision","position":{"x":650,"y":300}},
+      {"id":"dec","type":"hamming74_decode","label":"Hamming decoder","position":{"x":440,"y":300}},
+      {"id":"ber","type":"ber","label":"BER after decoding","position":{"x":230,"y":300}}
+    ], "edges": [
+      {"id":"e1","source":"src","target":"enc"},{"id":"e2","source":"enc","target":"mod"},{"id":"e3","source":"mod","target":"ch"},{"id":"e4","source":"ch","target":"demod"},
+      {"id":"e5","source":"demod","target":"dec"},{"id":"e6","source":"enc","source_handle":"reference","target":"ber","target_handle":"reference"},{"id":"e7","source":"dec","target":"ber","target_handle":"estimate"}
+    ]},
+    "config": {"trials":500,"max_frames":500,"min_frames":50,"min_errors":250,"snr_db_start":-2,"snr_db_stop":10,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","chunk_size":20}
+  },
+  {
+    "format": "signallab-simulation", "version": "1.0",
+    "sample": {
+      "id": "repetition3-bpsk", "title": "Mã lặp 3 và quyết định đa số", "subtitle": "Mã kênh đơn giản để quan sát dư thừa", "category": "Digital communications", "level": "Cơ bản", "duration_minutes": 25,
+      "summary": "Mỗi bit được phát ba lần rồi giải mã bằng biểu quyết đa số. Bài học trực quan hóa đánh đổi giữa khả năng chống lỗi và hiệu suất băng thông.",
+      "concepts": ["Repetition code", "Majority vote", "Code rate", "Redundancy"], "uses_python": false,
+      "learning_objectives": ["Tính code rate R=1/3", "Kiểm chứng decoder cần nhóm đúng ba bit", "Đánh giá độ tin cậy và chi phí dư thừa"],
+      "instructions": ["Run once và so sánh kích thước output nguồn, encoder, decoder.", "Quan sát ba bản sao liên tiếp của từng bit tại output encoder.", "Chạy benchmark và lưu đường BER.", "Thay Max frames, Min errors để xem ảnh hưởng của tiêu chuẩn dừng."],
+      "expected_observations": ["Encoder tăng kích thước tín hiệu gấp ba; decoder giảm về đúng kích thước ban đầu.", "Một lỗi trong nhóm ba bit vẫn được majority decoder sửa đúng."]
+    },
+    "graph": { "version": "1.0", "nodes": [
+      {"id":"src","type":"bit_source","label":"Random bits","position":{"x":20,"y":100},"params":{"length":2048,"seed":-1}},
+      {"id":"enc","type":"repetition3_encode","label":"Repeat each bit ×3","position":{"x":220,"y":100}},
+      {"id":"mod","type":"bpsk_mod","label":"BPSK","position":{"x":420,"y":100}},
+      {"id":"ch","type":"awgn","label":"AWGN","position":{"x":620,"y":100},"params":{"ebn0_db":4,"snr_mode":"experiment","seed":-1}},
+      {"id":"demod","type":"bpsk_demod","label":"Hard decision","position":{"x":620,"y":310}},
+      {"id":"dec","type":"repetition3_decode","label":"Majority decoder","position":{"x":420,"y":310}},
+      {"id":"ber","type":"ber","label":"BER meter","position":{"x":220,"y":310}}
+    ], "edges": [
+      {"id":"e1","source":"src","target":"enc"},{"id":"e2","source":"enc","target":"mod"},{"id":"e3","source":"mod","target":"ch"},{"id":"e4","source":"ch","target":"demod"},
+      {"id":"e5","source":"demod","target":"dec"},{"id":"e6","source":"enc","source_handle":"reference","target":"ber","target_handle":"reference"},{"id":"e7","source":"dec","target":"ber","target_handle":"estimate"}
+    ]},
+    "config": {"trials":300,"max_frames":300,"min_frames":40,"min_errors":200,"snr_db_start":-4,"snr_db_stop":8,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","chunk_size":20}
+  },
+  {
+    "format": "signallab-simulation", "version": "1.0",
+    "sample": {
+      "id": "qpsk-constellation", "title": "QPSK, constellation và AWGN", "subtitle": "Hai bit trên symbol phức I/Q", "category": "Digital communications", "level": "Trung cấp", "duration_minutes": 30,
+      "summary": "Bit được ghép theo cặp thành symbol QPSK phức. Constellation Sink và Power Meter cung cấp góc nhìn trực quan bên cạnh phép đo BER.",
+      "concepts": ["QPSK", "I/Q", "Constellation", "Symbol energy", "Gray-free mapping"], "uses_python": false,
+      "learning_objectives": ["Hiểu quan hệ 2 bit trên một symbol", "Quan sát đám mây constellation khi SNR thay đổi", "Kiểm tra công suất trung bình của tín hiệu"],
+      "instructions": ["Run once và kiểm tra 4096 bit biến thành 2048 complex symbols.", "Chọn Rx constellation để xem thống kê I/Q tại SNR Start.", "Thay SNR Start từ cao xuống thấp và Run once lại để so sánh độ phân tán.", "Run Benchmark để khảo sát BER toàn dải."],
+      "expected_observations": ["QPSK modulator giảm số phần tử còn một nửa; demodulator khôi phục gấp đôi số bit.", "Nhiễu lớn làm các cụm constellation lan rộng và tăng xác suất quyết định sai."]
+    },
+    "graph": { "version": "1.0", "nodes": [
+      {"id":"src","type":"bit_source","label":"Even-length bits","position":{"x":20,"y":120},"params":{"length":4096,"seed":-1}},
+      {"id":"mod","type":"qpsk_mod","label":"QPSK mapper","position":{"x":230,"y":120}},
+      {"id":"ch","type":"awgn","label":"Complex AWGN","position":{"x":450,"y":120},"params":{"ebn0_db":6,"snr_mode":"experiment","seed":-1}},
+      {"id":"demod","type":"qpsk_demod","label":"QPSK detector","position":{"x":680,"y":120}},
+      {"id":"ber","type":"ber","label":"BER meter","position":{"x":680,"y":330},"port_orientation":"reversed"},
+      {"id":"const","type":"constellation","label":"Rx constellation","position":{"x":450,"y":330}},
+      {"id":"power","type":"power_meter","label":"Tx power","position":{"x":230,"y":330}}
+    ], "edges": [
+      {"id":"e1","source":"src","target":"mod"},{"id":"e2","source":"mod","target":"ch"},{"id":"e3","source":"ch","target":"demod"},
+      {"id":"e4","source":"src","target":"ber","target_handle":"reference"},{"id":"e5","source":"demod","target":"ber","target_handle":"estimate"},
+      {"id":"e6","source":"ch","target":"const"},{"id":"e7","source":"mod","target":"power"}
+    ]},
+    "config": {"trials":300,"max_frames":300,"min_frames":40,"min_errors":200,"snr_db_start":-2,"snr_db_stop":12,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","chunk_size":20}
+  },
+  {
+    "format": "signallab-simulation", "version": "1.0",
+    "sample": {
+      "id": "discrete-source-entropy", "title": "Entropy của nguồn rời rạc", "subtitle": "P(x), lượng tin riêng và hiệu suất nguồn", "category": "Information theory", "level": "Cơ bản", "duration_minutes": 25,
+      "summary": "Nguồn A, B, C, D được sinh theo phân bố đã cho và phân tích bằng I(x)=-log2(P(x)), H(X), Hmax cùng hiệu suất nguồn.",
+      "concepts": ["Self-information", "Entropy", "Maximum entropy", "Source efficiency", "Discrete source"], "uses_python": false,
+      "learning_objectives": ["Tính lượng tin riêng của từng symbol", "Đối chiếu entropy lý thuyết và mẫu sinh", "Nhận biết phân bố đều cho entropy cực đại"],
+      "instructions": ["Run once rồi chọn Source Information Analyzer để xem toàn bộ port và metrics.", "Đối chiếu codebook xác suất 0.5, 0.25, 0.125, 0.125 với I(x).", "Đổi probabilities thành 1,1,1,1 ở cả hai block và chạy lại.", "Tăng length từ 200 lên 10000 để tần suất mẫu gần xác suất lý thuyết hơn."],
+      "expected_observations": ["Phân bố mặc định có H(X)=1.75 bit/symbol, thấp hơn Hmax=2.", "Khi bốn xác suất bằng nhau, entropy đạt 2 bit/symbol và hiệu suất 100%." ]
+    },
+    "graph": { "version": "1.0", "nodes": [
+      {"id":"src","type":"discrete_symbol_source","label":"Source X","position":{"x":180,"y":180},"params":{"alphabet":"A,B,C,D","probabilities":"0.5,0.25,0.125,0.125","length":200,"seed":-1}},
+      {"id":"analyzer","type":"source_analyzer","label":"Information analyzer","position":{"x":470,"y":180},"params":{"alphabet":"A,B,C,D","probabilities":"0.5,0.25,0.125,0.125"}}
+    ], "edges": [{"id":"e1","source":"src","target":"analyzer"}]},
+    "config": {"trials":100,"max_frames":100,"min_frames":20,"min_errors":0,"snr_db_start":0,"snr_db_stop":0,"snr_db_step":1,"workers":1,"seed":2026,"device":"cpu","chunk_size":10}
+  },
+  {
+    "format": "signallab-simulation", "version": "1.0",
+    "sample": {
+      "id": "huffman-symbol-roundtrip", "title": "Mã Huffman cho nguồn văn bản", "subtitle": "Codebook prefix, độ dài trung bình và SER", "category": "Information theory", "level": "Trung cấp", "duration_minutes": 35,
+      "summary": "Chuỗi ký tự đi trực tiếp qua Huffman Symbol Encoder/Decoder. Bài học hiển thị codebook động, chuỗi từ mã có dấu phân cách và payload bit thuần không header.",
+      "concepts": ["Huffman coding", "Prefix code", "Average length", "Coding efficiency", "SER"], "uses_python": false,
+      "learning_objectives": ["Dựng và đọc codebook Huffman", "Phân biệt codeword, payload và framing header", "Kiểm chứng giải mã lossless bằng SER"],
+      "instructions": ["Chọn Huffman encoder và đọc bảng mã cập nhật theo P(x).", "Run once; xem Current encoded sequence theo dạng 0|0|10|… rồi so với payload liền mạch.", "Chọn decoder để kiểm tra chuỗi ký tự khôi phục.", "Thay text và probabilities nhưng giữ encoder/decoder cùng model; quan sát SER vẫn bằng 0."],
+      "expected_observations": ["Symbol xác suất cao nhất nhận codeword ngắn nhất.", "Payload mặc định không có 32 bit header; SER bằng 0 khi codebook encoder và decoder khớp nhau." ]
+    },
+    "graph": { "version": "1.0", "nodes": [
+      {"id":"src","type":"text_symbol_source","label":"Text symbols","position":{"x":50,"y":150},"params":{"text":"AAABACADABAA","repeat":1}},
+      {"id":"enc","type":"symbol_huffman_encode","label":"Huffman symbol encoder","position":{"x":300,"y":150},"params":{"alphabet":"A,B,C,D","probabilities":"0.5,0.25,0.125,0.125","include_header":false}},
+      {"id":"dec","type":"symbol_huffman_decode","label":"Huffman symbol decoder","position":{"x":570,"y":150},"params":{"alphabet":"A,B,C,D","probabilities":"0.5,0.25,0.125,0.125","include_header":false}},
+      {"id":"ser","type":"ser","label":"Symbol error rate","position":{"x":570,"y":350},"port_orientation":"reversed"}
+    ], "edges": [
+      {"id":"e1","source":"src","target":"enc"},{"id":"e2","source":"enc","target":"dec"},
+      {"id":"e3","source":"enc","source_handle":"reference","target":"ser","target_handle":"reference"},{"id":"e4","source":"dec","target":"ser","target_handle":"estimate"}
+    ]},
+    "config": {"trials":50,"max_frames":50,"min_frames":10,"min_errors":0,"snr_db_start":0,"snr_db_stop":0,"snr_db_step":1,"workers":1,"seed":2026,"device":"cpu","chunk_size":10}
+  },
+  {
+    "format": "signallab-simulation", "version": "1.0",
+    "sample": {
+      "id": "shannon-fano-symbol-roundtrip", "title": "Shannon–Fano cho nguồn văn bản", "subtitle": "So sánh phương pháp chia xác suất với Huffman", "category": "Information theory", "level": "Trung cấp", "duration_minutes": 30,
+      "summary": "Bài mã hóa và giải mã lossless chuỗi symbol bằng Shannon–Fano. Người học có thể lưu kết quả và so sánh chiều dài mã với bài Huffman có cùng phân bố.",
+      "concepts": ["Shannon–Fano", "Prefix tree", "Source coding", "Compression ratio", "SER"], "uses_python": false,
+      "learning_objectives": ["Hiểu nguyên tắc chia tập symbol theo tổng xác suất", "Kiểm chứng tính prefix và giải mã duy nhất", "So sánh hiệu suất Shannon–Fano và Huffman"],
+      "instructions": ["Run once và xem payload bit ở output encoder.", "Kiểm tra chuỗi output decoder khớp hoàn toàn source.", "Dùng cùng alphabet/probabilities với sample Huffman.", "Thay phân bố lệch hơn và so sánh số bit output của hai phương pháp."],
+      "expected_observations": ["SER bằng 0 khi encoder/decoder dùng cùng model.", "Shannon–Fano thường tốt nhưng không bảo đảm tối ưu chiều dài trung bình như Huffman." ]
+    },
+    "graph": { "version": "1.0", "nodes": [
+      {"id":"src","type":"text_symbol_source","label":"Text symbols","position":{"x":50,"y":150},"params":{"text":"AAABACADABAA","repeat":1}},
+      {"id":"enc","type":"symbol_shannon_fano_encode","label":"Shannon–Fano encoder","position":{"x":300,"y":150},"params":{"alphabet":"A,B,C,D","probabilities":"0.5,0.25,0.125,0.125","include_header":true}},
+      {"id":"dec","type":"symbol_shannon_fano_decode","label":"Shannon–Fano decoder","position":{"x":570,"y":150},"params":{"alphabet":"A,B,C,D","probabilities":"0.5,0.25,0.125,0.125","include_header":true}},
+      {"id":"ser","type":"ser","label":"Symbol error rate","position":{"x":570,"y":350},"port_orientation":"reversed"}
+    ], "edges": [
+      {"id":"e1","source":"src","target":"enc"},{"id":"e2","source":"enc","target":"dec"},
+      {"id":"e3","source":"enc","source_handle":"reference","target":"ser","target_handle":"reference"},{"id":"e4","source":"dec","target":"ser","target_handle":"estimate"}
+    ]},
+    "config": {"trials":50,"max_frames":50,"min_frames":10,"min_errors":0,"snr_db_start":0,"snr_db_stop":0,"snr_db_step":1,"workers":1,"seed":2026,"device":"cpu","chunk_size":10}
+  },
+  {
+    "format": "signallab-simulation", "version": "1.0",
+    "sample": {
+      "id": "python-hard-decision", "title": "Bộ thu BPSK viết bằng Python", "subtitle": "Thay block giải điều chế bằng NumPy", "category": "Python labs", "level": "Cơ bản", "duration_minutes": 30,
+      "summary": "Python Block thực hiện quyết định ngưỡng y<0 ngay trên một frame NumPy. Runtime vẫn tự chia các frame Monte-Carlo cho nhiều worker, người học chỉ viết phép xử lý tín hiệu tuần tự tự nhiên.",
+      "concepts": ["Python Block", "NumPy", "Hard decision", "Vectorization", "Automatic parallelism"], "uses_python": true,
+      "learning_objectives": ["Viết process(signal, params) không cần xử lý worker", "Dùng phép so sánh vector hóa của NumPy", "Thay đổi threshold và đánh giá BER"],
+      "instructions": ["Chọn Custom hard decision và đọc code Python ngắn trong tab Block.", "Run once, kiểm tra input float và output int8 có cùng kích thước.", "Đổi threshold từ 0 thành 0.2 hoặc -0.2 rồi chạy benchmark.", "So sánh với BPSK Demodulator chuẩn bằng cách thay Python Block."],
+      "expected_observations": ["Code chỉ xử lý một frame; SignalLab tự song song hóa benchmark.", "Threshold 0 là quyết định đối xứng phù hợp với BPSK qua AWGN zero-mean." ]
+    },
+    "graph": { "version": "1.0", "nodes": [
+      {"id":"src","type":"bit_source","label":"Random bits","position":{"x":30,"y":150},"params":{"length":4096,"seed":-1}},
+      {"id":"mod","type":"bpsk_mod","label":"BPSK","position":{"x":240,"y":150}},
+      {"id":"ch","type":"awgn","label":"AWGN","position":{"x":450,"y":150},"params":{"ebn0_db":4,"snr_mode":"experiment","seed":-1}},
+      {"id":"py","type":"python","label":"Custom hard decision","position":{"x":670,"y":150},"params":{"threshold":0,"output_size":"same"},"code":"import numpy as np\n\n# Process one frame. SignalLab parallelizes frames automatically.\ndef process(signal, params):\n    threshold = float(params.get(\"threshold\", 0.0))\n    samples = np.real(np.asarray(signal))\n    return (samples < threshold).astype(np.int8)\n"},
+      {"id":"ber","type":"ber","label":"BER meter","position":{"x":670,"y":350},"port_orientation":"reversed"}
+    ], "edges": [
+      {"id":"e1","source":"src","target":"mod"},{"id":"e2","source":"mod","target":"ch"},{"id":"e3","source":"ch","target":"py"},
+      {"id":"e4","source":"src","target":"ber","target_handle":"reference"},{"id":"e5","source":"py","target":"ber","target_handle":"estimate"}
+    ]},
+    "config": {"trials":300,"max_frames":300,"min_frames":40,"min_errors":200,"snr_db_start":-2,"snr_db_stop":10,"snr_db_step":2,"workers":0,"seed":2026,"device":"cpu","chunk_size":20}
+  },
+  {
+    "format": "signallab-simulation", "version": "1.0",
+    "sample": {
+      "id": "python-binary-symmetric-channel", "title": "Kênh nhị phân đối xứng bằng Python", "subtitle": "Mô phỏng BSC(p) và kiểm chứng BER ≈ p", "category": "Python labs", "level": "Trung cấp", "duration_minutes": 35,
+      "summary": "Một Python Block mô phỏng BSC bằng cách sinh mặt nạ Bernoulli và XOR với bit vào. Đây là cầu nối trực tiếp giữa xác suất lỗi lý thuyết và kết quả Monte-Carlo.",
+      "concepts": ["Binary symmetric channel", "Bernoulli noise", "NumPy RNG", "BER", "Law of large numbers"], "uses_python": true,
+      "learning_objectives": ["Cài đặt BSC(p) bằng phép XOR vector hóa", "Hiểu seed=-1 và seed cố định", "Kiểm chứng BER hội tụ về crossover probability p"],
+      "instructions": ["Chọn Python BSC và đọc code tạo flips từ rng.random.", "Run once để xem vị trí bit bị đảo ở input/output.", "Run Benchmark với flip_probability=0.08; BER không phụ thuộc SNR và xấp xỉ 0.08.", "Tăng length, Max frames hoặc đổi p để quan sát định luật số lớn; đặt seed cố định để tái lập."],
+      "expected_observations": ["Đường BER gần nằm ngang vì BSC không sử dụng SNR của Experiment.", "Khi tổng số bit tăng, BER đo được tiến gần tham số p." ]
+    },
+    "graph": { "version": "1.0", "nodes": [
+      {"id":"src","type":"bit_source","label":"Bernoulli bit source","position":{"x":120,"y":170},"params":{"length":10000,"seed":-1}},
+      {"id":"py","type":"python","label":"Python BSC(p)","position":{"x":410,"y":170},"params":{"flip_probability":0.08,"seed":-1,"output_size":"same"},"code":"import numpy as np\n\n# Binary symmetric channel: each bit is flipped independently with P(error)=p.\ndef process(signal, params):\n    bits = np.asarray(signal, dtype=np.int8)\n    p = float(params.get(\"flip_probability\", 0.08))\n    seed = int(params.get(\"seed\", -1))\n    rng = np.random.default_rng(None if seed < 0 else seed)\n    flips = (rng.random(bits.size) < p).astype(np.int8)\n    return np.bitwise_xor(bits, flips)\n"},
+      {"id":"ber","type":"ber","label":"Measured crossover rate","position":{"x":690,"y":170}}
+    ], "edges": [
+      {"id":"e1","source":"src","target":"py"},{"id":"e2","source":"src","target":"ber","target_handle":"reference"},{"id":"e3","source":"py","target":"ber","target_handle":"estimate"}
+    ]},
+    "config": {"trials":100,"max_frames":100,"min_frames":30,"min_errors":500,"snr_db_start":0,"snr_db_stop":10,"snr_db_step":2,"workers":0,"seed":2026,"device":"cpu","chunk_size":10}
+  }
+]

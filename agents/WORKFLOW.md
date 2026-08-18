@@ -9,3 +9,4 @@
 7. Trước bàn giao chạy `test.bat` hoặc pytest + npm build.
 8. Giữ ranh giới module: registry block ở `block_registry.py`, processor ở `blocks.py`; dữ liệu/logic BER ở `frontend/src/features/ber`, không đưa trở lại `App.tsx`.
 9. Nếu thêm block phải cập nhật backend registry, processor map, frontend fallback catalog, tài liệu và test trong cùng thay đổi.
+10. Nếu thêm/sửa bài học Open Samples, cập nhật `samples/catalog.json`; bảo đảm metadata học tập đầy đủ, graph chạy được bằng Run once và `backend/tests/test_samples.py` pass.

@@ -39,6 +39,7 @@ frontend/src/
   features/projects/projectFiles.ts Save/Open đa nền tảng và desktop bridge
   features/sourceTheory/           codebook Huffman và bảng giảng dạy live
   features/documents/              cửa sổ tài liệu, search và Markdown renderer
+  features/samples/                catalog, schema, materializer và modal Open Samples
   features/ber/
     BerPlot.tsx                   SVG plot dùng chung preview/report
     BerLegend.tsx                 legend dùng chung preview/report
@@ -48,6 +49,8 @@ frontend/src/
     imageExport.ts                copy/xuất PNG
     types.ts                      hợp đồng dữ liệu BER
 ```
+
+Catalog bài học canonical nằm tại `samples/catalog.json`. Mỗi entry là một project `signallab-simulation` hợp lệ kèm metadata giáo dục (mục tiêu, khái niệm, các bước và kết quả cần quan sát). Frontend bundle JSON để dùng offline; `materializeSample()` chỉ chuyển schema project sang React Flow dựa trên `BlockSpec` đang hoạt động. Backend test đọc cùng file, validate graph và Run once từng bài nên UI và engine không thể âm thầm lệch port/kích thước. Sample mở ra luôn là project Unsaved và ngắt file target hiện tại, tránh ghi đè catalog hoặc file của người dùng.
 
 Backend tách hợp đồng block khỏi thuật toán xử lý: `block_registry.py` chứa `BlockSpec`, catalog và khả năng GPU; `blocks.py` chỉ chứa processor; `engine.py` biên dịch/thực thi DAG; `jobs.py` quản lý vòng đời job; `main.py` chỉ là lớp HTTP. Nhờ vậy đổi nhãn/port/default không đụng thuật toán, còn thêm processor không làm phình API layer.
 

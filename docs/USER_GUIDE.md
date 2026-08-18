@@ -18,6 +18,32 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 
 Nút **Documents** trên topbar mở trung tâm tài liệu trong một cửa sổ riêng. Ô tìm kiếm hỗ trợ tên hàm, khái niệm và ví dụ; menu chia tài liệu thành Python API, tham chiếu hàm và cách làm việc trong app. Nhấn `Ctrl+K` trong cửa sổ Documents để chuyển nhanh tới ô tìm kiếm. Nội dung được đóng gói cùng SignalLab nên đọc được khi offline.
 
+### Open Samples — thư viện bài thực hành
+
+Nút **Open Samples** trên topbar mở thư viện bài học được đóng gói sẵn và dùng được offline. Có thể tìm theo tên, khái niệm hoặc block; lọc theo **Digital communications**, **Information theory** và **Python labs**. Chọn một bài để xem trước:
+
+- trình độ, thời lượng dự kiến và số block;
+- mục tiêu học tập và các khái niệm trọng tâm;
+- toàn bộ chuỗi block sẽ được nạp;
+- quy trình thực hành từng bước;
+- các kết quả cần quan sát và câu hỏi gợi ý.
+
+Nhấn **Open this sample** để nạp graph cùng cấu hình Experiment đã hiệu chỉnh cho bài đó. Sample luôn được mở dưới dạng simulation **Unsaved**, không liên kết với file gốc; do đó có thể thay đổi tùy ý rồi dùng Save/`Ctrl+S` để chọn tên và vị trí lưu thành bài riêng. Nếu simulation hiện tại chưa lưu, app hỏi xác nhận trước khi thay thế.
+
+Catalog hiện có chín bài:
+
+1. BPSK không mã hóa qua AWGN — đường BER chuẩn.
+2. Hamming (7,4) hệ thống qua AWGN — syndrome, sửa lỗi đơn và coding gain.
+3. Mã lặp 3 — quyết định đa số và đánh đổi code rate.
+4. QPSK với Constellation/Power Sink — quan hệ bit/symbol và I/Q.
+5. Entropy nguồn rời rạc — P(x), I(x), H(X), Hmax và hiệu suất nguồn.
+6. Huffman cho nguồn văn bản — codebook prefix, payload và SER.
+7. Shannon–Fano cho nguồn văn bản — so sánh với Huffman.
+8. Bộ thu BPSK bằng Python Block — quyết định ngưỡng với NumPy.
+9. Kênh nhị phân đối xứng BSC(p) bằng Python Block — kiểm chứng BER xấp xỉ p.
+
+Hai bài Python minh họa đúng mô hình lập trình của SignalLab: người học chỉ viết `process(signal, params)` cho một frame; runtime tự xử lý worker và song song hóa Monte-Carlo. Mã nguồn nằm ngay trong Python Block để đọc, chạy và sửa.
+
 1. Chọn khối trong thanh bên hoặc dùng sơ đồ mẫu. Khi bắt đầu kéo block, block được chọn ngay.
 2. Kéo từ cổng bên phải của một khối sang cổng bên trái khối kế tiếp.
 3. Chọn khối để sửa tên và tham số. Với Python Block, sửa hàm `process` theo mẫu.

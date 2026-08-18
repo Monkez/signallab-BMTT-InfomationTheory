@@ -6,7 +6,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import {
   Activity, ArrowLeftRight, BookOpen, Box, Braces, CircleStop, FilePlus2, FolderOpen,
-  Layers3, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Save, SaveAll, Search, Terminal, Trash2, X,
+  Layers3, LibraryBig, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Save, SaveAll, Search, Terminal, Trash2, X,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
 import { cancelJob, createJob, getJob, graphPayload, GraphApiError, runGraphOnce } from './api'
@@ -19,6 +19,8 @@ import { fallbackSpecs, iconFor, miniMapColor } from './features/blocks/catalog'
 import { PortDataInspector } from './features/blocks/PortDataInspector'
 import { defaultSimulationConfig, snrPointCount, validateSimulationConfig } from './features/experiment/config'
 import { HuffmanCodebookTable } from './features/sourceTheory/HuffmanCodebookTable'
+import { SampleLibraryModal } from './features/samples/SampleLibraryModal'
+import { materializeSample, type SampleProject } from './features/samples/types'
 import {
   attachBrowserProjectFile, clearProjectFileTarget, openProjectFile, projectDisplayName,
   saveProjectFile, supportsProjectOpenDialog,
@@ -61,6 +63,7 @@ function App() {
   const [projectName, setProjectName] = useState('Hamming BPSK over AWGN')
   const [savedSignature, setSavedSignature] = useState(() => projectSignature(initialNodes, initialEdges, defaultSimulationConfig))
   const [savingProject, setSavingProject] = useState(false)
+  const [samplesOpen, setSamplesOpen] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
   const bootLoggedRef = useRef(false)
@@ -337,6 +340,27 @@ function App() {
     appendLog('info', 'Sample simulation restored. Save it to create a new project file.')
   }
 
+  const openCatalogSample = (sample: SampleProject) => {
+    if (projectDirty && !window.confirm('Discard unsaved changes and open this sample?')) return
+    const materialized = materializeSample(sample, specs)
+    clearDiagnostics()
+    setNodes(materialized.nodes)
+    setEdges(materialized.edges)
+    setConfig(materialized.config)
+    setSelectedId(null)
+    setJob(null)
+    setSnapshotId(null)
+    setError('')
+    setRightTab('run')
+    setProjectName(sample.sample.title)
+    setSavedSignature('')
+    lastSnrRef.current = null
+    void clearProjectFileTarget()
+    setSamplesOpen(false)
+    appendLog('success', `Sample “${sample.sample.title}” opened · ${materialized.nodes.length} blocks and ${materialized.edges.length} links.`)
+    appendLog('info', `Learning goal: ${sample.sample.learning_objectives[0]}`)
+  }
+
   useEffect(() => {
     const onSaveShortcut = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 's') return
@@ -376,12 +400,14 @@ function App() {
           <button className="ghost" onClick={resetSample} title="Reset sample"><RotateCcw size={16} /></button>
           <button className="ghost labeled" onClick={newSimulation} disabled={executionActive} title="Create a blank simulation"><FilePlus2 size={15} /> New</button>
           <button className="ghost labeled" onClick={() => void openProject()} title="Open a SignalLab simulation"><FolderOpen size={15} /> Open</button>
+          <button className="ghost labeled samples-action" onClick={() => setSamplesOpen(true)} title="Open a complete learning sample"><LibraryBig size={15} /><span>Open Samples</span></button>
           <input ref={fileRef} type="file" accept=".slab.json,.json,application/json" hidden onChange={e => { void importProject(e.target.files?.[0]); e.target.value = '' }} />
           <button className="ghost labeled save-action" onClick={() => void saveProject(false)} disabled={savingProject} title="Save simulation (Ctrl+S)"><Save size={15} /> {savingProject ? 'Saving…' : 'Save'}</button>
           <button className="ghost labeled" onClick={() => void saveProject(true)} disabled={savingProject} title="Save simulation as a new file (Ctrl+Shift+S)"><SaveAll size={15} /> Save As</button>
           <button className="ghost labeled documents-action" onClick={openDocuments} title="Open SignalLab documentation in a separate window"><BookOpen size={15} /><span>Documents</span></button>
         </div>
       </header>
+      <SampleLibraryModal open={samplesOpen} onClose={() => setSamplesOpen(false)} onOpenSample={openCatalogSample} />
 
       <aside className={`library ${leftOpen ? '' : 'collapsed'}`}>
         <div className="panel-title"><Layers3 size={16} /><span>Block library</span><small>{specs.length} blocks</small></div>

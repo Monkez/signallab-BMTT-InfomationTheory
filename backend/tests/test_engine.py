@@ -109,6 +109,21 @@ def test_run_once_returns_presentation_metrics_for_power_and_constellation_sinks
     assert result["port_previews"]["const"]["inputs"]["in"]["size"] == 8
 
 
+def test_constellation_preview_keeps_a_plot_sized_sample():
+    graph = Graph(nodes=[
+        {"id": "src", "type": "bit_source", "label": "Bits", "params": {"length": 4096, "seed": 1}},
+        {"id": "mod", "type": "bpsk_mod", "label": "BPSK", "params": {}},
+        {"id": "const", "type": "constellation", "label": "Constellation", "params": {}},
+    ], edges=[
+        {"id": "e1", "source": "src", "target": "mod"},
+        {"id": "e2", "source": "mod", "target": "const"},
+    ])
+    result = run_once(graph, SimulationConfig(seed=42, device="cpu"))
+    preview = result["port_previews"]["const"]["inputs"]["in"]
+    assert preview["size"] == 4096
+    assert len(preview["sample"]) == 2048
+
+
 def test_run_once_snapshot_exposes_every_port_value_by_page():
     client = TestClient(app)
     response = client.post("/api/run-once", json={

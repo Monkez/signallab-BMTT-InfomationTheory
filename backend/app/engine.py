@@ -162,6 +162,17 @@ def _preview_value(value: Any, sample_limit: int = 8) -> dict[str, Any]:
     return preview
 
 
+def _preview_limit(node_type: str) -> int:
+    """Keep ordinary port previews small, but give constellation plots enough points.
+
+    A benchmark may run hundreds of frames, while the UI preview is captured from
+    one representative frame. Eight values (the generic limit) makes a noisy I/Q
+    cloud look like only a few dots, so the constellation sink gets a bounded,
+    plot-friendly sample without sending the full signal buffer to the browser.
+    """
+    return 2048 if node_type == "constellation" else 8
+
+
 def _capture_value(value: Any) -> np.ndarray:
     """Keep the representative frame for lazy inspection; move GPU data once."""
     return np.array(to_numpy(value), copy=True)
@@ -236,8 +247,9 @@ def execute_trial(
                 edge.get("target_handle", "in"): port_values[edge["source"]]["outputs"][edge.get("source_handle", "out")]
                 for edge in incoming[node_id]
             }
+            limit = _preview_limit(node["type"])
             port_previews[node_id] = {
-                "inputs": {name: _preview_value(value) for name, value in captured_inputs.items()},
+                "inputs": {name: _preview_value(value, sample_limit=limit) for name, value in captured_inputs.items()},
                 "outputs": {},
             }
             port_values[node_id] = {
@@ -265,7 +277,8 @@ def execute_trial(
         if capture_ports:
             captured_outputs = {name: _capture_value(value) for name, value in result.items()}
             port_values[node_id]["outputs"] = captured_outputs
-            port_previews[node_id]["outputs"] = {name: _preview_value(value) for name, value in captured_outputs.items()}
+            limit = _preview_limit(node["type"])
+            port_previews[node_id]["outputs"] = {name: _preview_value(value, sample_limit=limit) for name, value in captured_outputs.items()}
     return {"metrics": metrics, "port_previews": port_previews, "_port_values": port_values} if capture_ports else metrics
 
 

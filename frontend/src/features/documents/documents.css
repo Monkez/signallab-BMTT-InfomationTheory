@@ -6,9 +6,9 @@ body:has(.docs-window) { min-width: 760px; overflow: auto; background: #fff; }
 .docs-brand strong, .docs-brand small { display: block; }
 .docs-brand strong { font-size: 15px; }
 .docs-brand small { margin-top: 2px; color: #7a8798; font-size: 10px; }
-.docs-search { height: 39px; display: flex; align-items: center; gap: 9px; padding: 0 11px; border: 1px solid #cbd6e3; border-radius: 8px; color: #718096; background: #f7f9fc; }
+.docs-search { height: 39px; display: flex; align-items: center; gap: 9px; margin: 0; padding: 0 11px; border: 1px solid #cbd6e3; border-radius: 8px; color: #718096; background: #f7f9fc; text-transform: none; }
 .docs-search:focus-within { border-color: #5d88db; box-shadow: 0 0 0 3px rgba(37,99,235,.1); background: #fff; }
-.docs-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #233148; font-size: 13px; }
+.docs-search input, .docs-search input:focus { min-width: 0; height: auto; flex: 1; margin: 0; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent; color: #233148; font-size: 13px; }
 .docs-search kbd { padding: 2px 6px; border: 1px solid #d5dde7; border-radius: 4px; color: #8a96a6; background: #fff; font: 9px Consolas, monospace; }
 .docs-close { justify-self: end; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 7px; color: #69778b; background: transparent; }
 .docs-close:hover { color: #1f4f9f; background: #eef4ff; }

@@ -109,6 +109,14 @@ def test_run_once_returns_presentation_metrics_for_power_and_constellation_sinks
     assert result["port_previews"]["const"]["inputs"]["in"]["size"] == 8
 
 
+def test_awgn_adds_noise_on_both_i_and_q_for_complex_signals():
+    context = make_context(np, np.random.default_rng(7), 0, 7, "cpu", 4.0)
+    clean = np.ones(4096, dtype=np.complex64)
+    noisy = PROCESSORS["awgn"]({"in": clean}, {"ebn0_db": 4, "snr_mode": "fixed"}, context)["out"]
+    assert np.std(np.real(noisy)) > 0
+    assert np.std(np.imag(noisy)) > 0
+
+
 def test_constellation_preview_keeps_a_plot_sized_sample():
     graph = Graph(nodes=[
         {"id": "src", "type": "bit_source", "label": "Bits", "params": {"length": 4096, "seed": 1}},

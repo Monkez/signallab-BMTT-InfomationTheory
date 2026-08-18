@@ -78,6 +78,7 @@ Hai bài Python minh họa đúng mô hình lập trình của SignalLab: ngư�
 - `Auto`: chọn GPU nếu có và phù hợp, nếu không dùng CPU.
 - Trong thư viện block, **Variables** và **Python Block** được đặt ở đầu để truy cập nhanh. Ở tab Experiment, bấm **Experiment parameters** để thu gọn/mở các tham số; **Run once** và **Run Benchmark** luôn nằm riêng ở đầu panel.
 - Sau khi chạy, chọn từng sink trên canvas để xem kết quả ngay trong tab **Block**. Constellation Sink hiển thị đồ thị I/Q từ tối đa 2.048 mẫu của frame đại diện (đủ để thấy cloud nhiễu thay vì vài điểm); Scope, Power Meter, Source Analyzer và SER hiển thị các chỉ số tương ứng. Tab **Experiment** chỉ tổng hợp lại các sink results này; BER Meter vẫn sở hữu đồ thị BER theo SNR cùng số frame/lỗi từng điểm.
+- Với tín hiệu phức như QPSK, AWGN tạo nhiễu độc lập trên cả hai thành phần I và Q. Vì vậy constellation đúng sẽ tạo bốn cụm quanh bốn điểm lý tưởng (+I,+Q), (+I,-Q), (-I,+Q), (-I,-Q), sau đó lan rộng theo mức nhiễu.
 - **Run Benchmark** là nút chạy thí nghiệm theo mode hiện tại. Sau khi hoàn tất, port preview đại diện được lấy từ một frame xác định tại SNR đầu tiên; dữ liệu đầy đủ của mọi frame không được gửi lên UI nên app vẫn nhẹ với mô phỏng lớn.
 - Reference BER được lưu theo tên trong trình duyệt; khi Browse/load một đường có cùng tên, đường cũ được thay thế để legend không xuất hiện các curve trùng tên.
 - Trên biểu đồ BER, chọn **Copy** để copy ảnh PNG hoặc **PNG** để tải ảnh. Bảng **Results by SNR** hỗ trợ **Copy** (TSV), **CSV** và **PNG**, thuận tiện đưa vào báo cáo.

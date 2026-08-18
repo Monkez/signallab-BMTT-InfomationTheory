@@ -402,7 +402,13 @@ def awgn(inputs, params, context):
     ebn0_db = float(params.get("ebn0_db", 4.0)) if mode == "fixed" or context.snr_db is None else float(context.snr_db)
     sigma = (1.0 / (2.0 * 10.0 ** (ebn0_db / 10.0))) ** 0.5
     random = _block_rng(params, context, context.xp)
-    noise = random.normal(0.0, sigma, samples.shape)
+    # Complex baseband signals need independent I/Q noise. Adding a real
+    # array to a complex signal only perturbs I, which collapses a QPSK
+    # constellation into two horizontal bands instead of four clouds.
+    if context.xp.iscomplexobj(samples):
+        noise = sigma * (random.normal(0.0, 1.0, samples.shape) + 1j * random.normal(0.0, 1.0, samples.shape))
+    else:
+        noise = random.normal(0.0, sigma, samples.shape)
     return {"out": samples + noise}
 
 

@@ -410,8 +410,11 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .sink-result-stats b { color: #2d4f81; font: 600 13px Consolas, monospace; }
 .constellation-card { grid-column: span 2; }
 .constellation-preview { display: block; width: 100%; height: 96px; margin-top: 8px; border: 1px solid #e2e8f0; border-radius: 5px; background: #f8fafc; }
-.constellation-preview path { stroke: #c8d3e1; stroke-width: 1; }
+.constellation-preview .constellation-axis { stroke: #b9c8da; stroke-width: 1.2; }
+.constellation-preview .constellation-grid line { stroke: #e2e8f0; stroke-width: .7; stroke-dasharray: 2 2; }
 .constellation-preview text { fill: #8290a2; font: 8px Consolas, monospace; }
+.constellation-preview .constellation-tick { fill: #8a99ac; font-size: 7px; }
+.constellation-preview .constellation-label { fill: #687b93; font-size: 9px; font-weight: 600; }
 .constellation-preview circle { fill: #2d6be4; fill-opacity: .72; stroke: #fff; stroke-width: .8; }
 .sink-visual-empty { display: grid; place-items: center; height: 96px; margin-top: 8px; color: #8995a4; font-size: 9px; background: #f8fafc; border: 1px dashed #d7e0eb; border-radius: 5px; }
 .sink-detail-backdrop { position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: 24px; background: rgba(20, 31, 46, .38); }
@@ -436,6 +439,8 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .sink-detail-metric-grid strong { display: block; margin-top: 7px; color: #1f57ba; font: 600 18px Consolas, monospace; }
 .sink-detail-note { color: #758191; font-size: 10px; line-height: 1.6; }
 .sink-edit-grid { display: grid; grid-template-columns: minmax(0, 1fr) 90px 120px; gap: 10px; }
+.sink-axis-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 360px; }
+.sink-axis-hint { display: block; margin-top: 6px; color: #7b8ba0; font-size: 11px; }
 .sink-detail-edit h3 { margin: 22px 0 8px; color: #526174; font-size: 11px; }
 .sink-metric-editor { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 9px; }
 .sink-metric-editor label, .sink-edit-grid label { color: #64748b; font-size: 10px; text-transform: capitalize; }

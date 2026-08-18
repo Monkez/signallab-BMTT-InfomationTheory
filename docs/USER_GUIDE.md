@@ -68,7 +68,7 @@ Hai bài Python minh họa đúng mô hình lập trình của SignalLab: ngư�
 
 ## Cấu hình Experiment
 
-- **Specific steps**: nhập `Steps` là số frame cố định cần chạy. Mode này không quét SNR; AWGN/Rayleigh dùng `ebn0_db` của chính block, kể cả khi block đang được đặt ở chế độ mặc định.
+- **Specific steps**: nhập `SNR (dB)` cho một điểm làm việc và `Steps` là số frame cố định cần chạy. Mode này không quét SNR; giá trị SNR được truyền vào `params["snr_db"]` của channel/Python Block. Nếu channel đặt `Fixed block value` thì `ebn0_db` của block vẫn được ưu tiên.
 - **BER benchmark**: dùng `SNR Start/Stop/Step`; mỗi điểm chạy ít nhất `Min frames / SNR`, dừng sớm khi đạt `Min errors / SNR`, hoặc dừng ở `Frames / SNR`.
 - Với block **AWGN**, chọn `Experiment sweep` để lấy `context.snr_db`; chọn `Fixed block value` để dùng `ebn0_db` riêng.
 - `Workers = 0`: hệ thống tự chọn; đặt `1` để debug dễ hơn.
@@ -77,7 +77,7 @@ Hai bài Python minh họa đúng mô hình lập trình của SignalLab: ngư�
 - Muốn benchmark tái lập hoàn toàn, đặt seed cụ thể cho tất cả block ngẫu nhiên và giữ nguyên Seed trong Experiment. Chỉ cần một block còn `-1` thì lần chạy sau có thể cho chuỗi mẫu/BER khác.
 - `Auto`: chọn GPU nếu có và phù hợp, nếu không dùng CPU.
 - Trong thư viện block, **Variables** và **Python Block** được đặt ở đầu để truy cập nhanh. Ở tab Experiment, bấm **Experiment parameters** để thu gọn/mở các tham số; **Run once** và **Run Benchmark** luôn nằm riêng ở đầu panel.
-- Sau khi chạy, chọn từng sink trên canvas để xem kết quả ngay trong tab **Block**. Constellation Sink hiển thị đồ thị I/Q từ tối đa 2.048 mẫu của frame đại diện (đủ để thấy cloud nhiễu thay vì vài điểm); Scope, Power Meter, Source Analyzer và SER hiển thị các chỉ số tương ứng. Tab **Experiment** chỉ tổng hợp lại các sink results này; BER Meter vẫn sở hữu đồ thị BER theo SNR cùng số frame/lỗi từng điểm.
+- Sau khi chạy, chọn từng sink trên canvas để xem kết quả ngay trong tab **Block**. Constellation Sink hiển thị đồ thị I/Q với đầy đủ trục, vạch chia và nhãn I/Q. Trong **Details → Edit & Data**, có thể đặt giới hạn đối xứng `I limit (±)` và `Q limit (±)`; các giới hạn này được lưu cùng reference JSON. Tab **Experiment** chỉ tổng hợp lại các sink results này.
 - Với tín hiệu phức như QPSK, AWGN tạo nhiễu độc lập trên cả hai thành phần I và Q. Vì vậy constellation đúng sẽ tạo bốn cụm quanh bốn điểm lý tưởng (+I,+Q), (+I,-Q), (-I,+Q), (-I,-Q), sau đó lan rộng theo mức nhiễu.
 - **Run Benchmark** là nút chạy thí nghiệm theo mode hiện tại. Sau khi hoàn tất, port preview đại diện được lấy từ một frame xác định tại SNR đầu tiên; dữ liệu đầy đủ của mọi frame không được gửi lên UI nên app vẫn nhẹ với mô phỏng lớn.
 - Reference BER được lưu theo tên trong trình duyệt; khi Browse/load một đường có cùng tên, đường cũ được thay thế để legend không xuất hiện các curve trùng tên.

@@ -301,7 +301,10 @@ def run_once(graph: Graph, config: SimulationConfig) -> dict[str, Any]:
     graph_dict = graph.model_dump()
     graph_dict["_global_variables"] = collect_global_variables(graph_dict["nodes"])
     graph_dict["_random_seed_root"] = int.from_bytes(os.urandom(8), "little")
-    snr_db = None if config.mode == "specific_steps" else float(config.snr_db_start)
+    # Both modes expose a concrete operating point to channels/Python blocks.
+    # Specific steps uses the single SNR value entered by the user; benchmark
+    # uses its first sweep point.
+    snr_db = float(config.snr_db_start)
     captured = execute_trial(graph_dict, 0, config.seed, device, snr_db, capture_ports=True)
     return {
         "device": device,
@@ -391,9 +394,10 @@ def run_simulation(
     max_frames = config.max_frames or config.trials
     min_frames = min(config.min_frames, max_frames)
     if config.mode == "specific_steps":
-        # A specific-step experiment is deliberately SNR-neutral: run a fixed
-        # number of frames once and let channels use their own block defaults.
-        snr_values = [None]
+        # Run a fixed number of frames at one explicit operating point.  This
+        # keeps the mode free of sweep/early-stop parameters while still
+        # allowing a channel or Python block to consume params.snr_db.
+        snr_values = [round(float(config.snr_db_start), 6)]
     else:
         if config.snr_db_stop < config.snr_db_start:
             raise ValueError("SNR stop must be greater than or equal to SNR start")

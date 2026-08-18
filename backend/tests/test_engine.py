@@ -71,13 +71,14 @@ def test_specific_steps_mode_runs_exact_points_with_fixed_frames():
         max_frames=2,
         min_frames=1,
         min_errors=999999,
+        snr_db_start=3,
         workers=1,
         seed=7,
         chunk_size=1,
         device="cpu",
     )
     result = run_simulation(sample_graph(), config)
-    assert [point["snr_db"] for point in result["snr_points"]] == [None]
+    assert [point["snr_db"] for point in result["snr_points"]] == [3.0]
     assert all(point["frames"] == 2 for point in result["snr_points"])
 
 

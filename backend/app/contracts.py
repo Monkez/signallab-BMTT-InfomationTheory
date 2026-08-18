@@ -47,17 +47,33 @@ def _random_seed(value: Any) -> int:
     return int(numeric)
 
 
+def _validate_symbol_model(params: dict[str, Any]) -> None:
+    alphabet = [token.strip() for token in str(params.get("alphabet", "A,B,C,D")).split(",")]
+    if not alphabet or any(not token for token in alphabet) or len(set(alphabet)) != len(alphabet):
+        raise SignalContractError("Parameter 'alphabet' must contain unique, non-empty comma-separated symbols")
+    raw_probabilities = str(params.get("probabilities", "0.5,0.25,0.125,0.125")).split(",")
+    if len(raw_probabilities) != len(alphabet):
+        raise SignalContractError("Parameter 'probabilities' must contain one value for every alphabet symbol")
+    probabilities = [float(value.strip()) for value in raw_probabilities]
+    if any(not math.isfinite(value) or value <= 0 for value in probabilities):
+        raise SignalContractError("Every configured probability must be a positive finite number")
+
+
 def validate_parameters(block_type: str, params: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     try:
         if block_type == "bit_source":
             _positive_integer(params.get("length", 4096), "length")
-        if block_type in {"bit_source", "awgn", "rayleigh"}:
+        if block_type in {"bit_source", "discrete_symbol_source", "awgn", "rayleigh"}:
             _random_seed(params.get("seed", -1))
-        if block_type in {"text_source", "text_file_source"}:
+        if block_type in {"text_source", "text_file_source", "text_symbol_source", "text_file_symbol_source"}:
             _positive_integer(params.get("repeat", 1), "repeat")
-        if block_type == "text_source" and not str(params.get("text", "HELLO")):
+        if block_type in {"text_source", "text_symbol_source"} and not str(params.get("text", "HELLO")):
             raise SignalContractError("Parameter 'text' must not be empty")
+        if block_type == "discrete_symbol_source":
+            _positive_integer(params.get("length", 100), "length")
+        if block_type in {"discrete_symbol_source", "source_analyzer", "symbol_huffman_encode", "symbol_huffman_decode", "symbol_shannon_fano_encode", "symbol_shannon_fano_decode"}:
+            _validate_symbol_model(params)
         if block_type == "image_file_source" and str(params.get("mode", "grayscale")) not in {"grayscale", "rgb"}:
             raise SignalContractError("Parameter 'mode' must be 'grayscale' or 'rgb'")
         if block_type in {"huffman_encode", "huffman_decode", "shannon_fano_encode", "shannon_fano_decode"}:
@@ -113,11 +129,15 @@ def validate_inputs(block_type: str, inputs: dict[str, Any], params: dict[str, A
             _multiple(primary, 2, "in", "QPSK modulation")
         elif block_type == "rle_decode":
             _multiple(primary, 9, "in", "Run-Length decoding")
-        elif block_type in {"huffman_decode", "shannon_fano_decode", "zip_decode"} and primary < 32:
+        elif block_type in {"huffman_decode", "shannon_fano_decode", "symbol_huffman_decode", "symbol_shannon_fano_decode", "zip_decode"} and primary < 32:
             raise SignalContractError(f"Port 'in' has {primary} values; {block_type.replace('_', ' ')} requires at least a 32-bit header")
-    if block_type == "ber" and sizes.get("reference") != sizes.get("estimate"):
+        if block_type in {"source_analyzer", "symbols_to_bits", "symbol_huffman_encode", "symbol_shannon_fano_encode"}:
+            signal = _signal(inputs["in"], "in")
+            if np.asarray(signal).dtype.kind not in {"U", "S", "O"}:
+                raise SignalContractError(f"Port 'in' must contain text symbols, received dtype {np.asarray(signal).dtype}")
+    if block_type in {"ber", "ser"} and sizes.get("reference") != sizes.get("estimate"):
         raise SignalContractError(
-            f"BER inputs must match exactly: reference has {sizes.get('reference', 0)} values, "
+            f"{block_type.upper()} inputs must match exactly: reference has {sizes.get('reference', 0)} values, "
             f"estimate has {sizes.get('estimate', 0)}"
         )
     return sizes
@@ -128,7 +148,7 @@ def _encoded_original_length(block_type: str, signal: Any) -> int | None:
     if hasattr(bits, "get"):
         bits = bits.get()
     bits = np.asarray(bits).astype(np.int8, copy=False)
-    if block_type in {"huffman_decode", "shannon_fano_decode"}:
+    if block_type in {"huffman_decode", "shannon_fano_decode", "symbol_huffman_decode", "symbol_shannon_fano_decode"}:
         return int.from_bytes(np.packbits(bits[:32]).astype(np.uint8).tobytes(), "big")
     if block_type == "zip_decode":
         return int.from_bytes(np.packbits(bits).tobytes()[:4], "big")
@@ -163,9 +183,9 @@ def validate_outputs(
     }
     if block_type in same_size and out_size != in_size:
         raise SignalContractError(f"Output 'out' must match input 'in': expected {in_size}, received {out_size}")
-    if block_type in {"text_source", "text_file_source", "image_file_source"} and output_sizes.get("reference") != out_size:
+    if block_type in {"text_source", "text_file_source", "image_file_source", "symbols_to_bits"} and output_sizes.get("reference") != out_size:
         raise SignalContractError("Outputs 'out' and 'reference' must have identical sizes")
-    if block_type in {"huffman_encode", "shannon_fano_encode", "rle_encode", "zip_encode", "hamming74_encode", "repetition3_encode"}:
+    if block_type in {"huffman_encode", "shannon_fano_encode", "symbol_huffman_encode", "symbol_shannon_fano_encode", "rle_encode", "zip_encode", "hamming74_encode", "repetition3_encode"}:
         if output_sizes.get("reference") != in_size:
             raise SignalContractError(f"Output 'reference' must match input 'in': expected {in_size}, received {output_sizes.get('reference')}")
     if block_type == "bit_source":
@@ -176,9 +196,21 @@ def validate_outputs(
         expected_size = len(str(params.get("text", "HELLO")).encode("utf-8")) * 8 * _positive_integer(params.get("repeat", 1), "repeat")
         if out_size != expected_size:
             raise SignalContractError(f"Output 'out' must contain {expected_size} UTF-8 bits, received {out_size}")
+    if block_type == "text_symbol_source":
+        expected_size = len(str(params.get("text", "ABACABAD"))) * _positive_integer(params.get("repeat", 1), "repeat")
+        if out_size != expected_size:
+            raise SignalContractError(f"Output 'out' must contain {expected_size} character symbols, received {out_size}")
+    if block_type == "discrete_symbol_source":
+        expected_size = _positive_integer(params.get("length", 100), "length")
+        if out_size != expected_size:
+            raise SignalContractError(f"Output 'out' must contain {expected_size} symbols, received {out_size}")
+    if block_type == "source_analyzer" and in_size is not None:
+        for port in ("symbols", "probability", "information"):
+            if output_sizes.get(port) != in_size:
+                raise SignalContractError(f"Output '{port}' must match input size {in_size}, received {output_sizes.get(port)}")
     if block_type == "rle_encode" and out_size is not None:
         _multiple(out_size, 9, "out", "Run-Length encoding")
-    if block_type in {"huffman_encode", "shannon_fano_encode", "zip_encode"} and (out_size or 0) < 32:
+    if block_type in {"huffman_encode", "shannon_fano_encode", "symbol_huffman_encode", "symbol_shannon_fano_encode", "zip_encode"} and (out_size or 0) < 32:
         raise SignalContractError("Encoded output must include a complete 32-bit size header")
 
     ratios: dict[str, tuple[int, int]] = {
@@ -197,7 +229,7 @@ def validate_outputs(
                 f"Output 'out' size mismatch: expected {expected_size} from {in_size} input values, received {out_size}"
             )
 
-    original_length = _encoded_original_length(block_type, inputs["in"]) if block_type in {"huffman_decode", "shannon_fano_decode", "rle_decode", "zip_decode"} else None
+    original_length = _encoded_original_length(block_type, inputs["in"]) if block_type in {"huffman_decode", "shannon_fano_decode", "symbol_huffman_decode", "symbol_shannon_fano_decode", "rle_decode", "zip_decode"} else None
     if original_length is not None and out_size != original_length:
         raise SignalContractError(
             f"Decoded output size mismatch: stream declares {original_length} values, decoder produced {out_size}"

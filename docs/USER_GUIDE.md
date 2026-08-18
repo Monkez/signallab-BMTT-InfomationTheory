@@ -54,6 +54,16 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 - Thư viện có thêm Text Source, Text File Source, Image File Source, Differential Encoder/Decoder, Huffman, Shannon-Fano, Run-Length, ZIP/DEFLATE, Repetition-3, QPSK, Rayleigh Fading, Signal Scope, Constellation Sink và Power Meter. File Source cho phép chọn file trực tiếp trong panel Block; dữ liệu được lưu trong project dưới dạng base64 để chạy được cả desktop và dev server.
 - Các codec nguồn kinh điển làm việc trên stream bit: Encoder có cổng `reference` để nối vào BER, Decoder dùng cùng tham số codebook/codec để khôi phục stream. Huffman và Shannon-Fano dùng nhóm symbol 2-bit với trọng số có thể chỉnh; RLE dùng cặp count/value; ZIP dùng DEFLATE chuẩn.
 
+## Thực hành lý thuyết nguồn với text
+
+- **Text Symbol Source** phát mỗi ký tự Unicode thành một symbol nhìn thấy trực tiếp; **Text File Symbols** làm tương tự với file UTF-8. Các block Text Source cũ vẫn phát bits để project cũ tiếp tục hoạt động.
+- **Discrete Symbol Source** cho nhập `alphabet`, `probabilities`, `length` và `seed`. Ví dụ `A,B,C,D` với `0.5,0.25,0.125,0.125`; các trọng số không bắt buộc cộng đúng 1 vì runtime tự chuẩn hóa, nhưng phải dương và đủ một giá trị cho mỗi symbol.
+- Nối nguồn vào **Source Information Analyzer**, chạy **Run once**, rồi chọn analyzer. Tab Block hiển thị từng symbol, `P(x)`, lượng tin riêng `I(x)=-log2(P(x))`, entropy `H(X)`, entropy cực đại `log2(M)` và hiệu suất nguồn.
+- **Huffman Symbol Encoder/Decoder** và **Shannon-Fano Symbol Encoder/Decoder** nhận trực tiếp chuỗi text, dùng cùng alphabet/xác suất ở hai phía và cho ra bitstream ở encoder. Nối `reference`/kết quả decoder vào **Symbol Error Rate** để đo SER.
+- Khi chỉ cần đưa text chưa nén sang mã kênh hoặc điều chế, dùng **Symbols to UTF-8 Bits**. Đây là điểm chuyển đổi rõ ràng từ miền ký tự sang miền bit.
+
+Luồng mẫu phân tích: `Text Symbol Source → Source Information Analyzer`. Luồng mã hóa nguồn: `Text Symbol Source → Huffman Symbol Encoder → ...bit channel... → Huffman Symbol Decoder → Symbol Error Rate`.
+
 ## Hợp đồng kích thước tín hiệu
 
 Mọi port phải mang mảng một chiều, không rỗng. Runtime không còn tự cắt phần dư hoặc để BER so sánh theo nhánh ngắn hơn:

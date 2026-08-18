@@ -269,3 +269,54 @@ def test_file_source_and_classic_source_codecs_round_trip():
         encoded = PROCESSORS[encoder]({"in": source}, {"weights": "8,4,2,1"}, context)["out"]
         decoded = PROCESSORS[decoder]({"in": encoded}, {"weights": "8,4,2,1"}, context)["out"]
         assert np.array_equal(decoded, source), encoder
+
+
+def test_text_and_file_symbol_sources_emit_visible_characters():
+    context = make_context(np, np.random.default_rng(3), 0, 3, "cpu")
+    manual = PROCESSORS["text_symbol_source"]({}, {"text": "A B", "repeat": 2}, context)["out"]
+    assert manual.dtype.kind == "U"
+    assert manual.tolist() == list("A BA B")
+    raw = base64.b64encode("Chào".encode("utf-8")).decode()
+    file_symbols = PROCESSORS["text_file_symbol_source"]({}, {"data_base64": raw, "repeat": 1}, context)["out"]
+    assert file_symbols.tolist() == list("Chào")
+
+
+def test_discrete_source_and_information_analyzer_use_probability_model():
+    context = make_context(np, np.random.default_rng(4), 0, 4, "cpu")
+    params = {"alphabet": "A,B,C,D", "probabilities": "0.5,0.25,0.125,0.125", "length": 5000, "seed": 42}
+    symbols = PROCESSORS["discrete_symbol_source"]({}, params, context)["out"]
+    assert abs(np.mean(symbols == "A") - 0.5) < 0.03
+    analyzed = PROCESSORS["source_analyzer"]({"in": np.asarray(list("ABCD"))}, params, context)
+    assert analyzed["probability"].tolist() == [0.5, 0.25, 0.125, 0.125]
+    assert analyzed["information"].tolist() == [1.0, 2.0, 3.0, 3.0]
+    assert analyzed["__metrics__"]["source_entropy_sum"] == pytest.approx(1.75)
+
+
+@pytest.mark.parametrize("encoder,decoder", [
+    ("symbol_huffman_encode", "symbol_huffman_decode"),
+    ("symbol_shannon_fano_encode", "symbol_shannon_fano_decode"),
+])
+def test_text_symbol_codecs_round_trip(encoder, decoder):
+    context = make_context(np, np.random.default_rng(5), 0, 5, "cpu")
+    params = {"alphabet": "A,B,C,D", "probabilities": "0.5,0.25,0.125,0.125"}
+    source = np.asarray(list("ABACABAD"))
+    encoded = PROCESSORS[encoder]({"in": source}, params, context)
+    decoded = PROCESSORS[decoder]({"in": encoded["out"]}, params, context)["out"]
+    assert encoded["reference"].tolist() == source.tolist()
+    assert decoded.tolist() == source.tolist()
+
+
+def test_symbols_to_bits_and_symbol_error_rate():
+    context = make_context(np, np.random.default_rng(6), 0, 6, "cpu")
+    symbols = np.asarray(list("Aé"))
+    converted = PROCESSORS["symbols_to_bits"]({"in": symbols}, {"separator": ""}, context)
+    expected = np.unpackbits(np.frombuffer("Aé".encode("utf-8"), dtype=np.uint8)).astype(np.int8)
+    assert np.array_equal(converted["out"], expected)
+    assert np.array_equal(converted["reference"], expected)
+    metrics = PROCESSORS["ser"]({"reference": symbols, "estimate": np.asarray(list("Aê"))}, {}, context)["__metrics__"]
+    assert metrics == {"symbol_errors": 1, "total_symbols": 2}
+
+
+def test_symbol_model_contract_rejects_mismatched_probabilities():
+    errors = validate_parameters("discrete_symbol_source", {"alphabet": "A,B,C", "probabilities": "0.5,0.5", "length": 10, "seed": -1})
+    assert errors and "one value for every alphabet symbol" in errors[0]

@@ -269,6 +269,11 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .sink-result span, .sink-result strong { display: block; }
 .sink-result span { color: #6880a4; font-size: 10px; }
 .sink-result strong { margin-top: 4px; color: #1f57ba; font: 600 13px Consolas, monospace; white-space: nowrap; }
+.source-theory-result { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.source-theory-result > div { min-width: 0; padding: 10px; border: 1px solid #cbdaf0; border-radius: 7px; background: #f5f8fc; }
+.source-theory-result span, .source-theory-result strong { display: block; }
+.source-theory-result span { color: #687b94; font-size: 10px; line-height: 1.25; }
+.source-theory-result strong { margin-top: 5px; color: #234f87; font: 600 12px/1.35 Consolas, monospace; overflow-wrap: anywhere; }
 .console-dock { grid-column: 2; grid-row: 3; min-width: 0; min-height: 0; width: 100%; position: relative; z-index: 8; display: flex; flex-direction: column; border: 1px solid var(--line-strong); border-bottom: 0; background: var(--panel); color: #263140; overflow: hidden; }
 .console-resizer { position: absolute; left: 0; right: 0; top: -5px; height: 9px; cursor: row-resize; z-index: 2; }
 .console-resizer:hover { background: rgba(93, 151, 235, .35); }

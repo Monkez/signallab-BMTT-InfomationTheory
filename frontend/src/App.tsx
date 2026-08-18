@@ -39,6 +39,7 @@ function App() {
   const [config, setConfig] = useState<SimulationConfig>(defaultSimulationConfig)
   const [job, setJob] = useState<Job | null>(null)
   const [runOnceActive, setRunOnceActive] = useState(false)
+  const [runOnceMetrics, setRunOnceMetrics] = useState<Record<string, number>>({})
   const [snapshotId, setSnapshotId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [rightTab, setRightTab] = useState<'block' | 'run'>('run')
@@ -66,6 +67,7 @@ function App() {
   const projectDirty = currentSignature !== savedSignature
   const configIssue = validateSimulationConfig(config)
   const selectedIsStochasticChannel = selected ? ['awgn', 'rayleigh'].includes(selected.data.blockType) : false
+  const selectedIsFileSource = selected ? ['text_file_source', 'text_file_symbol_source', 'image_file_source'].includes(selected.data.blockType) : false
   const visibleParams = selected ? Object.entries(selected.data.params).filter(([key]) => {
     if (key === 'data_base64' || key === 'file_name') return false
     if (selectedIsStochasticChannel && (key === 'snr_mode' || key === 'ebn0_db')) return false
@@ -80,6 +82,7 @@ function App() {
   }, [setNodes])
   const clearDiagnostics = useCallback(() => {
     setSnapshotId(null)
+    setRunOnceMetrics({})
     setNodes(items => items.map(node => node.data.portPreviews || node.data.runtimeError ? { ...node, data: { ...node.data, portPreviews: undefined, runtimeError: undefined } } : node))
   }, [setNodes])
   const applyNodeErrors = useCallback((errors: Record<string, string[]>) => {
@@ -202,19 +205,20 @@ function App() {
   const runOnce = async () => {
     if (configIssue) { setError(configIssue); return }
     clearDiagnostics()
-    setError(''); setRightTab('run'); setRunOnceActive(true)
+    setError(''); setRightTab('run'); setRunOnceActive(true); setJob(null)
     appendLog('info', `Running one frame at ${config.snr_db_start} dB…`)
     try {
       const snapshot = await runGraphOnce(nodes, edges, config)
       applyPortPreviews(snapshot.port_previews)
       setSnapshotId(snapshot.snapshot_id)
+      setRunOnceMetrics(snapshot.metrics)
       appendLog('success', `Run once completed in ${(snapshot.elapsed_seconds * 1000).toFixed(1)} ms on ${snapshot.device.toUpperCase()} · hover any port to inspect data.`)
     } catch (e) { executionError(e) } finally { setRunOnceActive(false) }
   }
 
   const runBenchmark = async () => {
     if (configIssue) { setError(configIssue); return }
-    setError(''); setRightTab('run'); lastSnrRef.current = null
+    setError(''); setRightTab('run'); lastSnrRef.current = null; setRunOnceMetrics({})
     clearDiagnostics()
     appendLog('info', `Starting Monte-Carlo benchmark ${config.snr_db_start}…${config.snr_db_stop} dB.`)
     try {
@@ -337,6 +341,20 @@ function App() {
   const grouped = useMemo(() => specs.filter(s => `${s.label} ${s.category}`.toLowerCase().includes(search.toLowerCase())).reduce<Record<string, BlockSpec[]>>((acc, spec) => ((acc[spec.category] ||= []).push(spec), acc), {}), [specs, search])
   const result = job?.result
   const livePoints = job?.status === 'running' ? (job.snr_points || []) : (result?.snr_points || job?.snr_points || [])
+  const sourceFrames = runOnceMetrics.source_frame_count || 0
+  const sourceSymbols = runOnceMetrics.source_symbol_count || 0
+  const sourceTheoryMetrics = result?.sink_metrics?.source_entropy !== undefined ? result.sink_metrics : sourceFrames ? {
+    source_entropy: runOnceMetrics.source_entropy_sum / sourceFrames,
+    source_max_entropy: runOnceMetrics.source_max_entropy_sum / sourceFrames,
+    source_efficiency_percent: runOnceMetrics.source_efficiency_sum / sourceFrames,
+    source_average_information: sourceSymbols ? runOnceMetrics.source_information_sum / sourceSymbols : 0,
+    source_alphabet_size: runOnceMetrics.source_alphabet_size_peak,
+  } : undefined
+  const symbolMetrics = result?.sink_metrics?.ser !== undefined ? result.sink_metrics : runOnceMetrics.total_symbols ? {
+    ser: runOnceMetrics.symbol_errors / runOnceMetrics.total_symbols,
+    symbol_errors: runOnceMetrics.symbol_errors,
+    total_symbols: runOnceMetrics.total_symbols,
+  } : undefined
 
   return (
     <div className="app-shell" style={{ gridTemplateRows: `60px minmax(0, 1fr) ${consoleOpen ? consoleHeight : 0}px`, gridTemplateColumns: `${leftOpen ? leftWidth : 0}px minmax(0, 1fr) ${rightOpen ? rightWidth : 0}px` }}>
@@ -383,7 +401,7 @@ function App() {
           <label>Display name<input value={selected.data.label} onChange={e => updateSelected({ label: e.target.value })} /></label>
            <div className="port-layout-control"><div><span>Port layout</span><small>{selected.data.portOrientation === 'reversed' ? 'Input right · Output left' : 'Input left · Output right'}</small></div><button className={`port-toggle ${selected.data.portOrientation === 'reversed' ? 'active' : ''}`} onClick={() => updateSelected({ portOrientation: selected.data.portOrientation === 'reversed' ? 'standard' : 'reversed' })}><ArrowLeftRight size={15} /> {selected.data.portOrientation === 'reversed' ? 'Reversed' : 'Standard'}</button></div>
            <div className="section-rule"><span>PARAMETERS</span></div>
-           {(selected.data.blockType === 'text_file_source' || selected.data.blockType === 'image_file_source') && <label>Input file<input type="file" accept={selected.data.blockType === 'image_file_source' ? 'image/*' : '.txt,.csv,.log,text/plain'} onChange={loadSourceFile} /><small>{String(selected.data.params.file_name || 'No file selected')}</small></label>}
+           {selectedIsFileSource && <label>Input file<input type="file" accept={selected.data.blockType === 'image_file_source' ? 'image/*' : '.txt,.csv,.log,text/plain'} onChange={loadSourceFile} /><small>{String(selected.data.params.file_name || 'No file selected')}</small></label>}
            {selectedIsStochasticChannel && <label>SNR source<select value={String(selected.data.params.snr_mode || 'experiment')} onChange={e => updateSelected({ params: { ...selected.data.params, snr_mode: e.target.value } })}><option value="experiment">Experiment sweep</option><option value="fixed">Fixed block value</option></select></label>}
            {selectedIsStochasticChannel && String(selected.data.params.snr_mode || 'experiment') === 'fixed' && <label>Fixed SNR dB<input type="number" value={String(selected.data.params.ebn0_db ?? 4)} onChange={e => updateSelected({ params: { ...selected.data.params, ebn0_db: Number(e.target.value) } })} /></label>}
            {selected.data.blockType === 'image_file_source' && <label>Pixel mode<select value={String(selected.data.params.mode || 'grayscale')} onChange={e => updateSelected({ params: { ...selected.data.params, mode: e.target.value } })}><option value="grayscale">Grayscale</option><option value="rgb">RGB</option></select></label>}
@@ -394,6 +412,8 @@ function App() {
           {result?.sink_metrics && selected.data.blockType === 'power_meter' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean power</span><strong>{result.sink_metrics.power_mean?.toExponential(3) ?? '—'}</strong></div></div></>}
           {result?.sink_metrics && selected.data.blockType === 'scope' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean amplitude</span><strong>{result.sink_metrics.scope_mean_amplitude?.toFixed(4) ?? '—'}</strong></div><div><span>Peak</span><strong>{result.sink_metrics.scope_peak_amplitude?.toFixed(4) ?? '—'}</strong></div></div></>}
           {result?.sink_metrics && selected.data.blockType === 'constellation' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean I / Q</span><strong>{`${result.sink_metrics.constellation_mean_i?.toFixed(3) ?? '—'} / ${result.sink_metrics.constellation_mean_q?.toFixed(3) ?? '—'}`}</strong></div><div><span>Mean |x|</span><strong>{result.sink_metrics.constellation_mean_power?.toFixed(4) ?? '—'}</strong></div></div></>}
+          {sourceTheoryMetrics && selected.data.blockType === 'source_analyzer' && <><div className="section-rule"><span>SOURCE THEORY RESULTS</span></div><div className="source-theory-result"><div><span>Entropy H(X)</span><strong>{sourceTheoryMetrics.source_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Average information</span><strong>{sourceTheoryMetrics.source_average_information?.toFixed(4)} bit/symbol</strong></div><div><span>Maximum entropy</span><strong>{sourceTheoryMetrics.source_max_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Source efficiency</span><strong>{sourceTheoryMetrics.source_efficiency_percent?.toFixed(2)}%</strong></div><div><span>Alphabet size</span><strong>{sourceTheoryMetrics.source_alphabet_size}</strong></div></div></>}
+          {symbolMetrics && selected.data.blockType === 'ser' && <><div className="section-rule"><span>SYMBOL RESULT</span></div><div className="source-theory-result"><div><span>Symbol error rate</span><strong>{symbolMetrics.ser?.toExponential(3)}</strong></div><div><span>Symbol errors</span><strong>{symbolMetrics.symbol_errors} / {symbolMetrics.total_symbols}</strong></div></div></>}
           {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><textarea className="code-editor" spellCheck={false} value={selected.data.code || pythonTemplate} onChange={e => updateSelected({ code: e.target.value })} /><p className="code-hint">Write <code>process(signal, params)</code> and return a 1-D NumPy array. Keep <code>output_size=same</code> for normal processing, use a positive length or <code>any</code> only for an intentional size change. SignalLab runs independent Monte-Carlo trials in parallel.</p></>}
         </div> : <div className="empty-state"><Box size={32} /><h3>No block selected</h3><p>Select a block on the canvas to edit its parameters and Python code.</p></div> :
         <div className="inspector-content">

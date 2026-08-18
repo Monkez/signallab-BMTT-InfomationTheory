@@ -74,7 +74,11 @@ Job **Run Benchmark** vẫn chạy Monte-Carlo bất đồng bộ qua polling. K
 
 `text_file_source` đọc bytes UTF-8/binary của file text, còn `image_file_source` dùng Pillow để đọc pixel grayscale hoặc RGB; cả hai phát ra bitstream và một bản sao `reference`. Frontend dùng file picker rồi lưu payload base64 trong node params, không phụ thuộc đường dẫn máy cục bộ khi mở lại project.
 
+Miền lý thuyết nguồn dùng mảng NumPy Unicode 1-D (`<U...`) làm **symbol stream**, không truyền một Python string nguyên khối. Cách biểu diễn này giữ từng ký tự quan sát được trong port inspector, cho phép kiểm tra size/serialize snapshot và vẫn phù hợp với scheduler. `text_symbol_source`/`text_file_symbol_source` phát ký tự; `discrete_symbol_source` lấy mẫu theo alphabet và `P(x)`; `source_analyzer` trả từng `P(x)`, `I(x)=-log2(P(x))` cùng metric entropy, entropy cực đại và hiệu suất. `symbols_to_bits` là ranh giới tường minh chuyển symbol sang UTF-8 bitstream trước mã kênh/điều chế.
+
 Nhóm source coding có cặp Encoder/Decoder cho Huffman, Shannon-Fano, RLE và ZIP/DEFLATE. Huffman/Shannon-Fano là implementation cố định 2-bit-symbol phục vụ giảng dạy; encoder đóng header độ dài để decoder loại padding. RLE và ZIP giữ header độ dài tương tự để round-trip chính xác.
+
+Các cặp `symbol_huffman_*` và `symbol_shannon_fano_*` nhận trực tiếp symbol stream và model alphabet/xác suất, phát bitstream có header số symbol rồi khôi phục chuỗi ký tự. Chúng tồn tại song song với codec bit-pair cũ để project trước đây không đổi ngữ nghĩa. `ser` so sánh chuỗi symbol sau giải mã; BER vẫn chỉ dành cho bitstream.
 
 ## Python block API
 

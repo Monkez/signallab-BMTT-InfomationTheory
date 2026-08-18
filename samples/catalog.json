@@ -60,9 +60,9 @@
       {"id":"enc","type":"repetition3_encode","label":"Repeat each bit ×3","position":{"x":220,"y":100}},
       {"id":"mod","type":"bpsk_mod","label":"BPSK","position":{"x":420,"y":100}},
       {"id":"ch","type":"awgn","label":"AWGN","position":{"x":620,"y":100},"params":{"ebn0_db":4,"snr_mode":"experiment","seed":-1}},
-      {"id":"demod","type":"bpsk_demod","label":"Hard decision","position":{"x":620,"y":310}},
-      {"id":"dec","type":"repetition3_decode","label":"Majority decoder","position":{"x":420,"y":310}},
-      {"id":"ber","type":"ber","label":"BER meter","position":{"x":220,"y":310}}
+      {"id":"demod","type":"bpsk_demod","label":"Hard decision","position":{"x":620,"y":310},"port_orientation":"reversed"},
+      {"id":"dec","type":"repetition3_decode","label":"Majority decoder","position":{"x":420,"y":310},"port_orientation":"reversed"},
+      {"id":"ber","type":"ber","label":"BER meter","position":{"x":220,"y":310},"port_orientation":"reversed"}
     ], "edges": [
       {"id":"e1","source":"src","target":"enc"},{"id":"e2","source":"enc","target":"mod"},{"id":"e3","source":"mod","target":"ch"},{"id":"e4","source":"ch","target":"demod"},
       {"id":"e5","source":"demod","target":"dec"},{"id":"e6","source":"enc","source_handle":"reference","target":"ber","target_handle":"reference"},{"id":"e7","source":"dec","target":"ber","target_handle":"estimate"}

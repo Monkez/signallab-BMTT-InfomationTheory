@@ -5,7 +5,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
-  Activity, ArrowLeftRight, BookOpen, Box, Braces, CircleStop, FilePlus2, FolderOpen,
+  Activity, ArrowLeftRight, BookOpen, Box, Braces, ChevronDown, CircleStop, FilePlus2, FolderOpen,
   Copy, Layers3, LibraryBig, Maximize2, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Save, SaveAll, Search, Terminal, Trash2, X,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
@@ -74,6 +74,7 @@ function App() {
   const [savingProject, setSavingProject] = useState(false)
   const [samplesOpen, setSamplesOpen] = useState(false)
   const [pythonEditorOpen, setPythonEditorOpen] = useState(false)
+  const [experimentSettingsOpen, setExperimentSettingsOpen] = useState(true)
   const fileRef = useRef<HTMLInputElement>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
   const bootLoggedRef = useRef(false)
@@ -420,7 +421,10 @@ function App() {
     window.addEventListener('keydown', onSaveShortcut)
     return () => window.removeEventListener('keydown', onSaveShortcut)
   }, [saveProject])
-  const grouped = useMemo(() => specs.filter(s => `${s.label} ${s.category}`.toLowerCase().includes(search.toLowerCase())).reduce<Record<string, BlockSpec[]>>((acc, spec) => ((acc[spec.category] ||= []).push(spec), acc), {}), [specs, search])
+  const grouped = useMemo(() => {
+    const priority = (spec: BlockSpec) => spec.type === 'variables' ? 0 : spec.type === 'python' ? 1 : 2
+    return specs.filter(s => `${s.label} ${s.category}`.toLowerCase().includes(search.toLowerCase())).sort((a, b) => priority(a) - priority(b)).reduce<Record<string, BlockSpec[]>>((acc, spec) => ((acc[spec.category] ||= []).push(spec), acc), {})
+  }, [specs, search])
   const result = job?.result
   const livePointsRaw = job?.status === 'running' ? (job.snr_points || []) : (result?.snr_points || job?.snr_points || [])
   const livePoints = livePointsRaw.filter(point => Number.isFinite(point.snr_db)).map(point => ({ ...point, snr_db: point.snr_db as number }))
@@ -518,7 +522,9 @@ function App() {
           {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><div className="python-editor-inline-toolbar"><div><Braces size={14} /><span><b>process.py</b><small>Python 3 · UTF-8</small></span></div><button type="button" onClick={() => setPythonEditorOpen(true)}><Maximize2 size={14} /> Open editor</button></div><Suspense fallback={<div className="python-editor-loading">Loading Python editor…</div>}><PythonCodeEditor value={selected.data.code || pythonTemplate} onChange={updatePythonCode} /></Suspense><p className="code-hint">Read the current sweep point with <code>params["snr_db"]</code>. For flexible ports, declare <code>PORTS = {'{'}"inputs": ["signal", "noise"], "outputs": ["out", "residual"]{'}'}</code> and write <code>process(inputs, params)</code> returning a dictionary. <button type="button" onClick={openDocuments}>Read Python API</button></p></>}
         </div> : <div className="empty-state"><Box size={32} /><h3>No block selected</h3><p>Select a block on the canvas to edit its parameters and Python code.</p></div> :
         <div className="inspector-content">
-          <div className="experiment-title"><div><small>MONTE-CARLO</small><h2>Experiment</h2></div><button className="run-once" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} title="Execute one frame and capture data at every port"><Play size={13} fill="currentColor" />{runOnceActive ? 'Running…' : 'Run once'}</button></div>
+          <div className="experiment-title"><div><small>MONTE-CARLO</small><h2>Experiment</h2></div><div className="experiment-actions"><button className="run-once" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} title="Execute one frame and capture data at every port"><Play size={13} fill="currentColor" />{runOnceActive ? 'Running…' : 'Run once'}</button><button className="run-wide experiment-benchmark" onClick={runBenchmark} disabled={executionActive || Boolean(configIssue)} title={configIssue || undefined}><Play size={14} fill="currentColor" />{jobActive ? 'Benchmark running…' : 'Run Benchmark'}</button></div></div>
+          <button className={`experiment-settings-toggle ${experimentSettingsOpen ? 'open' : ''}`} onClick={() => setExperimentSettingsOpen(value => !value)} aria-expanded={experimentSettingsOpen}><span>Experiment parameters</span><ChevronDown size={15} /></button>
+          {experimentSettingsOpen && <>
           <div className="section-rule"><span>EXPERIMENT MODE</span></div>
           <label>Mode<select disabled={executionActive} value={config.mode} onChange={e => setConfig({ ...config, mode: e.target.value as SimulationConfig['mode'] })}><option value="specific_steps">Specific steps · fixed count</option><option value="ber_benchmark">BER benchmark · SNR sweep</option></select><small>{config.mode === 'specific_steps' ? 'Run a fixed number of steps; channels keep their own default parameters.' : 'Sweep SNR and stop each point after enough errors or the frame limit.'}</small></label>
           <div className="section-rule"><span>{config.mode === 'specific_steps' ? 'FIXED STEPS' : 'SNR SWEEP (dB)'}</span></div>
@@ -528,7 +534,7 @@ function App() {
           <label>Chunk size<input disabled={executionActive} type="number" min="1" value={config.chunk_size} onChange={e => setConfig({ ...config, chunk_size: Number(e.target.value) })} /></label>
           <label>Compute device<select disabled={executionActive} value={config.device} onChange={e => setConfig({ ...config, device: e.target.value as SimulationConfig['device'] })}><option value="auto">Auto · best available</option><option value="cpu">CPU · multiprocessing</option><option value="gpu">GPU · CUDA/CuPy</option></select></label>
           {configIssue && <div className="config-issue" role="alert">{configIssue}</div>}
-          <button className="run-wide" onClick={runBenchmark} disabled={executionActive || Boolean(configIssue)} title={configIssue || undefined}><Play size={16} fill="currentColor" /> {jobActive ? 'Benchmark running…' : 'Run Benchmark'}</button>
+          </>}
           {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} frames processed · {job.trials} max</span><span>{job.device || result?.device || 'preparing'}</span></div>{job.status === 'running' && <button className="cancel" onClick={() => cancelJob(job.id)}><CircleStop size={14} /> Cancel</button>}</div>}
           {error && <div className="error-box">{error}</div>}
           {(result || hasVisibleSinkResults) && <div className="results" ref={resultsRef}>

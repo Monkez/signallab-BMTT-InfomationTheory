@@ -280,6 +280,12 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .empty-state p { font-size: 9px; line-height: 1.6; }
 .experiment-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 19px; }
 .experiment-title h2 { margin: 3px 0 0; font-size: 18px; letter-spacing: -.03em; }
+.experiment-actions { display: flex; flex-direction: column; align-items: stretch; gap: 7px; width: 100%; max-width: 210px; }
+.experiment-actions .run-once, .experiment-actions .run-wide { width: 100%; justify-content: center; margin: 0; }
+.experiment-settings-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; min-height: 34px; margin: 0 0 12px; padding: 0 10px; border: 1px solid #d5deea; border-radius: 6px; background: #f8fafc; color: #53657d; font-size: 11px; font-weight: 600; }
+.experiment-settings-toggle svg { transition: transform .16s ease; }
+.experiment-settings-toggle.open svg { transform: rotate(180deg); }
+.experiment-settings-toggle:hover { border-color: #9eb9df; background: #f1f6ff; color: #2459a6; }
 .run-once { min-height: 32px; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #a9c1e5; border-radius: 6px; background: #f3f7ff; color: #2459a6; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .run-once:hover { border-color: #769ed9; background: #e8f1ff; }
 .run-once:disabled { opacity: .5; cursor: default; }

@@ -5,14 +5,14 @@
   --accent: #2563eb; --accent-soft: #eaf1ff; --surface: #f7f8fa;
 }
 * { box-sizing: border-box; }
-.startup-splash { position: fixed; inset: 0; z-index: 300; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: #f6f8fb; color: #23344b; opacity: 1; transition: opacity .28s ease, visibility .28s ease; }
+.startup-splash { position: fixed; inset: 0; z-index: 300; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: #f6f8fb; color: #23344b; opacity: 1; transition: opacity .14s ease-out, visibility .14s ease-out; }
 .startup-splash.hidden { visibility: hidden; opacity: 0; pointer-events: none; }
 .startup-logo { display: grid; place-items: center; width: 68px; height: 68px; margin-bottom: 4px; border: 1px solid #cbd8e8; border-radius: 17px; background: #1f2d3f; box-shadow: 0 8px 24px rgba(36,55,78,.16); }
 .startup-logo img { width: 48px; height: 48px; }
 .startup-splash strong { font-size: 24px; letter-spacing: -.03em; }
 .startup-splash span { color: #718096; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
 .startup-splash i { width: 38px; height: 3px; margin-top: 13px; overflow: hidden; border-radius: 3px; background: #d8e2ef; }
-.startup-splash i::after { display: block; width: 50%; height: 100%; content: ''; border-radius: inherit; background: #3572d1; animation: startup-progress 1s ease-in-out infinite; }
+.startup-splash i::after { display: block; width: 50%; height: 100%; content: ''; border-radius: inherit; background: #3572d1; animation: startup-progress .45s ease-in-out infinite; }
 @keyframes startup-progress { from { transform: translateX(-100%); } to { transform: translateX(200%); } }
 body { margin: 0; min-width: 1100px; min-height: 100vh; overflow: hidden; }
 button, input, select, textarea { font: inherit; }

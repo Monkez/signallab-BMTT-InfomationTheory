@@ -133,8 +133,10 @@ function App() {
   useEffect(() => { clearDiagnostics() }, [clearDiagnostics, config])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setSplashVisible(false), 900)
-    return () => window.clearTimeout(timer)
+    // Hide on the first painted frame instead of imposing a fixed startup delay.
+    // The tiny CSS fade keeps the transition readable without slowing the app.
+    const frame = window.requestAnimationFrame(() => setSplashVisible(false))
+    return () => window.cancelAnimationFrame(frame)
   }, [])
   useEffect(() => {
     if (bootLoggedRef.current) return

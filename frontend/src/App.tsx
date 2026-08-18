@@ -416,6 +416,7 @@ function App() {
   const result = job?.result
   const livePoints = job?.status === 'running' ? (job.snr_points || []) : (result?.snr_points || job?.snr_points || [])
   const activeSinkMetrics = result?.sink_metrics || runOnceSinkMetrics
+  const hasBerSink = nodes.some(node => node.data.blockType === 'ber')
   const sinkNodes = nodes.filter(node => ['ber', 'power_meter', 'constellation', 'scope', 'source_analyzer', 'ser'].includes(node.data.blockType))
   const hasSinkResults = sinkNodes.some(node => node.data.blockType !== 'ber') && Object.keys(activeSinkMetrics).length > 0
   const sourceFrames = runOnceMetrics.source_frame_count || 0
@@ -521,13 +522,11 @@ function App() {
           <button className="run-wide" onClick={runBenchmark} disabled={executionActive || Boolean(configIssue)} title={configIssue || undefined}><Play size={16} fill="currentColor" /> {jobActive ? 'Benchmark running…' : 'Run Benchmark'}</button>
           {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} frames processed · {job.trials} max</span><span>{job.device || result?.device || 'preparing'}</span></div>{job.status === 'running' && <button className="cancel" onClick={() => cancelJob(job.id)}><CircleStop size={14} /> Cancel</button>}</div>}
           {error && <div className="error-box">{error}</div>}
-          {(result || livePoints.length > 0 || hasSinkResults) && <div className="results" ref={resultsRef}>
+          {((hasBerSink && (result || livePoints.length > 0)) || hasSinkResults) && <div className="results" ref={resultsRef}>
             <div className="section-rule"><span>{job?.status === 'running' ? 'LIVE RESULTS' : 'RESULTS'}</span></div>
-            {result && <div className="overall-ber-card"><div><span>OVERALL BIT ERROR RATE</span><small>Aggregate across the complete experiment</small></div><strong>{result.ber === null ? '—' : result.ber.toExponential(3)}</strong></div>}
-            <div className="ber-plot-section"><BerChart points={livePoints} live={job?.status === 'running'} /></div>
-            <ResultsTable points={livePoints} />
+            {hasBerSink && <><div className="ber-plot-section"><BerChart points={livePoints} live={job?.status === 'running'} /></div><ResultsTable points={livePoints} /></>}
             <SinkResults nodes={sinkNodes} metrics={activeSinkMetrics} />
-            {result && <><div className="metric-row"><div className="metric"><span>Bit errors</span><strong>{formatNumber(result.bit_errors)}</strong></div><div className="metric"><span>Total bits</span><strong>{formatNumber(result.total_bits)}</strong></div></div><div className="metric-row"><div className="metric"><span>Elapsed</span><strong>{result.elapsed_seconds.toFixed(2)} s</strong></div><div className="metric"><span>Throughput</span><strong>{formatNumber(result.throughput_bps / 1000)} kb/s</strong></div></div>{result.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}</>}
+            {result && <><div className="metric-row"><div className="metric"><span>Elapsed</span><strong>{result.elapsed_seconds.toFixed(2)} s</strong></div><div className="metric"><span>Throughput</span><strong>{formatNumber(result.throughput_bps / 1000)} kb/s</strong></div></div>{result.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}</>}
           </div>}
         </div>}
         {rightOpen && <div className="sidebar-resizer right-resizer" onPointerDown={event => startResize('right', event)} title="Resize inspector" />}

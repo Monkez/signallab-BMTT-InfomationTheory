@@ -414,12 +414,17 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .console-resizer:hover { background: rgba(93, 151, 235, .35); }
 .console-header { height: 36px; flex: 0 0 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--line); background: #fff; }
 .console-header > div { display: flex; align-items: center; gap: 8px; }
+.console-actions { display: flex; align-items: center; gap: 5px; }
 .console-header strong { font-size: 12px; }
 .console-header span { color: #7b8796; font-size: 10px; }
+.console-copy { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 8px; color: #50657f; background: #fff; border: 1px solid #cfd9e5; border-radius: 5px; font-size: 10px; }
+.console-copy:hover:not(:disabled) { color: #1f57ba; background: #eef4ff; border-color: #9db9e8; }
+.console-copy:disabled { opacity: .5; cursor: not-allowed; }
 .console-clear { display: grid; place-items: center; width: 26px; height: 26px; color: #6d7a8b; background: transparent; border-radius: 5px; }
 .console-clear:hover { color: #1f57ba; background: #eef4ff; }
-.console-body { min-height: 0; overflow: auto; padding: 6px 14px 10px; background: #fbfcfd; font: 11px/1.55 Consolas, 'Courier New', monospace; }
+.console-body { min-height: 0; overflow: auto; padding: 6px 14px 10px; background: #fbfcfd; font: 11px/1.55 Consolas, 'Courier New', monospace; user-select: text; cursor: text; }
 .console-line { display: grid; grid-template-columns: 76px 58px 1fr; gap: 9px; white-space: pre-wrap; }
+.console-line, .console-line * { user-select: text; }
 .console-line time { color: #8a95a3; }
 .console-line b { color: #718096; font-size: 10px; text-transform: uppercase; }
 .console-line.info span { color: #465467; }

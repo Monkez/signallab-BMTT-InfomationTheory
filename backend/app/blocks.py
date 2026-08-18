@@ -5,6 +5,7 @@ import copy
 import heapq
 import inspect
 import secrets
+import traceback
 import zlib
 from io import BytesIO
 from types import SimpleNamespace
@@ -527,19 +528,30 @@ def python_block(inputs, params, context, code):
     }
     positional = [parameter for parameter in inspect.signature(process).parameters.values() if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)]
     has_varargs = any(parameter.kind == parameter.VAR_POSITIONAL for parameter in inspect.signature(process).parameters.values())
-    if has_varargs or len(positional) >= 3:
-        # Backward-compatible form: process(inputs, params, context) -> {"out": ...}
-        result = process(inputs, runtime_params, context)
-    elif ports.explicit:
-        # Explicit PORTS use a named input mapping, even when there is only one port.
-        result = process(inputs, runtime_params) if len(positional) >= 2 else process(inputs)
-    elif len(positional) == 2:
-        # Recommended form: process(signal, params) -> array
-        result = process(signal, runtime_params)
-    elif len(positional) == 1:
-        result = process(signal)
-    else:
-        result = process()
+    try:
+        if has_varargs or len(positional) >= 3:
+            # Backward-compatible form: process(inputs, params, context) -> {"out": ...}
+            result = process(inputs, runtime_params, context)
+        elif ports.explicit:
+            # Explicit PORTS use a named input mapping. A source with no inputs
+            # may use the natural process(params) form, which is especially
+            # useful for generators driven entirely by Variables/Experiment.
+            if len(positional) >= 2:
+                result = process(inputs, runtime_params)
+            elif len(positional) == 1:
+                parameter_name = positional[0].name.lower()
+                result = process(runtime_params if not ports.inputs and parameter_name in {"params", "config", "runtime_params"} else inputs)
+            else:
+                result = process()
+        elif len(positional) == 2:
+            # Recommended form: process(signal, params) -> array
+            result = process(signal, runtime_params)
+        elif len(positional) == 1:
+            result = process(signal)
+        else:
+            result = process()
+    except Exception as exc:
+        raise ValueError(_python_process_error(exc, code, runtime_params, ports.inputs)) from exc
     if isinstance(result, dict):
         return result
     if result is None:
@@ -549,6 +561,25 @@ def python_block(inputs, params, context, code):
     if len(ports.outputs) != 1:
         raise ValueError("A Python Block with multiple output ports must return a dictionary keyed by port name")
     return {ports.outputs[0]: result}
+
+
+def _python_process_error(exc: Exception, code: str, runtime_params: dict[str, Any], input_ports: list[str]) -> str:
+    """Turn a Python exception into an actionable classroom-friendly message."""
+    location = ""
+    traceback_items = traceback.extract_tb(exc.__traceback__)
+    block_frames = [item for item in traceback_items if item.filename == "<python-block>"]
+    if block_frames:
+        frame = block_frames[-1]
+        source_line = code.splitlines()[frame.lineno - 1].strip() if frame.lineno and frame.lineno <= len(code.splitlines()) else ""
+        location = f" at line {frame.lineno}"
+        if source_line:
+            location += f" ({source_line})"
+    if isinstance(exc, KeyError) and exc.args:
+        missing = str(exc.args[0])
+        available = ", ".join(sorted(str(key) for key in runtime_params)) or "none"
+        hint = " Add it in the Variables block or use params.get(...)." if not input_ports else " Check the input port name or add the parameter in Variables."
+        return f"Python process() failed{location}: missing key {missing!r}. Available params: {available}.{hint}"
+    return f"Python process() failed{location}: {type(exc).__name__}: {exc}"
 
 
 PROCESSORS: dict[str, Callable] = {

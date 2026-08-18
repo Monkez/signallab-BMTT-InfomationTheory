@@ -262,6 +262,16 @@ def test_python_block_supports_natural_and_legacy_apis():
     assert (python_block({"in": signal}, {}, context, legacy)["out"] == [2.0, 3.0]).all()
 
 
+def test_python_source_can_use_process_params_and_reports_missing_keys_clearly():
+    context = make_context(np, np.random.default_rng(1), 0, 1, "cpu")
+    source = 'PORTS = {"inputs": [], "outputs": ["out"]}\ndef process(params):\n    return np.zeros(params["length"], dtype=np.int8)'
+    result = python_block({}, {"length": 5}, context, source)
+    assert result["out"].size == 5
+    broken = 'PORTS = {"inputs": [], "outputs": ["out"]}\ndef process(params):\n    return np.zeros(params["missing"], dtype=np.int8)'
+    with pytest.raises(ValueError, match=r"line 3.*missing key 'missing'.*Available params: .*length"):
+        python_block({}, {"length": 5}, context, broken)
+
+
 def test_variables_parser_accepts_typed_literals_and_rejects_executable_code():
     parsed = parse_variable_definitions("""
 # Course parameters

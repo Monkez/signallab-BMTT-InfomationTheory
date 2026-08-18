@@ -92,6 +92,20 @@ Metadata chỉ dùng literal, không chạy hàm hay biểu thức:
 PORTS = {"inputs": ["in", "side_info"], "outputs": ["out"]}
 ```
 
+### Python source không có input
+
+Khi `PORTS["inputs"]` là danh sách rỗng, block có thể viết ngắn gọn `process(params)` để đọc Variables và tham số Experiment:
+
+```python
+PORTS = {"inputs": [], "outputs": ["out"]}
+
+def process(params):
+    length = int(params["N"])
+    return np.random.randint(0, 2, length)
+```
+
+Nếu thiếu khóa, Console sẽ ghi rõ tên block, số dòng, dòng code gây lỗi và danh sách tham số hiện có. Có thể dùng `params.get("name", default)` khi tham số là tùy chọn.
+
 Không dùng Python module globals để truyền dữ liệu giữa frame. Mỗi frame/worker nhận một input mapping riêng, nên mô hình này vẫn tái lập và an toàn khi SignalLab song song hóa Monte-Carlo.
 
 ## Alias có sẵn

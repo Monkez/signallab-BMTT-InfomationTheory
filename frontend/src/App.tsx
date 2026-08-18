@@ -6,7 +6,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import {
   Activity, ArrowLeftRight, BookOpen, Box, Braces, CircleStop, FilePlus2, FolderOpen,
-  Layers3, LibraryBig, Maximize2, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Save, SaveAll, Search, Terminal, Trash2, X,
+  Copy, Layers3, LibraryBig, Maximize2, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Save, SaveAll, Search, Terminal, Trash2, X,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
 import { cancelJob, createJob, getJob, graphPayload, GraphApiError, runGraphOnce } from './api'
@@ -65,6 +65,7 @@ function App() {
   const [consoleOpen, setConsoleOpen] = useState(true)
   const [consoleHeight, setConsoleHeight] = useState(156)
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([])
+  const [consoleCopied, setConsoleCopied] = useState(false)
   const [projectName, setProjectName] = useState('Hamming BPSK over AWGN')
   const [savedSignature, setSavedSignature] = useState(() => projectSignature(initialNodes, initialEdges, defaultSimulationConfig))
   const [savingProject, setSavingProject] = useState(false)
@@ -95,6 +96,17 @@ function App() {
   const appendLog = useCallback((level: ConsoleLevel, message: string) => {
     setConsoleEntries(entries => [...entries.slice(-199), { id: Date.now() + Math.random(), time: new Date().toLocaleTimeString(), level, message }])
   }, [])
+  const copyConsole = useCallback(async () => {
+    const text = consoleEntries.map(entry => `[${entry.time}] ${entry.level.toUpperCase()} ${entry.message}`).join('\n')
+    if (!text) return
+    try {
+      await navigator.clipboard.writeText(text)
+      setConsoleCopied(true)
+      window.setTimeout(() => setConsoleCopied(false), 1400)
+    } catch (cause) {
+      appendLog('warning', `Could not copy console text: ${(cause as Error).message || 'clipboard unavailable'}`)
+    }
+  }, [appendLog, consoleEntries])
   const applyPortPreviews = useCallback((previews: PortPreviewMap) => {
     setNodes(items => items.map(node => ({ ...node, data: { ...node.data, portPreviews: previews[node.id] } })))
   }, [setNodes])
@@ -515,7 +527,7 @@ function App() {
 
       {consoleOpen && <section className="console-dock">
         <div className="console-resizer" onPointerDown={startConsoleResize} title="Resize console" />
-        <div className="console-header"><div><Terminal size={15} /><strong>Console</strong><span>{consoleEntries.length} events</span></div><button className="console-clear" onClick={() => setConsoleEntries([])} title="Clear console"><Trash2 size={14} /></button></div>
+        <div className="console-header"><div><Terminal size={15} /><strong>Console</strong><span>{consoleEntries.length} events</span></div><div className="console-actions"><button className="console-copy" onClick={() => void copyConsole()} disabled={!consoleEntries.length} title="Copy all console text"><Copy size={13} />{consoleCopied ? 'Copied' : 'Copy'}</button><button className="console-clear" onClick={() => setConsoleEntries([])} title="Clear console"><Trash2 size={14} /></button></div></div>
         <div className="console-body">
           {consoleEntries.length ? consoleEntries.map(entry => <div className={`console-line ${entry.level}`} key={entry.id}><time>{entry.time}</time><b>{entry.level}</b><span>{entry.message}</span></div>) : <div className="console-empty">No messages yet.</div>}
         </div>

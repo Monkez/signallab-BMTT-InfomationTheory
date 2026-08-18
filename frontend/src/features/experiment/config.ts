@@ -23,10 +23,15 @@ export function snrPointCount(config: SimulationConfig) {
 
 export function validateSimulationConfig(config: SimulationConfig) {
   if (!['specific_steps', 'ber_benchmark'].includes(config.mode)) return 'Choose a valid experiment mode.'
-  if (!Number.isFinite(config.snr_db_start) || !Number.isFinite(config.snr_db_stop)) return 'SNR start and stop must be finite numbers.'
-  if (!Number.isFinite(config.snr_db_step) || config.snr_db_step <= 0) return 'SNR step must be greater than 0.'
-  if (config.snr_db_stop < config.snr_db_start) return 'SNR stop must be greater than or equal to start.'
-  if (snrPointCount(config) > 10_000) return 'The SNR sweep is too large; use at most 10,000 points.'
+  // Specific steps intentionally do not use an SNR sweep. Do not validate
+  // hidden start/stop/step fields here: a saved simulation may leave them
+  // empty or stale, and they must not prevent a fixed-step run.
+  if (config.mode === 'ber_benchmark') {
+    if (!Number.isFinite(config.snr_db_start) || !Number.isFinite(config.snr_db_stop)) return 'SNR start and stop must be finite numbers.'
+    if (!Number.isFinite(config.snr_db_step) || config.snr_db_step <= 0) return 'SNR step must be greater than 0.'
+    if (config.snr_db_stop < config.snr_db_start) return 'SNR stop must be greater than or equal to start.'
+    if (snrPointCount(config) > 10_000) return 'The SNR sweep is too large; use at most 10,000 points.'
+  }
   if (!Number.isInteger(config.max_frames) || config.max_frames < 1) return 'Max frames must be a positive integer.'
   if (!Number.isInteger(config.min_frames) || config.min_frames < 1) return 'Min frames must be a positive integer.'
   if (config.min_frames > config.max_frames) return 'Min frames cannot exceed max frames.'

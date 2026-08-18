@@ -171,6 +171,25 @@ def _huffman_codes(weights):
     return {symbol: code or "0" for symbol, code in heap[0][1:]}
 
 
+def _stable_huffman_codes(weights):
+    """Deterministic teaching codebook: equal weights keep insertion order."""
+    queue = [
+        {"weight": float(weight), "order": symbol, "codes": {symbol: ""}}
+        for symbol, weight in enumerate(weights)
+    ]
+    next_order = len(queue)
+    while len(queue) > 1:
+        queue.sort(key=lambda item: (item["weight"], item["order"]))
+        left, right = queue.pop(0), queue.pop(0)
+        codes = {
+            **{symbol: "0" + code for symbol, code in left["codes"].items()},
+            **{symbol: "1" + code for symbol, code in right["codes"].items()},
+        }
+        queue.append({"weight": left["weight"] + right["weight"], "order": next_order, "codes": codes})
+        next_order += 1
+    return {symbol: code or "0" for symbol, code in queue[0]["codes"].items()}
+
+
 def _shannon_fano_codes(weights):
     codes = {symbol: "" for symbol in range(4)}
     ordered = sorted(enumerate(weights), key=lambda item: (-item[1], item[0]))
@@ -263,8 +282,8 @@ def _symbol_variable_decode(inputs, params, code_factory):
     return {"out": _symbol_array(decoded)}
 
 
-def symbol_huffman_encode(inputs, params, context): return _symbol_variable_encode(inputs, params, _huffman_codes)
-def symbol_huffman_decode(inputs, params, context): return _symbol_variable_decode(inputs, params, _huffman_codes)
+def symbol_huffman_encode(inputs, params, context): return _symbol_variable_encode(inputs, params, _stable_huffman_codes)
+def symbol_huffman_decode(inputs, params, context): return _symbol_variable_decode(inputs, params, _stable_huffman_codes)
 def symbol_shannon_fano_encode(inputs, params, context): return _symbol_variable_encode(inputs, params, _shannon_fano_codes)
 def symbol_shannon_fano_decode(inputs, params, context): return _symbol_variable_decode(inputs, params, _shannon_fano_codes)
 

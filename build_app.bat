@@ -22,12 +22,18 @@ if not exist "assets" mkdir assets
 if errorlevel 1 goto :error
 
 echo [SignalLab] Packaging Windows desktop application...
+set "SIGNALLAB_RELEASE=%~dp0dist\SignalLab\SignalLab.exe"
 ".venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean SignalLab.spec
-if errorlevel 1 goto :error
+if errorlevel 1 (
+  echo [SignalLab] The standard release may be locked. Building a side-by-side update...
+  ".venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean --distpath dist-update --workpath build-update SignalLab.spec
+  if errorlevel 1 goto :error
+  set "SIGNALLAB_RELEASE=%~dp0dist-update\SignalLab\SignalLab.exe"
+)
 
 echo.
 echo Desktop build complete:
-echo   %~dp0dist\SignalLab\SignalLab.exe
+echo   %SIGNALLAB_RELEASE%
 exit /b 0
 
 :error

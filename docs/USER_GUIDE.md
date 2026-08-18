@@ -6,6 +6,8 @@
 2. Chạy `build_app.bat` để tạo `dist\SignalLab\SignalLab.exe`.
 3. Chạy `run.bat` hoặc mở trực tiếp file EXE. Launcher tự chọn bản đóng gói mới nhất giữa thư mục phát hành chuẩn và thư mục cập nhật dự phòng, nên vẫn mở đúng tính năng mới khi bản EXE cũ đang bị Windows khóa.
 
+Nếu SignalLab đang mở trong lúc build, `build_app.bat` tự chuyển sang `dist-update\SignalLab\SignalLab.exe` thay vì báo thất bại hoặc tự đóng ứng dụng. `run.bat` sẽ chọn bản update này ở lần mở tiếp theo.
+
 Bản desktop chỉ mở một cửa sổ SignalLab, không cần Node.js/Vite khi sử dụng và không mở terminal. Khi sao chép sang máy khác, phải sao chép cả thư mục `dist\SignalLab`, bao gồm `_internal`; không chỉ sao chép riêng EXE. Máy Windows đích cần Microsoft Edge WebView2 Runtime, vốn có sẵn trên Windows 10/11 được cập nhật.
 
 `run_dev.bat` chỉ dành cho lập trình viên. Nó chạy Vite tại port 5173, nên nếu đóng cửa sổ dev server thì trình duyệt sẽ báo WebSocket mất kết nối và `ERR_CONNECTION_REFUSED`. Đây không phải cơ chế chạy của bản EXE.
@@ -60,6 +62,7 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 - **Discrete Symbol Source** cho nhập `alphabet`, `probabilities`, `length` và `seed`. Ví dụ `A,B,C,D` với `0.5,0.25,0.125,0.125`; các trọng số không bắt buộc cộng đúng 1 vì runtime tự chuẩn hóa, nhưng phải dương và đủ một giá trị cho mỗi symbol.
 - Nối nguồn vào **Source Information Analyzer**, chạy **Run once**, rồi chọn analyzer. Tab Block hiển thị từng symbol, `P(x)`, lượng tin riêng `I(x)=-log2(P(x))`, entropy `H(X)`, entropy cực đại `log2(M)` và hiệu suất nguồn.
 - **Huffman Symbol Encoder/Decoder** và **Shannon-Fano Symbol Encoder/Decoder** nhận trực tiếp chuỗi text, dùng cùng alphabet/xác suất ở hai phía và cho ra bitstream ở encoder. Nối `reference`/kết quả decoder vào **Symbol Error Rate** để đo SER.
+- Khi chọn **Huffman Symbol Encoder**, mục **Current Huffman Codebook** hiển thị ngay symbol, xác suất đã chuẩn hóa, lượng tin, từ mã và độ dài. Bảng cùng H(X), chiều dài trung bình và hiệu suất cập nhật tức thời mỗi khi sửa alphabet hoặc probabilities; không cần chạy mô phỏng.
 - Khi chỉ cần đưa text chưa nén sang mã kênh hoặc điều chế, dùng **Symbols to UTF-8 Bits**. Đây là điểm chuyển đổi rõ ràng từ miền ký tự sang miền bit.
 
 Luồng mẫu phân tích: `Text Symbol Source → Source Information Analyzer`. Luồng mã hóa nguồn: `Text Symbol Source → Huffman Symbol Encoder → ...bit channel... → Huffman Symbol Decoder → Symbol Error Rate`.

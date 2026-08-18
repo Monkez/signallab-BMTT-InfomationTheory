@@ -61,3 +61,6 @@
 - Analyzer hiển thị toàn bộ symbol, P(x), I(x) qua port data và card H(X), average information, Hmax, efficiency, alphabet size cho cả Run once/Benchmark. Validation chặn alphabet trùng/rỗng, thiếu xác suất, xác suất không dương và dữ liệu ngoài alphabet.
 - Xác minh Source theory: backend 39/39 pass; frontend production build pass; browser flow `Text Symbol Source → Analyzer` hiển thị `<U1`, 8 symbol, P(x), I(x), H(X)=1.7500 và efficiency=87.50%.
 - Bản desktop chứa 39 block đã đóng gói lại; `run.bat` chọn `dist\SignalLab\SignalLab.exe` mới và smoke test duy trì tiến trình ổn định.
+- Huffman Symbol Encoder có bảng codebook live trong inspector: symbol, P(x) chuẩn hóa, I(x), codeword, length, H(X), average length và efficiency. Backend/frontend dùng cùng tie-break ổn định theo weight + insertion order; sửa probabilities cập nhật bảng ngay.
+- Xác minh codebook: backend 40/40 pass; frontend build pass; browser xác nhận mặc định `A/B/C/D → 0/10/110/111`, đổi P(x) sang `0.4,0.3,0.2,0.1` cập nhật code và efficiency 97.18% không cần Run once.
+- `build_app.bat` có fallback side-by-side khi EXE chuẩn bị Windows khóa. Bản codebook mới đã build/smoke test tại `dist-update\SignalLab\SignalLab.exe`; `run.bat --print-path` chọn đúng update mới nhất.

@@ -274,6 +274,17 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .source-theory-result span, .source-theory-result strong { display: block; }
 .source-theory-result span { color: #687b94; font-size: 10px; line-height: 1.25; }
 .source-theory-result strong { margin-top: 5px; color: #234f87; font: 600 12px/1.35 Consolas, monospace; overflow-wrap: anywhere; }
+.huffman-codebook { overflow: hidden; border: 1px solid #cbd7e5; border-radius: 7px; background: #fff; }
+.huffman-codebook table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10px; }
+.huffman-codebook th, .huffman-codebook td { padding: 7px 5px; border-bottom: 1px solid #e7edf4; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.huffman-codebook th:first-child, .huffman-codebook td:first-child { text-align: left; }
+.huffman-codebook th { color: #6b7b90; background: #f4f7fb; font-size: 9px; font-weight: 600; }
+.huffman-codebook td { color: #425168; font-family: Consolas, monospace; }
+.huffman-codebook td code { color: #1859bd; font-weight: 700; letter-spacing: .08em; }
+.huffman-codebook tbody tr:last-child td { border-bottom: 0; }
+.huffman-codebook footer { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 8px; border-top: 1px solid #dce5f0; background: #f8fafc; color: #6b7b90; font-size: 9px; }
+.huffman-codebook footer b { margin-left: 3px; color: #244e83; font-family: Consolas, monospace; }
+.codebook-error { padding: 9px 10px; border: 1px solid #efb6bd; border-radius: 6px; background: #fff4f5; color: #a72c3c; font-size: 10px; line-height: 1.45; }
 .console-dock { grid-column: 2; grid-row: 3; min-width: 0; min-height: 0; width: 100%; position: relative; z-index: 8; display: flex; flex-direction: column; border: 1px solid var(--line-strong); border-bottom: 0; background: var(--panel); color: #263140; overflow: hidden; }
 .console-resizer { position: absolute; left: 0; right: 0; top: -5px; height: 9px; cursor: row-resize; z-index: 2; }
 .console-resizer:hover { background: rgba(93, 151, 235, .35); }

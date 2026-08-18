@@ -30,6 +30,7 @@ frontend/src/
   features/blocks/catalog.ts      catalog offline + icon/màu nhóm block
   features/experiment/config.ts   mặc định và phép tính SNR sweep
   features/projects/projectFiles.ts Save/Open đa nền tảng và desktop bridge
+  features/sourceTheory/           codebook Huffman và bảng giảng dạy live
   features/ber/
     BerPlot.tsx                   SVG plot dùng chung preview/report
     BerLegend.tsx                 legend dùng chung preview/report
@@ -79,6 +80,8 @@ Miền lý thuyết nguồn dùng mảng NumPy Unicode 1-D (`<U...`) làm **symb
 Nhóm source coding có cặp Encoder/Decoder cho Huffman, Shannon-Fano, RLE và ZIP/DEFLATE. Huffman/Shannon-Fano là implementation cố định 2-bit-symbol phục vụ giảng dạy; encoder đóng header độ dài để decoder loại padding. RLE và ZIP giữ header độ dài tương tự để round-trip chính xác.
 
 Các cặp `symbol_huffman_*` và `symbol_shannon_fano_*` nhận trực tiếp symbol stream và model alphabet/xác suất, phát bitstream có header số symbol rồi khôi phục chuỗi ký tự. Chúng tồn tại song song với codec bit-pair cũ để project trước đây không đổi ngữ nghĩa. `ser` so sánh chuỗi symbol sau giải mã; BER vẫn chỉ dành cho bitstream.
+
+Huffman symbol dùng quy tắc phá hòa xác định: hàng đợi ưu tiên theo trọng số rồi theo thứ tự chèn. `features/sourceTheory/huffmanCodebook.ts` triển khai cùng quy tắc để inspector dựng codebook tức thời mà không gọi runtime; test backend khóa các từ mã khi xác suất bằng nhau để UI và encoder không lệch nhau.
 
 ## Python block API
 

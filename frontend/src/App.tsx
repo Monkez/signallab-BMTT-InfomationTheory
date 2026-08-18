@@ -18,6 +18,7 @@ import { FlowMiniMapNode } from './components/FlowMiniMapNode'
 import { fallbackSpecs, iconFor, miniMapColor } from './features/blocks/catalog'
 import { PortDataInspector } from './features/blocks/PortDataInspector'
 import { defaultSimulationConfig, snrPointCount, validateSimulationConfig } from './features/experiment/config'
+import { HuffmanCodebookTable } from './features/sourceTheory/HuffmanCodebookTable'
 import {
   attachBrowserProjectFile, clearProjectFileTarget, openProjectFile, projectDisplayName,
   saveProjectFile, supportsProjectOpenDialog,
@@ -406,6 +407,7 @@ function App() {
            {selectedIsStochasticChannel && String(selected.data.params.snr_mode || 'experiment') === 'fixed' && <label>Fixed SNR dB<input type="number" value={String(selected.data.params.ebn0_db ?? 4)} onChange={e => updateSelected({ params: { ...selected.data.params, ebn0_db: Number(e.target.value) } })} /></label>}
            {selected.data.blockType === 'image_file_source' && <label>Pixel mode<select value={String(selected.data.params.mode || 'grayscale')} onChange={e => updateSelected({ params: { ...selected.data.params, mode: e.target.value } })}><option value="grayscale">Grayscale</option><option value="rgb">RGB</option></select></label>}
            {visibleParams.length ? visibleParams.map(([key, value]) => <label key={key}>{key.replaceAll('_', ' ')}<input type={typeof value === 'number' ? 'number' : 'text'} value={String(value)} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value } })} />{key === 'seed' && <small>-1 = random each run · 0+ = reproducible</small>}</label>) : !['awgn', 'rayleigh', 'text_file_source', 'image_file_source'].includes(selected.data.blockType) && <p className="muted">This block has no parameters.</p>}
+          {selected.data.blockType === 'symbol_huffman_encode' && <><div className="section-rule"><span>CURRENT HUFFMAN CODEBOOK</span><em>updates with P(x)</em></div><HuffmanCodebookTable params={selected.data.params} /></>}
           <div className="section-rule"><span>CURRENT PORT DATA</span><em>representative frame</em></div>
           <PortDataInspector snapshotId={snapshotId} nodeId={selected.id} previews={selected.data.portPreviews} />
           {selected.data.blockType === 'ber' && livePoints.length ? <><div className="section-rule"><span>SINK PREVIEW</span></div><BerChart points={livePoints} live={job?.status === 'running'} /></> : null}

@@ -3,7 +3,7 @@ import base64
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.app.blocks import PROCESSORS, make_context, python_block
+from backend.app.blocks import PROCESSORS, _stable_huffman_codes, make_context, python_block
 from backend.app.block_registry import SPEC_BY_TYPE
 from backend.app.contracts import BlockExecutionError
 from backend.app.contracts import validate_inputs, validate_outputs, validate_parameters
@@ -320,3 +320,8 @@ def test_symbols_to_bits_and_symbol_error_rate():
 def test_symbol_model_contract_rejects_mismatched_probabilities():
     errors = validate_parameters("discrete_symbol_source", {"alphabet": "A,B,C", "probabilities": "0.5,0.5", "length": 10, "seed": -1})
     assert errors and "one value for every alphabet symbol" in errors[0]
+
+
+def test_symbol_huffman_codebook_is_deterministic_for_equal_weights():
+    assert _stable_huffman_codes([0.5, 0.25, 0.125, 0.125]) == {0: "0", 1: "10", 2: "110", 3: "111"}
+    assert _stable_huffman_codes([0.4, 0.3, 0.2, 0.1]) == {0: "0", 1: "10", 3: "110", 2: "111"}

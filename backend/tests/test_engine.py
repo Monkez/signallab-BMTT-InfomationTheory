@@ -103,6 +103,28 @@ def test_hamming_rejects_input_that_would_be_silently_padded():
     assert parallel_capture.value.node_id == "1"
 
 
+def test_hamming_uses_systematic_data_then_parity_layout():
+    context = make_context(np, np.random.default_rng(7), 0, 7, "cpu")
+    data = np.array([1, 1, 0, 1], dtype=np.int8)
+    encoded = PROCESSORS["hamming74_encode"]({"in": data}, {}, context)["out"]
+
+    assert encoded.tolist() == [1, 1, 0, 1, 1, 0, 0]
+    assert encoded[:4].tolist() == data.tolist()
+    assert PROCESSORS["hamming74_decode"]({"in": encoded}, {}, context)["out"].tolist() == data.tolist()
+
+
+def test_hamming_corrects_every_single_bit_error_for_all_messages():
+    context = make_context(np, np.random.default_rng(7), 0, 7, "cpu")
+    for value in range(16):
+        data = np.array([(value >> shift) & 1 for shift in (3, 2, 1, 0)], dtype=np.int8)
+        encoded = PROCESSORS["hamming74_encode"]({"in": data}, {}, context)["out"]
+        for error_index in range(7):
+            corrupted = encoded.copy()
+            corrupted[error_index] ^= 1
+            decoded = PROCESSORS["hamming74_decode"]({"in": corrupted}, {}, context)["out"]
+            assert np.array_equal(decoded, data), (value, error_index)
+
+
 def test_ber_requires_reference_and_estimate_to_match_exactly():
     graph = Graph(nodes=[
         {"id": "reference", "type": "bit_source", "label": "Reference", "params": {"length": 8}},

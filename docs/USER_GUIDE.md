@@ -56,7 +56,7 @@ Yêu cầu để build: Windows 10/11, Python 3.11+ và Node.js 20+. Lần chạ
 
 Mọi port phải mang mảng một chiều, không rỗng. Runtime không còn tự cắt phần dư hoặc để BER so sánh theo nhánh ngắn hơn:
 
-- Hamming (7,4): encoder yêu cầu input chia hết cho 4 và tạo `7/4` số phần tử; decoder yêu cầu input chia hết cho 7 và tạo `4/7` số phần tử.
+- Hamming (7,4): encoder dùng dạng hệ thống quen thuộc trong giáo trình `c = [d1 d2 d3 d4 p1 p2 p3]`, yêu cầu input chia hết cho 4 và tạo `7/4` số phần tử. Decoder yêu cầu input chia hết cho 7, sửa tối đa một bit lỗi trong mỗi codeword rồi trả về bốn bit dữ liệu đầu tiên.
 - Repetition-3: encoder tạo kích thước gấp 3; decoder yêu cầu input chia hết cho 3.
 - QPSK: modulator yêu cầu số bit chẵn và tạo một symbol trên hai bit; demodulator khôi phục hai bit trên một symbol.
 - Differential, BPSK, AWGN và Rayleigh phải bảo toàn chính xác kích thước input/output.

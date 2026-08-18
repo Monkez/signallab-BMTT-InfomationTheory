@@ -105,4 +105,6 @@ Khi thêm block built-in: thêm `BlockSpec` vào `backend/app/block_registry.py`
 
 Mỗi block mới đồng thời phải khai báo mô tả `SIZE_CONTRACTS` và thêm quy tắc input/output tương ứng trong `contracts.py`. Không được padding, truncate hoặc lấy `min(input sizes)` ngầm trong processor; mọi thay đổi kích thước phải là một tỷ lệ/header rõ ràng hoặc tham số chủ ý như `Python Block.output_size`.
 
+Hamming (7,4) dùng ma trận sinh hệ thống `G = [I4 | P]`. Mỗi codeword có thứ tự `[d1,d2,d3,d4,p1,p2,p3]`; decoder dùng parity-check tương ứng và ánh xạ syndrome về đúng tọa độ hệ thống. Processor không tự padding/cắt phần dư vì hợp đồng runtime đã yêu cầu kích thước input là bội của 4/7.
+
 Khi thêm kiểu Sink/đồ thị: tạo feature riêng trong `frontend/src/features`, định nghĩa type và hàm biến đổi dữ liệu thuần trước, sau đó mới viết component SVG/UI. Không sao chép phép chiếu đồ thị giữa preview và report.

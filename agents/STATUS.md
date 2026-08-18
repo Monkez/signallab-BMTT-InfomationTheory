@@ -47,3 +47,5 @@
 - Backend thêm LRU snapshot store (4 frame) và API đọc port lazy; Run once/Benchmark trả `snapshot_id`, polling vẫn chỉ mang summary nên không phình payload. GPU chỉ copy representative frame về CPU một lần.
 - Xác minh: backend 24/24 pass; frontend production build pass; browser E2E kiểm tra Hamming 3 port, chuyển trang 0→128, AWGN input/output 7.168 phần tử, Copy all và snapshot từ cả Run once lẫn Benchmark.
 - EXE chứa port-data inspector đã được build lại và smoke test thành công tại `dist\SignalLab\SignalLab.exe`.
+- Hamming (7,4) đã chuyển sang dạng hệ thống theo giáo trình `[d1,d2,d3,d4,p1,p2,p3]`; encoder/decoder dùng cùng ma trận, không padding/cắt dư ngầm. Test bao phủ vector `1101 → 1101100`, toàn bộ 16 message và lỗi đơn ở cả 7 vị trí; backend 26/26 pass và frontend production build pass.
+- Vì bản EXE cũ đang được người dùng mở và bị Windows khóa, bản systematic mới được đóng gói an toàn tại `dist\SignalLab-systematic\SignalLab.exe` thay vì tự đóng app hoặc ghi đè phiên đang chạy.

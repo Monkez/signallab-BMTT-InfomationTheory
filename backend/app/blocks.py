@@ -196,14 +196,13 @@ def differential_decode(inputs, params, context):
 
 def hamming74_encode(inputs, params, context):
     bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1)
-    padding = (-len(bits)) % 4
-    padded = np.pad(bits, (0, padding)) if padding else bits
-    d = padded.reshape(-1, 4)
+    d = bits.reshape(-1, 4)
     encoded = np.empty((len(d), 7), dtype=np.int8)
-    encoded[:, 2], encoded[:, 4], encoded[:, 5], encoded[:, 6] = d.T
-    encoded[:, 0] = d[:, 0] ^ d[:, 1] ^ d[:, 3]
-    encoded[:, 1] = d[:, 0] ^ d[:, 2] ^ d[:, 3]
-    encoded[:, 3] = d[:, 1] ^ d[:, 2] ^ d[:, 3]
+    # Systematic Hamming (7,4): [d1, d2, d3, d4, p1, p2, p3].
+    encoded[:, :4] = d
+    encoded[:, 4] = d[:, 0] ^ d[:, 1] ^ d[:, 3]
+    encoded[:, 5] = d[:, 0] ^ d[:, 2] ^ d[:, 3]
+    encoded[:, 6] = d[:, 1] ^ d[:, 2] ^ d[:, 3]
     return {"out": encoded.reshape(-1), "reference": bits.copy()}
 
 
@@ -272,16 +271,18 @@ def qpsk_demod(inputs, params, context):
 
 def hamming74_decode(inputs, params, context):
     received = to_numpy(inputs["in"]).astype(np.int8).reshape(-1)
-    received = received[: len(received) - len(received) % 7].reshape(-1, 7).copy()
+    received = received.reshape(-1, 7).copy()
     if not len(received):
         return {"out": np.array([], dtype=np.int8)}
-    s1 = received[:, 0] ^ received[:, 2] ^ received[:, 4] ^ received[:, 6]
-    s2 = received[:, 1] ^ received[:, 2] ^ received[:, 5] ^ received[:, 6]
-    s4 = received[:, 3] ^ received[:, 4] ^ received[:, 5] ^ received[:, 6]
-    positions = s1 + 2 * s2 + 4 * s4
-    rows = np.flatnonzero(positions)
-    received[rows, positions[rows] - 1] ^= 1
-    return {"out": received[:, [2, 4, 5, 6]].reshape(-1)}
+    s1 = received[:, 0] ^ received[:, 1] ^ received[:, 3] ^ received[:, 4]
+    s2 = received[:, 0] ^ received[:, 2] ^ received[:, 3] ^ received[:, 5]
+    s3 = received[:, 1] ^ received[:, 2] ^ received[:, 3] ^ received[:, 6]
+    syndromes = s1 + 2 * s2 + 4 * s3
+    # Map the non-zero syndrome to its coordinate in [d1,d2,d3,d4,p1,p2,p3].
+    error_indices = np.array([-1, 4, 5, 0, 6, 1, 2, 3], dtype=np.int8)
+    rows = np.flatnonzero(syndromes)
+    received[rows, error_indices[syndromes[rows]]] ^= 1
+    return {"out": received[:, :4].reshape(-1)}
 
 
 def ber(inputs, params, context):

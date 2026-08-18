@@ -24,7 +24,7 @@ class JobManager:
         event = threading.Event()
         max_frames = request.config.max_frames or request.config.trials
         if request.config.mode == "specific_steps":
-            snr_count = len(request.config.snr_db_points)
+            snr_count = 1
         else:
             snr_count = max(1, math.floor((request.config.snr_db_stop - request.config.snr_db_start) / request.config.snr_db_step + 1e-9) + 1)
         with self.lock:

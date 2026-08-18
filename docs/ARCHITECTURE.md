@@ -35,7 +35,7 @@ frontend/src/
   App.tsx                         điều phối workspace và job
   components/FlowMiniMapNode.tsx renderer MiniMap
   features/blocks/catalog.ts      catalog offline + icon/màu nhóm block
-  features/experiment/config.ts   mặc định và phép tính SNR sweep
+features/experiment/config.ts   mode, mặc định và phép tính điểm SNR
   features/projects/projectFiles.ts Save/Open đa nền tảng và desktop bridge
   features/sourceTheory/           codebook Huffman và bảng giảng dạy live
   features/documents/              cửa sổ tài liệu, search và Markdown renderer
@@ -79,7 +79,7 @@ Python Block mặc định giữ contract `in/out`. Nếu code có `PORTS` liter
 
 Random Bits, AWGN và Rayleigh có seed riêng. `seed = -1` lấy một entropy gốc mới đúng một lần khi bắt đầu Run once/Benchmark; runtime tiếp tục trộn entropy đó với seed frame và CRC32 của node để các node/frame có stream độc lập, ổn định trước thay đổi lịch multiprocessing. Với `seed >= 0`, entropy gốc của run bị bỏ qua nên cùng graph, Experiment seed và block seed sẽ tái lập; frame vẫn khác nhau vì seed frame vẫn tham gia phép trộn.
 
-`POST /api/run-once` dùng cùng DAG runtime nhưng chỉ chạy một frame đồng bộ tại `snr_db_start`. Khi bật `capture_ports`, engine tóm tắt input/output của từng node thành dtype, shape, size, min/mean/max và tối đa 8 mẫu dạng JSON-safe. Frontend gắn summary vào node để tooltip đọc trực tiếp; dữ liệu đầy đủ được giữ sau `snapshot_id` và chỉ truyền từng trang khi tab Block yêu cầu.
+`POST /api/run-once` dùng cùng DAG runtime nhưng chỉ chạy một frame đồng bộ. Với Specific steps, channel nhận `context.snr_db=None` để dùng tham số riêng; với BER benchmark, frame dùng `snr_db_start`. Khi bật `capture_ports`, engine tóm tắt input/output của từng node thành dtype, shape, size, min/mean/max và tối đa 8 mẫu dạng JSON-safe. Frontend gắn summary vào node để tooltip đọc trực tiếp; dữ liệu đầy đủ được giữ sau `snapshot_id` và chỉ truyền từng trang khi tab Block yêu cầu.
 
 Job **Run Benchmark** vẫn chạy Monte-Carlo bất đồng bộ qua polling. Khi hoàn tất, engine chạy thêm một frame đại diện xác định bằng seed cấu hình tại SNR đầu tiên để trả `port_previews` và đăng ký snapshot đầy đủ. Frame này phục vụ quan sát luồng dữ liệu, không tham gia phép cộng metric và không làm thay đổi BER benchmark. Mọi chỉnh sửa topology hoặc tham số đều xóa preview/snapshot phía frontend để tránh hiển thị dữ liệu hết hạn.
 
@@ -118,7 +118,7 @@ Mỗi node có `port_orientation` (`standard` hoặc `reversed`). Đây là thu�
 
 ## Experiment sweep và Sink
 
-Experiment tạo dải SNR từ `snr_db_start/stop/step`; mỗi trial nhận `context.snr_db`, vì vậy AWGN ở chế độ `experiment` không cần hard-code một giá trị. Mỗi điểm dừng khi đạt `min_frames` và (`min_errors` hoặc `max_frames`). Kết quả giữ `snr_points` để Sink vẽ BER theo SNR. Block được chọn ngay tại sự kiện bắt đầu kéo; hai sidebar có thể ẩn/hiện và kéo đổi chiều rộng. BER Meter hiển thị đồ thị SVG log-scale trong inspector sau khi có kết quả.
+Experiment có hai mode: `specific_steps` chạy đúng số frame cố định và truyền `context.snr_db=None` để channel dùng tham số riêng; `ber_benchmark` tạo dải từ `snr_db_start/stop/step` và dừng từng điểm khi đạt `min_frames` cùng (`min_errors` hoặc `max_frames`). Kết quả giữ `snr_points` cho BER benchmark; Specific steps không tạo đường BER theo SNR. Block được chọn ngay tại sự kiện bắt đầu kéo; hai sidebar có thể ẩn/hiện và kéo đổi chiều rộng.
 
 Console dock là lớp hiển thị phía frontend, nhận sự kiện khi nạp block, xếp hàng/chạy/kết thúc/hủy job và lỗi API. Trong lúc chạy, callback tiến độ mang theo `snr_points` gồm các điểm đã hoàn tất và điểm SNR hiện tại, vì vậy dashboard có thể vẽ BER theo thời gian thực mà không đợi job kết thúc. Engine trả thêm `sink_metrics` cho Scope, Constellation và Power Meter để inspector hiển thị tóm tắt trực quan mà không truyền mảng mẫu lớn qua API.
 

@@ -260,8 +260,7 @@ function App() {
     if (configIssue) { setError(configIssue); return }
     clearDiagnostics()
     setError(''); setRightTab('run'); setRunOnceActive(true); setJob(null)
-    const firstSnr = config.mode === 'specific_steps' ? config.snr_db_points[0] : config.snr_db_start
-    appendLog('info', `Running one frame at ${firstSnr} dB…`)
+    appendLog('info', config.mode === 'specific_steps' ? 'Running specific steps with channel defaults…' : `Running one frame at ${config.snr_db_start} dB…`)
     try {
       const snapshot = await runGraphOnce(nodes, edges, config)
       applyPortPreviews(snapshot.port_previews)
@@ -276,8 +275,8 @@ function App() {
     if (configIssue) { setError(configIssue); return }
     setError(''); setRightTab('run'); lastSnrRef.current = null; setRunOnceMetrics({}); setRunOnceSinkMetrics({})
     clearDiagnostics()
-    const sweepLabel = config.mode === 'specific_steps' ? config.snr_db_points.join(', ') : `${config.snr_db_start}…${config.snr_db_stop}`
-    appendLog('info', `Starting ${config.mode === 'ber_benchmark' ? 'BER benchmark' : 'experiment'} at ${sweepLabel} dB.`)
+    const sweepLabel = config.mode === 'specific_steps' ? `${config.max_frames} fixed steps (channel defaults)` : `${config.snr_db_start}…${config.snr_db_stop} dB`
+    appendLog('info', `Starting ${config.mode === 'ber_benchmark' ? 'BER benchmark' : 'specific-step experiment'}: ${sweepLabel}.`)
     try {
       const id = await createJob(nodes, edges, config)
       const totalTrials = snrPointCount(config) * config.max_frames
@@ -309,7 +308,7 @@ function App() {
       const importedEdges = project.graph.edges.map((e: any) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.source_handle, targetHandle: e.target_handle }))
       const imported = project.config || {}
       const importedMaxFrames = imported.max_frames ?? imported.trials ?? defaultSimulationConfig.max_frames
-      const importedConfig = { ...defaultSimulationConfig, ...imported, trials: imported.trials ?? importedMaxFrames, max_frames: importedMaxFrames }
+      const importedConfig = { ...defaultSimulationConfig, ...imported, mode: imported.mode === 'ber_benchmark' ? 'ber_benchmark' : 'specific_steps', snr_db_points: Array.isArray(imported.snr_db_points) && imported.snr_db_points.length ? imported.snr_db_points : [0], trials: imported.trials ?? importedMaxFrames, max_frames: importedMaxFrames }
       setNodes(importedNodes)
       setEdges(importedEdges)
       setConfig(importedConfig)
@@ -421,7 +420,8 @@ function App() {
   }, [saveProject])
   const grouped = useMemo(() => specs.filter(s => `${s.label} ${s.category}`.toLowerCase().includes(search.toLowerCase())).reduce<Record<string, BlockSpec[]>>((acc, spec) => ((acc[spec.category] ||= []).push(spec), acc), {}), [specs, search])
   const result = job?.result
-  const livePoints = job?.status === 'running' ? (job.snr_points || []) : (result?.snr_points || job?.snr_points || [])
+  const livePointsRaw = job?.status === 'running' ? (job.snr_points || []) : (result?.snr_points || job?.snr_points || [])
+  const livePoints = livePointsRaw.filter(point => Number.isFinite(point.snr_db)).map(point => ({ ...point, snr_db: point.snr_db as number }))
   const activeSinkMetrics = result?.sink_metrics || runOnceSinkMetrics
   const hasBerSink = nodes.some(node => node.data.blockType === 'ber')
   const sinkNodes = nodes.filter(node => ['ber', 'power_meter', 'constellation', 'scope', 'source_analyzer', 'ser'].includes(node.data.blockType))
@@ -518,11 +518,9 @@ function App() {
         <div className="inspector-content">
           <div className="experiment-title"><div><small>MONTE-CARLO</small><h2>Experiment</h2></div><button className="run-once" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} title="Execute one frame and capture data at every port"><Play size={13} fill="currentColor" />{runOnceActive ? 'Running…' : 'Run once'}</button></div>
           <div className="section-rule"><span>EXPERIMENT MODE</span></div>
-          <label>Mode<select disabled={executionActive} value={config.mode} onChange={e => setConfig({ ...config, mode: e.target.value as SimulationConfig['mode'] })}><option value="specific_steps">Specific steps · exact points</option><option value="ber_benchmark">BER benchmark · adaptive errors</option><option value="parameter_sweep">Signal sweep · fixed frames</option></select><small>{config.mode === 'specific_steps' ? 'Run exactly the SNR values you provide.' : config.mode === 'ber_benchmark' ? 'Stop each point after enough errors or the frame limit.' : 'Sweep a regular range for any sink or metric.'}</small></label>
-          <div className="section-rule"><span>{config.mode === 'specific_steps' ? 'SPECIFIC SNR STEPS (dB)' : 'SNR SWEEP (dB)'}</span></div>
-          {config.mode === 'specific_steps' ? <label>SNR points<input disabled={executionActive} type="text" value={config.snr_db_points.join(', ')} onChange={e => setConfig({ ...config, snr_db_points: e.target.value.split(',').map(value => value.trim()).filter(Boolean).map(Number) })} /><small>Comma-separated values, for example: -4, -2, 0, 3, 6</small></label> : <><div className="form-grid"><label>Start<input disabled={executionActive} type="number" step="any" value={config.snr_db_start} onChange={e => setConfig({ ...config, snr_db_start: Number(e.target.value) })} /></label><label>Stop<input disabled={executionActive} type="number" step="any" value={config.snr_db_stop} onChange={e => setConfig({ ...config, snr_db_stop: Number(e.target.value) })} /></label></div><label>Step<input disabled={executionActive} type="number" min="0.01" step="any" value={config.snr_db_step} onChange={e => setConfig({ ...config, snr_db_step: Number(e.target.value) })} /></label></>}
-          <div className="form-grid"><label>Frames / SNR<input disabled={executionActive} type="number" min="1" value={config.max_frames} onChange={e => { const value = Number(e.target.value); setConfig({ ...config, max_frames: value, trials: value }) }} /><small>{config.mode === 'ber_benchmark' ? 'Upper limit per point' : 'Exact frames per point'}</small></label>{config.mode === 'ber_benchmark' ? <label>Min frames / SNR<input disabled={executionActive} type="number" min="1" value={config.min_frames} onChange={e => setConfig({ ...config, min_frames: Number(e.target.value) })} /></label> : <div />}</div>
-          {config.mode === 'ber_benchmark' && <label>Min errors / SNR<input disabled={executionActive} type="number" min="0" value={config.min_errors} onChange={e => setConfig({ ...config, min_errors: Number(e.target.value) })} /><small>Benchmark stops early after this many bit errors.</small></label>}
+          <label>Mode<select disabled={executionActive} value={config.mode} onChange={e => setConfig({ ...config, mode: e.target.value as SimulationConfig['mode'] })}><option value="specific_steps">Specific steps · fixed count</option><option value="ber_benchmark">BER benchmark · SNR sweep</option></select><small>{config.mode === 'specific_steps' ? 'Run a fixed number of steps; channels keep their own default parameters.' : 'Sweep SNR and stop each point after enough errors or the frame limit.'}</small></label>
+          <div className="section-rule"><span>{config.mode === 'specific_steps' ? 'FIXED STEPS' : 'SNR SWEEP (dB)'}</span></div>
+          {config.mode === 'specific_steps' ? <label>Steps<input disabled={executionActive} type="number" min="1" value={config.max_frames} onChange={e => { const value = Number(e.target.value); setConfig({ ...config, max_frames: value, trials: value, min_frames: value }) }} /><small>No SNR sweep; AWGN/Rayleigh use their block parameters.</small></label> : <><div className="form-grid"><label>Start<input disabled={executionActive} type="number" step="any" value={config.snr_db_start} onChange={e => setConfig({ ...config, snr_db_start: Number(e.target.value) })} /></label><label>Stop<input disabled={executionActive} type="number" step="any" value={config.snr_db_stop} onChange={e => setConfig({ ...config, snr_db_stop: Number(e.target.value) })} /></label></div><label>Step<input disabled={executionActive} type="number" min="0.01" step="any" value={config.snr_db_step} onChange={e => setConfig({ ...config, snr_db_step: Number(e.target.value) })} /></label><div className="form-grid"><label>Max frames / SNR<input disabled={executionActive} type="number" min="1" value={config.max_frames} onChange={e => { const value = Number(e.target.value); setConfig({ ...config, max_frames: value, trials: value }) }} /></label><label>Min frames / SNR<input disabled={executionActive} type="number" min="1" value={config.min_frames} onChange={e => setConfig({ ...config, min_frames: Number(e.target.value) })} /></label></div><label>Min errors / SNR<input disabled={executionActive} type="number" min="0" value={config.min_errors} onChange={e => setConfig({ ...config, min_errors: Number(e.target.value) })} /><small>Benchmark stops early after this many bit errors.</small></label></>}
           <div className="section-rule"><span>RUNTIME</span></div>
           <div className="form-grid"><label>Workers<input disabled={executionActive} type="number" min="0" value={config.workers} onChange={e => setConfig({ ...config, workers: Number(e.target.value) })} /><small>0 = auto</small></label><label>Seed<input disabled={executionActive} type="number" value={config.seed} onChange={e => setConfig({ ...config, seed: Number(e.target.value) })} /></label></div>
           <label>Chunk size<input disabled={executionActive} type="number" min="1" value={config.chunk_size} onChange={e => setConfig({ ...config, chunk_size: Number(e.target.value) })} /></label>

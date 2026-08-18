@@ -34,7 +34,7 @@ export type PortPreviewMap = Record<string, NodePortPreviews>
 
 export type RunOnceResult = {
   device: string
-  snr_db: number
+  snr_db: number | null
   elapsed_seconds: number
   metrics: Record<string, number>
   sink_metrics: Record<string, number>
@@ -72,7 +72,7 @@ export type BlockSpec = {
 }
 
 export type SimulationConfig = {
-  mode: 'specific_steps' | 'ber_benchmark' | 'parameter_sweep'
+  mode: 'specific_steps' | 'ber_benchmark'
   trials: number
   max_frames: number
   min_frames: number
@@ -99,11 +99,11 @@ export type Job = {
   node_errors?: Record<string, string[]>
   device?: string
   workers?: number
-  snr_db?: number
+  snr_db?: number | null
   snr_index?: number
   snr_count?: number
   snr_points?: Array<{
-    snr_db: number
+    snr_db: number | null
     bit_errors: number
     total_bits: number
     frames: number
@@ -122,7 +122,7 @@ export type Job = {
     port_previews: PortPreviewMap
     snapshot_id?: string
     snr_points: Array<{
-      snr_db: number
+      snr_db: number | null
       bit_errors: number
       total_bits: number
       frames: number

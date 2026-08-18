@@ -288,7 +288,7 @@ def run_once(graph: Graph, config: SimulationConfig) -> dict[str, Any]:
     graph_dict = graph.model_dump()
     graph_dict["_global_variables"] = collect_global_variables(graph_dict["nodes"])
     graph_dict["_random_seed_root"] = int.from_bytes(os.urandom(8), "little")
-    snr_db = float(config.snr_db_points[0] if config.mode == "specific_steps" else config.snr_db_start)
+    snr_db = None if config.mode == "specific_steps" else float(config.snr_db_start)
     captured = execute_trial(graph_dict, 0, config.seed, device, snr_db, capture_ports=True)
     return {
         "device": device,
@@ -306,7 +306,7 @@ def _run_chunk(
     graph_dict: dict[str, Any],
     items: list[tuple[int, int]],
     device: str,
-    snr_db: float,
+    snr_db: float | None,
 ) -> dict[str, float]:
     total: dict[str, float] = {"completed_trials": 0}
     for trial_index, seed in items:
@@ -378,9 +378,9 @@ def run_simulation(
     max_frames = config.max_frames or config.trials
     min_frames = min(config.min_frames, max_frames)
     if config.mode == "specific_steps":
-        snr_values = [round(float(value), 6) for value in config.snr_db_points]
-        if len(set(snr_values)) != len(snr_values):
-            raise ValueError("Specific SNR steps must be unique")
+        # A specific-step experiment is deliberately SNR-neutral: run a fixed
+        # number of frames once and let channels use their own block defaults.
+        snr_values = [None]
     else:
         if config.snr_db_stop < config.snr_db_start:
             raise ValueError("SNR stop must be greater than or equal to SNR start")

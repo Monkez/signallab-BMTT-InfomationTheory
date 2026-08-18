@@ -35,7 +35,7 @@ const iconFor = (kind: SinkKind) => kind === 'constellation' ? Radio : kind === 
 const titleFor = (kind: SinkKind) => ({ power_meter: 'TX Power', constellation: 'Constellation', scope: 'Scope', source_analyzer: 'Source theory', ser: 'Symbol error rate' })[kind]
 
 export function SinkResults({ nodes, metrics, berPoints = [], berLive = false }: Props) {
-  const hasBer = nodes.some(node => node.data.blockType === 'ber') && berPoints.length > 0
+  const hasBer = nodes.some(node => node.data.blockType === 'ber') && berPoints.length > 0 && berPoints.every(point => Number.isFinite(point.snr_db))
   const sinks = nodes.filter(node => ['ber', 'power_meter', 'constellation', 'scope', 'source_analyzer', 'ser'].includes(node.data.blockType)) as FlowNode[]
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null)
   const activeNode = sinks.find(node => node.id === detailNodeId) || null

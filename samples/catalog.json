@@ -19,7 +19,7 @@
       {"id":"e1","source":"src","target":"mod"},{"id":"e2","source":"mod","target":"ch"},{"id":"e3","source":"ch","target":"demod"},
       {"id":"e4","source":"src","target":"ber","target_handle":"reference"},{"id":"e5","source":"demod","target":"ber","target_handle":"estimate"}
     ]},
-    "config": {"trials":300,"max_frames":300,"min_frames":40,"min_errors":200,"snr_db_start":-2,"snr_db_stop":10,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","chunk_size":20}
+    "config": {"mode":"ber_benchmark","trials":300,"max_frames":300,"min_frames":40,"min_errors":200,"snr_db_start":-2,"snr_db_stop":10,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","chunk_size":20}
   },
   {
     "format": "signallab-simulation", "version": "1.0",
@@ -43,7 +43,7 @@
       {"id":"e1","source":"src","target":"enc"},{"id":"e2","source":"enc","target":"mod"},{"id":"e3","source":"mod","target":"ch"},{"id":"e4","source":"ch","target":"demod"},
       {"id":"e5","source":"demod","target":"dec"},{"id":"e6","source":"enc","source_handle":"reference","target":"ber","target_handle":"reference"},{"id":"e7","source":"dec","target":"ber","target_handle":"estimate"}
     ]},
-    "config": {"trials":500,"max_frames":500,"min_frames":50,"min_errors":250,"snr_db_start":-2,"snr_db_stop":10,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","chunk_size":20}
+    "config": {"mode":"ber_benchmark","trials":500,"max_frames":500,"min_frames":50,"min_errors":250,"snr_db_start":-2,"snr_db_stop":10,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","chunk_size":20}
   },
   {
     "format": "signallab-simulation", "version": "1.0",
@@ -67,7 +67,7 @@
       {"id":"e1","source":"src","target":"enc"},{"id":"e2","source":"enc","target":"mod"},{"id":"e3","source":"mod","target":"ch"},{"id":"e4","source":"ch","target":"demod"},
       {"id":"e5","source":"demod","target":"dec"},{"id":"e6","source":"enc","source_handle":"reference","target":"ber","target_handle":"reference"},{"id":"e7","source":"dec","target":"ber","target_handle":"estimate"}
     ]},
-    "config": {"trials":300,"max_frames":300,"min_frames":40,"min_errors":200,"snr_db_start":-4,"snr_db_stop":8,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","chunk_size":20}
+    "config": {"mode":"ber_benchmark","trials":300,"max_frames":300,"min_frames":40,"min_errors":200,"snr_db_start":-4,"snr_db_stop":8,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","chunk_size":20}
   },
   {
     "format": "signallab-simulation", "version": "1.0",
@@ -92,7 +92,7 @@
       {"id":"e4","source":"src","target":"ber","target_handle":"reference"},{"id":"e5","source":"demod","target":"ber","target_handle":"estimate"},
       {"id":"e6","source":"ch","target":"const"},{"id":"e7","source":"mod","target":"power"}
     ]},
-    "config": {"trials":300,"max_frames":300,"min_frames":40,"min_errors":200,"snr_db_start":-2,"snr_db_stop":12,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","chunk_size":20}
+    "config": {"mode":"ber_benchmark","trials":300,"max_frames":300,"min_frames":40,"min_errors":200,"snr_db_start":-2,"snr_db_stop":12,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","chunk_size":20}
   },
   {
     "format": "signallab-simulation", "version": "1.0",
@@ -108,7 +108,7 @@
       {"id":"src","type":"discrete_symbol_source","label":"Source X","position":{"x":180,"y":180},"params":{"alphabet":"A,B,C,D","probabilities":"0.5,0.25,0.125,0.125","length":200,"seed":-1}},
       {"id":"analyzer","type":"source_analyzer","label":"Information analyzer","position":{"x":470,"y":180},"params":{"alphabet":"A,B,C,D","probabilities":"0.5,0.25,0.125,0.125"}}
     ], "edges": [{"id":"e1","source":"src","target":"analyzer"}]},
-    "config": {"trials":100,"max_frames":100,"min_frames":20,"min_errors":0,"snr_db_start":0,"snr_db_stop":0,"snr_db_step":1,"workers":1,"seed":2026,"device":"cpu","chunk_size":10}
+    "config": {"mode":"specific_steps","trials":100,"max_frames":100,"min_frames":100,"min_errors":0,"workers":1,"seed":2026,"device":"cpu","chunk_size":10}
   },
   {
     "format": "signallab-simulation", "version": "1.0",
@@ -129,7 +129,7 @@
       {"id":"e1","source":"src","target":"enc"},{"id":"e2","source":"enc","target":"dec"},
       {"id":"e3","source":"enc","source_handle":"reference","target":"ser","target_handle":"reference"},{"id":"e4","source":"dec","target":"ser","target_handle":"estimate"}
     ]},
-    "config": {"trials":50,"max_frames":50,"min_frames":10,"min_errors":0,"snr_db_start":0,"snr_db_stop":0,"snr_db_step":1,"workers":1,"seed":2026,"device":"cpu","chunk_size":10}
+    "config": {"mode":"specific_steps","trials":50,"max_frames":50,"min_frames":50,"min_errors":0,"workers":1,"seed":2026,"device":"cpu","chunk_size":10}
   },
   {
     "format": "signallab-simulation", "version": "1.0",
@@ -150,7 +150,7 @@
       {"id":"e1","source":"src","target":"enc"},{"id":"e2","source":"enc","target":"dec"},
       {"id":"e3","source":"enc","source_handle":"reference","target":"ser","target_handle":"reference"},{"id":"e4","source":"dec","target":"ser","target_handle":"estimate"}
     ]},
-    "config": {"trials":50,"max_frames":50,"min_frames":10,"min_errors":0,"snr_db_start":0,"snr_db_stop":0,"snr_db_step":1,"workers":1,"seed":2026,"device":"cpu","chunk_size":10}
+    "config": {"mode":"specific_steps","trials":50,"max_frames":50,"min_frames":50,"min_errors":0,"workers":1,"seed":2026,"device":"cpu","chunk_size":10}
   },
   {
     "format": "signallab-simulation", "version": "1.0",
@@ -172,7 +172,7 @@
       {"id":"e1","source":"src","target":"mod"},{"id":"e2","source":"mod","target":"ch"},{"id":"e3","source":"ch","target":"py"},
       {"id":"e4","source":"src","target":"ber","target_handle":"reference"},{"id":"e5","source":"py","target":"ber","target_handle":"estimate"}
     ]},
-    "config": {"trials":300,"max_frames":300,"min_frames":40,"min_errors":200,"snr_db_start":-2,"snr_db_stop":10,"snr_db_step":2,"workers":0,"seed":2026,"device":"cpu","chunk_size":20}
+    "config": {"mode":"ber_benchmark","trials":300,"max_frames":300,"min_frames":40,"min_errors":200,"snr_db_start":-2,"snr_db_stop":10,"snr_db_step":2,"workers":0,"seed":2026,"device":"cpu","chunk_size":20}
   },
   {
     "format": "signallab-simulation", "version": "1.0",
@@ -181,7 +181,7 @@
       "summary": "Một Python Block mô phỏng BSC bằng cách sinh mặt nạ Bernoulli và XOR với bit vào. Đây là cầu nối trực tiếp giữa xác suất lỗi lý thuyết và kết quả Monte-Carlo.",
       "concepts": ["Binary symmetric channel", "Bernoulli noise", "NumPy RNG", "BER", "Law of large numbers"], "uses_python": true,
       "learning_objectives": ["Cài đặt BSC(p) bằng phép XOR vector hóa", "Hiểu seed=-1 và seed cố định", "Kiểm chứng BER hội tụ về crossover probability p"],
-      "instructions": ["Chọn Python BSC và đọc code tạo flips từ rng.random.", "Run once để xem vị trí bit bị đảo ở input/output.", "Run Benchmark với flip_probability=0.08; BER không phụ thuộc SNR và xấp xỉ 0.08.", "Tăng length, Max frames hoặc đổi p để quan sát định luật số lớn; đặt seed cố định để tái lập."],
+      "instructions": ["Chọn Python BSC và đọc code tạo flips từ rng.random.", "Run once để xem vị trí bit bị đảo ở input/output.", "Chọn Specific steps, đặt Steps đủ lớn rồi chạy thí nghiệm; BER xấp xỉ 0.08.", "Tăng Steps hoặc đổi p để quan sát định luật số lớn; đặt seed cố định để tái lập."],
       "expected_observations": ["Đường BER gần nằm ngang vì BSC không sử dụng SNR của Experiment.", "Khi tổng số bit tăng, BER đo được tiến gần tham số p." ]
     },
     "graph": { "version": "1.0", "nodes": [
@@ -191,6 +191,6 @@
     ], "edges": [
       {"id":"e1","source":"src","target":"py"},{"id":"e2","source":"src","target":"ber","target_handle":"reference"},{"id":"e3","source":"py","target":"ber","target_handle":"estimate"}
     ]},
-    "config": {"trials":100,"max_frames":100,"min_frames":30,"min_errors":500,"snr_db_start":0,"snr_db_stop":10,"snr_db_step":2,"workers":0,"seed":2026,"device":"cpu","chunk_size":10}
+    "config": {"mode":"specific_steps","trials":100,"max_frames":100,"min_frames":100,"min_errors":0,"workers":0,"seed":2026,"device":"cpu","chunk_size":10}
   }
 ]

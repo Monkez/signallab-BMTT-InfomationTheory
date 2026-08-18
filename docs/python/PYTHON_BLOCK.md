@@ -29,7 +29,7 @@ def process(signal, params):
     return np.asarray(signal) * adaptive_gain
 ```
 
-Không truyền SNR bằng biến global Python và không tự viết vòng lặp sweep trong block. **Run Benchmark** gọi block nhiều lần và cập nhật `params["snr_db"]` đúng step tự động. **Run once** dùng giá trị SNR Start.
+Không truyền SNR bằng biến global Python và không tự viết vòng lặp sweep trong block. **Specific steps** gọi block theo số bước cố định và `params["snr_db"]` là `None`; channel vì vậy dùng tham số mặc định của block. **BER benchmark** gọi block nhiều lần và cập nhật `params["snr_db"]` theo Start/Stop/Step. **Run once** giữ cùng quy tắc của mode hiện tại.
 
 ## Khối Variables
 

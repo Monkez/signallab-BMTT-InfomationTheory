@@ -42,6 +42,7 @@ def test_simulation_is_reproducible():
     graph = sample_graph()
     graph.nodes[3].params["ebn0_db"] = 0
     config = SimulationConfig(
+        mode="ber_benchmark",
         trials=4,
         max_frames=4,
         min_frames=1,
@@ -70,14 +71,13 @@ def test_specific_steps_mode_runs_exact_points_with_fixed_frames():
         max_frames=2,
         min_frames=1,
         min_errors=999999,
-        snr_db_points=[3.5, -1.0, 8.0],
         workers=1,
         seed=7,
         chunk_size=1,
         device="cpu",
     )
     result = run_simulation(sample_graph(), config)
-    assert [point["snr_db"] for point in result["snr_points"]] == [3.5, -1.0, 8.0]
+    assert [point["snr_db"] for point in result["snr_points"]] == [None]
     assert all(point["frames"] == 2 for point in result["snr_points"])
 
 

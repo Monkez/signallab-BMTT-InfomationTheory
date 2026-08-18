@@ -27,6 +27,8 @@ def test_learning_sample_catalog_is_complete_and_executable():
 
         graph = Graph.model_validate(project["graph"])
         config = SimulationConfig.model_validate(project["config"])
+        assert config.mode in {"specific_steps", "ber_benchmark"}
+        assert config.snr_db_points
         validation = validate_graph(graph)
         assert validation.valid, f"{metadata['id']}: {validation.errors}"
         result = run_once(graph, config)

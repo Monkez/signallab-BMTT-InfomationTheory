@@ -13,14 +13,6 @@ import threading
 import time
 from pathlib import Path
 
-import uvicorn
-import webview
-from fastapi.staticfiles import StaticFiles
-
-from backend.app.main import app
-from backend.app.project_files import read_project_text, write_project_text
-
-
 PROJECT_FILE_TYPES = (
     "SignalLab simulation (*.json)",
 )
@@ -38,6 +30,9 @@ class DesktopProjectApi:
         self._lock = threading.Lock()
 
     def open_project(self) -> dict[str, object]:
+        import webview
+        from backend.app.project_files import read_project_text
+
         selection = webview.windows[0].create_file_dialog(webview.FileDialog.OPEN, file_types=PROJECT_FILE_TYPES)
         if not selection:
             return {"cancelled": True}
@@ -48,6 +43,9 @@ class DesktopProjectApi:
         return {"cancelled": False, "content": content, "name": path.name, "path": str(path)}
 
     def save_project(self, content: str, save_as: bool = False, suggested_name: str = "untitled-simulation.slab.json") -> dict[str, object]:
+        import webview
+        from backend.app.project_files import write_project_text
+
         with self._lock:
             path = self._current_path
         if save_as or path is None:
@@ -74,6 +72,49 @@ def resource_path(*parts: str) -> Path:
     return root.joinpath(*parts)
 
 
+class NativeSplash:
+    """A tiny Tk window that appears before WebView2 and backend imports."""
+
+    def __init__(self) -> None:
+        self._closed = threading.Event()
+        self._thread = threading.Thread(target=self._run, name="signallab-splash", daemon=True)
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def close(self) -> None:
+        self._closed.set()
+
+    def _run(self) -> None:
+        try:
+            import tkinter as tk
+
+            root = tk.Tk()
+            root.overrideredirect(True)
+            root.attributes("-topmost", True)
+            root.configure(bg="#f6f8fb")
+            width, height = 440, 250
+            x = max(0, (root.winfo_screenwidth() - width) // 2)
+            y = max(0, (root.winfo_screenheight() - height) // 2)
+            root.geometry(f"{width}x{height}+{x}+{y}")
+            frame = tk.Frame(root, bg="#f6f8fb")
+            frame.pack(expand=True, fill="both")
+            tk.Label(frame, text="∿", font=("Segoe UI", 32, "bold"), fg="white", bg="#23344b", width=2, height=1).pack(pady=(42, 12))
+            tk.Label(frame, text="SignalLab", font=("Segoe UI", 22, "bold"), fg="#23344b", bg="#f6f8fb").pack()
+            tk.Label(frame, text="DIGITAL COMMUNICATIONS STUDIO", font=("Segoe UI", 9), fg="#718096", bg="#f6f8fb").pack(pady=(4, 16))
+            bar = tk.Frame(frame, bg="#d8e2ef", width=44, height=3)
+            bar.pack()
+            bar.pack_propagate(False)
+            root.update_idletasks()
+            root.update()
+            while not self._closed.wait(0.025):
+                root.update()
+            root.destroy()
+        except Exception:
+            # Startup must continue even if Tk is unavailable on a target machine.
+            return
+
+
 def free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
@@ -91,17 +132,28 @@ def wait_until_ready(port: int, timeout: float = 15.0) -> None:
     raise RuntimeError("SignalLab local service did not start in time")
 
 
-def load_frontend_when_ready(window: webview.Window, port: int) -> None:
+def load_frontend_when_ready(window: object, port: int, splash: NativeSplash) -> None:
     """Keep the native loading window visible while the local API boots."""
     try:
         wait_until_ready(port)
         window.load_url(f"http://127.0.0.1:{port}")
+        splash.close()
     except Exception as exc:  # pragma: no cover - only reachable during desktop startup
         message = str(exc).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         window.load_html(f"<html><body style='font:14px Segoe UI;padding:32px;color:#23344b'><h2>SignalLab could not start</h2><p>{message}</p></body></html>")
+        splash.close()
 
 
 def run() -> None:
+    # Start this before importing FastAPI, NumPy, WebView2, or the block registry.
+    # Those imports are the expensive part of a frozen desktop startup.
+    splash = NativeSplash()
+    splash.start()
+    import uvicorn
+    import webview
+    from fastapi.staticfiles import StaticFiles
+    from backend.app.main import app
+
     frontend = resource_path("frontend", "dist")
     if not (frontend / "index.html").exists():
         raise FileNotFoundError(f"Production frontend not found: {frontend}")
@@ -127,12 +179,13 @@ def run() -> None:
     )
     try:
         webview.start(
-            func=lambda: threading.Thread(target=load_frontend_when_ready, args=(window, port), daemon=True).start(),
+            func=lambda: threading.Thread(target=load_frontend_when_ready, args=(window, port, splash), daemon=True).start(),
             gui="edgechromium",
             debug=False,
             private_mode=False,
         )
     finally:
+        splash.close()
         server.should_exit = True
         server_thread.join(timeout=3)
 

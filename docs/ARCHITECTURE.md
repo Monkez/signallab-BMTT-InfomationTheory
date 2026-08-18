@@ -65,7 +65,7 @@ Backend tách hợp đồng block khỏi thuật toán xử lý: `block_registry
 
 ## Bản desktop Windows
 
-PyWebView tạo cửa sổ loading native dùng WebView2 trước khi chờ Uvicorn nội bộ khởi động; khi loopback API sẵn sàng, cửa sổ chuyển sang frontend production. PyInstaller gom Python runtime, backend và `frontend/dist` vào thư mục phát hành onedir chứa `SignalLab.exe`. Onedir được chọn để khởi động nhanh và tránh mỗi worker Monte-Carlo phải giải nén lại toàn bộ onefile. Người dùng cuối không chạy Vite, Node.js hoặc hai terminal; Vite chỉ còn dành cho phát triển giao diện qua `run_dev.bat`.
+Launcher tạo một NativeSplash Tk tối giản trước khi import FastAPI/NumPy/WebView2, nên cửa sổ loading xuất hiện ngay cả khi các module backend còn đang nạp. Sau đó PyWebView tạo cửa sổ WebView2 và chuyển sang frontend production khi Uvicorn nội bộ trên loopback sẵn sàng. PyInstaller gom Python runtime, backend và `frontend/dist` vào thư mục phát hành onedir chứa `SignalLab.exe`. Onedir được chọn để khởi động nhanh và tránh mỗi worker Monte-Carlo phải giải nén lại toàn bộ onefile. Người dùng cuối không chạy Vite, Node.js hoặc hai terminal; Vite chỉ còn dành cho phát triển giao diện qua `run_dev.bat`.
 
 `DesktopProjectApi` là bridge nhỏ giữa React và hộp thoại file native. Open đọc UTF-8, Save As chọn đường dẫn, còn Save/`Ctrl+S` ghi lại đường dẫn đang liên kết. `project_files.py` ghi qua file tạm cùng thư mục rồi `os.replace`, tránh để lại file JSON dở dang nếu quá trình ghi lỗi. Bản web ưu tiên File System Access API và dùng download/upload làm fallback; logic lựa chọn nền tảng nằm riêng trong `features/projects/projectFiles.ts`.
 

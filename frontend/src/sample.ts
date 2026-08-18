@@ -1,17 +1,17 @@
 import type { FlowEdge, FlowNode } from './types'
 
-const block = (id: string, blockType: string, label: string, x: number, y: number, inputs: string[], outputs: string[], params = {}): FlowNode => ({
-  id, type: 'signal', position: { x, y }, data: { label, blockType, category: '', params, inputs, outputs },
+const block = (id: string, blockType: string, label: string, x: number, y: number, inputs: string[], outputs: string[], params = {}, portOrientation: 'standard' | 'reversed' = 'standard'): FlowNode => ({
+  id, type: 'signal', position: { x, y }, data: { label, blockType, category: '', params, inputs, outputs, portOrientation },
 })
 
 export const initialNodes: FlowNode[] = [
-  block('source', 'bit_source', 'Random bits', 30, 90, [], ['out'], { length: 4096, seed: -1 }),
-  block('encoder', 'hamming74_encode', 'Hamming 7,4', 230, 90, ['in'], ['out', 'reference']),
-  block('mod', 'bpsk_mod', 'BPSK', 430, 90, ['in'], ['out']),
-  block('channel', 'awgn', 'AWGN', 630, 90, ['in'], ['out'], { ebn0_db: 4, snr_mode: 'experiment', seed: -1 }),
-  block('demod', 'bpsk_demod', 'Hard decision', 630, 300, ['in'], ['out']),
-  block('decoder', 'hamming74_decode', 'Hamming decode', 430, 300, ['in'], ['out']),
-  block('meter', 'ber', 'BER meter', 230, 300, ['reference', 'estimate'], []),
+  block('source', 'bit_source', 'Random bits', 20, 48, [], ['out'], { length: 4096, seed: -1 }),
+  block('encoder', 'hamming74_encode', 'Hamming 7,4', 252, 48, ['in'], ['out', 'reference']),
+  block('mod', 'bpsk_mod', 'BPSK', 484, 48, ['in'], ['out']),
+  block('channel', 'awgn', 'AWGN', 716, 48, ['in'], ['out'], { ebn0_db: 4, snr_mode: 'experiment', seed: -1 }),
+  block('demod', 'bpsk_demod', 'Hard decision', 702, 380, ['in'], ['out'], {}, 'reversed'),
+  block('decoder', 'hamming74_decode', 'Hamming decode', 428, 380, ['in'], ['out'], {}, 'reversed'),
+  block('meter', 'ber', 'BER meter', 104, 326, ['reference', 'estimate'], [], {}, 'reversed'),
 ]
 
 export const initialEdges: FlowEdge[] = [

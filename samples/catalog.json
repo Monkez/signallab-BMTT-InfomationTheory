@@ -32,13 +32,13 @@
       "expected_observations": ["Với 4096 bit, encoder sinh 7168 bit vì 4096 chia hết cho 4.", "Decoder sửa được tối đa một lỗi trong mỗi codeword; nhiều lỗi cùng codeword có thể làm sai dữ liệu."]
     },
     "graph": { "version": "1.0", "nodes": [
-      {"id":"src","type":"bit_source","label":"Random bits","position":{"x":30,"y":90},"params":{"length":4096,"seed":-1}},
-      {"id":"enc","type":"hamming74_encode","label":"Systematic Hamming (7,4)","position":{"x":230,"y":90}},
-      {"id":"mod","type":"bpsk_mod","label":"BPSK","position":{"x":440,"y":90}},
-      {"id":"ch","type":"awgn","label":"AWGN","position":{"x":650,"y":90},"params":{"ebn0_db":4,"snr_mode":"experiment","seed":-1}},
-      {"id":"demod","type":"bpsk_demod","label":"Hard decision","position":{"x":650,"y":300}},
-      {"id":"dec","type":"hamming74_decode","label":"Hamming decoder","position":{"x":440,"y":300}},
-      {"id":"ber","type":"ber","label":"BER after decoding","position":{"x":230,"y":300}}
+      {"id":"src","type":"bit_source","label":"Random bits","position":{"x":20,"y":48},"params":{"length":4096,"seed":-1}},
+      {"id":"enc","type":"hamming74_encode","label":"Systematic Hamming (7,4)","position":{"x":252,"y":48}},
+      {"id":"mod","type":"bpsk_mod","label":"BPSK","position":{"x":484,"y":48}},
+      {"id":"ch","type":"awgn","label":"AWGN","position":{"x":716,"y":48},"params":{"ebn0_db":4,"snr_mode":"experiment","seed":-1}},
+      {"id":"demod","type":"bpsk_demod","label":"Hard decision","position":{"x":702,"y":380},"port_orientation":"reversed"},
+      {"id":"dec","type":"hamming74_decode","label":"Hamming decoder","position":{"x":428,"y":380},"port_orientation":"reversed"},
+      {"id":"ber","type":"ber","label":"BER after decoding","position":{"x":104,"y":326},"port_orientation":"reversed"}
     ], "edges": [
       {"id":"e1","source":"src","target":"enc"},{"id":"e2","source":"enc","target":"mod"},{"id":"e3","source":"mod","target":"ch"},{"id":"e4","source":"ch","target":"demod"},
       {"id":"e5","source":"demod","target":"dec"},{"id":"e6","source":"enc","source_handle":"reference","target":"ber","target_handle":"reference"},{"id":"e7","source":"dec","target":"ber","target_handle":"estimate"}

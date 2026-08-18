@@ -147,6 +147,10 @@ input, select { display: block; width: 100%; margin-top: 6px; height: 34px; padd
 input[hidden] { display: none !important; }
 input:focus, select:focus, textarea:focus { border-color: #4d78cb; box-shadow: 0 0 0 2px rgba(37,99,235,.1); }
 input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: not-allowed; }
+.boolean-param { min-height: 48px; padding: 10px 46px 9px 11px; border: 1px solid var(--line-strong); border-radius: 6px; background: #f8fafc; }
+.boolean-param > span { display: block; color: #405069; font-size: 10px; font-weight: 600; }
+.boolean-param input[type="checkbox"] { position: absolute; top: 9px; right: 11px; width: 30px; height: 17px; margin: 0; accent-color: var(--accent); }
+.boolean-param small { display: block; margin-top: 4px; color: #7d8999; font-size: 8px; line-height: 1.35; text-transform: none; }
 .section-rule { display: flex; align-items: center; gap: 8px; color: #788493; font-size: 7px; letter-spacing: .1em; margin: 20px 0 12px; }
 .section-rule:after { content: ''; height: 1px; background: var(--line); flex: 1; }
 .section-rule em { font-style: normal; color: #8792a0; letter-spacing: 0; order: 2; }
@@ -289,6 +293,15 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .huffman-codebook footer { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 8px; border-top: 1px solid #dce5f0; background: #f8fafc; color: #6b7b90; font-size: 9px; }
 .huffman-codebook footer b { margin-left: 3px; color: #244e83; font-family: Consolas, monospace; }
 .codebook-error { padding: 9px 10px; border: 1px solid #efb6bd; border-radius: 6px; background: #fff4f5; color: #a72c3c; font-size: 10px; line-height: 1.45; }
+.huffman-sequence { margin-top: 9px; overflow: hidden; border: 1px solid #cbd7e5; border-radius: 7px; background: #fbfcfe; }
+.huffman-sequence header { display: flex; justify-content: space-between; gap: 8px; padding: 8px 9px; border-bottom: 1px solid #e2e8f0; background: #f3f7fc; }
+.huffman-sequence header strong { color: #30445f; font-size: 9px; }
+.huffman-sequence header span { color: #7a8798; font-size: 8px; }
+.huffman-sequence > div { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 3px 8px; padding: 7px 9px; border-bottom: 1px solid #edf1f5; }
+.huffman-sequence > div:last-child { border-bottom: 0; }
+.huffman-sequence > div > span { color: #6d7a8d; font-size: 8px; }
+.huffman-sequence code { min-width: 0; overflow-wrap: anywhere; color: #1558bd; font: 600 9px/1.45 Consolas, monospace; }
+.huffman-sequence small { grid-column: 2; color: #8994a3; font-size: 7.5px; }
 .console-dock { grid-column: 2; grid-row: 3; min-width: 0; min-height: 0; width: 100%; position: relative; z-index: 8; display: flex; flex-direction: column; border: 1px solid var(--line-strong); border-bottom: 0; background: var(--panel); color: #263140; overflow: hidden; }
 .console-resizer { position: absolute; left: 0; right: 0; top: -5px; height: 9px; cursor: row-resize; z-index: 2; }
 .console-resizer:hover { background: rgba(93, 151, 235, .35); }

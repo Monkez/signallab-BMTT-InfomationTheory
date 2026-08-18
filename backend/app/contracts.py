@@ -129,8 +129,10 @@ def validate_inputs(block_type: str, inputs: dict[str, Any], params: dict[str, A
             _multiple(primary, 2, "in", "QPSK modulation")
         elif block_type == "rle_decode":
             _multiple(primary, 9, "in", "Run-Length decoding")
-        elif block_type in {"huffman_decode", "shannon_fano_decode", "symbol_huffman_decode", "symbol_shannon_fano_decode", "zip_decode"} and primary < 32:
+        elif block_type in {"huffman_decode", "shannon_fano_decode", "symbol_shannon_fano_decode", "zip_decode"} and primary < 32:
             raise SignalContractError(f"Port 'in' has {primary} values; {block_type.replace('_', ' ')} requires at least a 32-bit header")
+        elif block_type == "symbol_huffman_decode" and bool(params.get("include_header", False)) and primary < 32:
+            raise SignalContractError("Port 'in' must contain a complete 32-bit symbol-count header when include_header is enabled")
         if block_type in {"source_analyzer", "symbols_to_bits", "symbol_huffman_encode", "symbol_shannon_fano_encode"}:
             signal = _signal(inputs["in"], "in")
             if np.asarray(signal).dtype.kind not in {"U", "S", "O"}:
@@ -143,12 +145,12 @@ def validate_inputs(block_type: str, inputs: dict[str, Any], params: dict[str, A
     return sizes
 
 
-def _encoded_original_length(block_type: str, signal: Any) -> int | None:
+def _encoded_original_length(block_type: str, signal: Any, params: dict[str, Any]) -> int | None:
     bits = _signal(signal, "in")
     if hasattr(bits, "get"):
         bits = bits.get()
     bits = np.asarray(bits).astype(np.int8, copy=False)
-    if block_type in {"huffman_decode", "shannon_fano_decode", "symbol_huffman_decode", "symbol_shannon_fano_decode"}:
+    if block_type in {"huffman_decode", "shannon_fano_decode", "symbol_shannon_fano_decode"} or (block_type == "symbol_huffman_decode" and bool(params.get("include_header", False))):
         return int.from_bytes(np.packbits(bits[:32]).astype(np.uint8).tobytes(), "big")
     if block_type == "zip_decode":
         return int.from_bytes(np.packbits(bits).tobytes()[:4], "big")
@@ -210,7 +212,8 @@ def validate_outputs(
                 raise SignalContractError(f"Output '{port}' must match input size {in_size}, received {output_sizes.get(port)}")
     if block_type == "rle_encode" and out_size is not None:
         _multiple(out_size, 9, "out", "Run-Length encoding")
-    if block_type in {"huffman_encode", "shannon_fano_encode", "symbol_huffman_encode", "symbol_shannon_fano_encode", "zip_encode"} and (out_size or 0) < 32:
+    requires_header = block_type in {"huffman_encode", "shannon_fano_encode", "symbol_shannon_fano_encode", "zip_encode"} or (block_type == "symbol_huffman_encode" and bool(params.get("include_header", False)))
+    if requires_header and (out_size or 0) < 32:
         raise SignalContractError("Encoded output must include a complete 32-bit size header")
 
     ratios: dict[str, tuple[int, int]] = {
@@ -229,7 +232,7 @@ def validate_outputs(
                 f"Output 'out' size mismatch: expected {expected_size} from {in_size} input values, received {out_size}"
             )
 
-    original_length = _encoded_original_length(block_type, inputs["in"]) if block_type in {"huffman_decode", "shannon_fano_decode", "symbol_huffman_decode", "symbol_shannon_fano_decode", "rle_decode", "zip_decode"} else None
+    original_length = _encoded_original_length(block_type, inputs["in"], params) if block_type in {"huffman_decode", "shannon_fano_decode", "symbol_huffman_decode", "symbol_shannon_fano_decode", "rle_decode", "zip_decode"} else None
     if original_length is not None and out_size != original_length:
         raise SignalContractError(
             f"Decoded output size mismatch: stream declares {original_length} values, decoder produced {out_size}"

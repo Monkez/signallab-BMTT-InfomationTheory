@@ -68,3 +68,7 @@
 - Topbar có **Documents** mở cửa sổ `#/documents` độc lập, có menu theo nhóm, full-text search, `Ctrl+K`, mục lục và renderer Markdown. Tài liệu chi tiết canonical nằm ở `docs/python/` và được đóng gói offline vào frontend.
 - Xác minh mốc package/Documents: backend 49/49 pass, frontend production build pass; browser UI xác nhận menu Documents, nội dung API, code/table, search `Hamming sửa lỗi` và bố cục ba cột rõ ràng.
 - PyInstaller đã nhận hook NumPy/SciPy, đóng gói thành công package và tài liệu offline tại `dist\SignalLab\SignalLab.exe`; smoke test xác nhận EXE duy trì tiến trình ổn định.
+- Huffman Symbol Encoder/Decoder mặc định dùng payload prefix thuần, bỏ header 32 bit khỏi output giáo dục. Checkbox **Include 32-bit symbol-count header** là tùy chọn mặc định tắt và phải đồng bộ hai đầu; decoder không header đọc tới hết stream, đồng thời báo lỗi codeword dang dở.
+- Inspector Huffman sau Run once tách trực quan `Symbols`, `Codewords` dạng `0 | 0 | 0 | 10 | …`, payload nối liền, số bit và—nếu bật—header/serialized output riêng. Backend hiện 52/52 test pass, gồm full graph contract cho payload 11 bit; frontend production build pass; browser xác nhận checkbox mặc định tắt và bật được đúng kiểu boolean.
+- Dự án được xuất bản độc lập bằng `git subtree` tới `https://github.com/Monkez/signallab-BMTT-InfomationTheory.git`; không đẩy toàn bộ monorepo BMTT vào repository standalone.
+- EXE chứa Huffman payload/header option đã build tại `dist\SignalLab\SignalLab.exe` và smoke test duy trì tiến trình ổn định.

@@ -87,7 +87,7 @@ Miền lý thuyết nguồn dùng mảng NumPy Unicode 1-D (`<U...`) làm **symb
 
 Nhóm source coding có cặp Encoder/Decoder cho Huffman, Shannon-Fano, RLE và ZIP/DEFLATE. Huffman/Shannon-Fano là implementation cố định 2-bit-symbol phục vụ giảng dạy; encoder đóng header độ dài để decoder loại padding. RLE và ZIP giữ header độ dài tương tự để round-trip chính xác.
 
-Các cặp `symbol_huffman_*` và `symbol_shannon_fano_*` nhận trực tiếp symbol stream và model alphabet/xác suất, phát bitstream có header số symbol rồi khôi phục chuỗi ký tự. Chúng tồn tại song song với codec bit-pair cũ để project trước đây không đổi ngữ nghĩa. `ser` so sánh chuỗi symbol sau giải mã; BER vẫn chỉ dành cho bitstream.
+Các cặp `symbol_huffman_*` và `symbol_shannon_fano_*` nhận trực tiếp symbol stream và model alphabet/xác suất. Riêng Huffman Symbol phát payload prefix thuần theo mặc định; tùy chọn `include_header` mới nối header đếm symbol 32 bit và phải được bật đồng thời ở decoder. Khi không có header, decoder đọc đến hết mảng và từ chối codeword cuối dang dở. Shannon-Fano Symbol hiện vẫn giữ framing cũ. Các codec này tồn tại song song với codec bit-pair cũ để project trước đây không đổi ngữ nghĩa. `ser` so sánh chuỗi symbol sau giải mã; BER vẫn chỉ dành cho bitstream.
 
 Huffman symbol dùng quy tắc phá hòa xác định: hàng đợi ưu tiên theo trọng số rồi theo thứ tự chèn. `features/sourceTheory/huffmanCodebook.ts` triển khai cùng quy tắc để inspector dựng codebook tức thời mà không gọi runtime; test backend khóa các từ mã khi xác suất bằng nhau để UI và encoder không lệch nhau.
 

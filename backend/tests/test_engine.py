@@ -306,6 +306,51 @@ def test_text_symbol_codecs_round_trip(encoder, decoder):
     assert decoded.tolist() == source.tolist()
 
 
+def test_symbol_huffman_defaults_to_pure_payload_and_supports_optional_header():
+    context = make_context(np, np.random.default_rng(5), 0, 5, "cpu")
+    base_params = {"alphabet": "A,B,C,D", "probabilities": "0.5,0.25,0.125,0.125"}
+    source = np.asarray(list("AAABCD"))
+
+    encoded = PROCESSORS["symbol_huffman_encode"]({"in": source}, base_params, context)["out"]
+    assert encoded.tolist() == [0, 0, 0, 1, 0, 1, 1, 0, 1, 1, 1]
+    decoded = PROCESSORS["symbol_huffman_decode"]({"in": encoded}, base_params, context)["out"]
+    assert decoded.tolist() == source.tolist()
+
+    framed_params = {**base_params, "include_header": True}
+    framed = PROCESSORS["symbol_huffman_encode"]({"in": source}, framed_params, context)["out"]
+    assert len(framed) == 43
+    assert framed[:32].tolist() == [int(bit) for bit in f"{len(source):032b}"]
+    assert framed[32:].tolist() == encoded.tolist()
+    framed_decoded = PROCESSORS["symbol_huffman_decode"]({"in": framed}, framed_params, context)["out"]
+    assert framed_decoded.tolist() == source.tolist()
+
+
+def test_symbol_huffman_rejects_an_incomplete_final_codeword():
+    context = make_context(np, np.random.default_rng(5), 0, 5, "cpu")
+    params = {"alphabet": "A,B,C,D", "probabilities": "0.5,0.25,0.125,0.125", "include_header": False}
+    with pytest.raises(ValueError, match="incomplete codeword"):
+        PROCESSORS["symbol_huffman_decode"]({"in": np.asarray([1], dtype=np.int8)}, params, context)
+
+
+def test_symbol_huffman_pure_payload_passes_full_graph_contracts():
+    params = {"alphabet": "A,B,C,D", "probabilities": "0.5,0.25,0.125,0.125", "include_header": False}
+    graph = Graph(nodes=[
+        {"id": "source", "type": "text_symbol_source", "label": "Text", "params": {"text": "AAABCD", "repeat": 1}},
+        {"id": "encoder", "type": "symbol_huffman_encode", "label": "Huffman encode", "params": params},
+        {"id": "decoder", "type": "symbol_huffman_decode", "label": "Huffman decode", "params": params},
+        {"id": "ser", "type": "ser", "label": "SER", "params": {}},
+    ], edges=[
+        {"id": "source-encoder", "source": "source", "target": "encoder", "source_handle": "out", "target_handle": "in"},
+        {"id": "encoder-decoder", "source": "encoder", "target": "decoder", "source_handle": "out", "target_handle": "in"},
+        {"id": "reference", "source": "encoder", "target": "ser", "source_handle": "reference", "target_handle": "reference"},
+        {"id": "estimate", "source": "decoder", "target": "ser", "source_handle": "out", "target_handle": "estimate"},
+    ])
+    result = run_once(graph, SimulationConfig(seed=42, device="cpu"))
+    assert result["port_previews"]["encoder"]["outputs"]["out"]["size"] == 11
+    assert result["port_previews"]["encoder"]["inputs"]["in"]["sample"] == list("AAABCD")
+    assert result["metrics"]["symbol_errors"] == 0
+
+
 def test_symbols_to_bits_and_symbol_error_rate():
     context = make_context(np, np.random.default_rng(6), 0, 6, "cpu")
     symbols = np.asarray(list("Aé"))

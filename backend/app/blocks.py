@@ -264,24 +264,31 @@ def _symbol_variable_encode(inputs, params, code_factory):
         raise ValueError(f"input contains symbols outside alphabet: {', '.join(repr(value) for value in unknown[:5])}")
     codes = code_factory(probabilities.tolist())
     encoded = [int(bit) for symbol in symbols for bit in codes[lookup[str(symbol)]]]
-    header = np.unpackbits(np.array([len(symbols)], dtype=">u4").view(np.uint8)).astype(np.int8)
-    return {"out": np.concatenate([header, np.asarray(encoded, dtype=np.int8)]), "reference": _symbol_array(symbols)}
+    payload = np.asarray(encoded, dtype=np.int8)
+    if bool(params.get("include_header", False)):
+        header = np.unpackbits(np.array([len(symbols)], dtype=">u4").view(np.uint8)).astype(np.int8)
+        payload = np.concatenate([header, payload])
+    return {"out": payload, "reference": _symbol_array(symbols)}
 
 
 def _symbol_variable_decode(inputs, params, code_factory):
     bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1)
-    original_length = int.from_bytes(np.packbits(bits[:32]).astype(np.uint8).tobytes(), "big")
+    include_header = bool(params.get("include_header", False))
+    original_length = int.from_bytes(np.packbits(bits[:32]).astype(np.uint8).tobytes(), "big") if include_header else None
+    payload = bits[32:] if include_header else bits
     alphabet, probabilities = _symbol_model(params)
     reverse = {code: alphabet[index] for index, code in code_factory(probabilities.tolist()).items()}
     decoded = []
     token = ""
-    for bit in bits[32:]:
+    for bit in payload:
         token += str(int(bit))
         if token in reverse:
             decoded.append(reverse[token])
             token = ""
-            if len(decoded) == original_length:
-                break
+    if token:
+        raise ValueError(f"encoded payload ends with incomplete codeword {token!r}")
+    if original_length is not None and len(decoded) != original_length:
+        raise ValueError(f"header declares {original_length} symbols but payload decodes to {len(decoded)}")
     return {"out": _symbol_array(decoded)}
 
 

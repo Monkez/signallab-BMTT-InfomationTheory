@@ -4,7 +4,7 @@
 
 1. Chạy `setup.bat` ở lần đầu.
 2. Chạy `build_app.bat` để tạo `dist\SignalLab\SignalLab.exe`.
-3. Chạy `run.bat` hoặc mở trực tiếp file EXE.
+3. Chạy `run.bat` hoặc mở trực tiếp file EXE. Launcher tự chọn bản đóng gói mới nhất giữa thư mục phát hành chuẩn và thư mục cập nhật dự phòng, nên vẫn mở đúng tính năng mới khi bản EXE cũ đang bị Windows khóa.
 
 Bản desktop chỉ mở một cửa sổ SignalLab, không cần Node.js/Vite khi sử dụng và không mở terminal. Khi sao chép sang máy khác, phải sao chép cả thư mục `dist\SignalLab`, bao gồm `_internal`; không chỉ sao chép riêng EXE. Máy Windows đích cần Microsoft Edge WebView2 Runtime, vốn có sẵn trên Windows 10/11 được cập nhật.
 

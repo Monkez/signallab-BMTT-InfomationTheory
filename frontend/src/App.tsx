@@ -94,9 +94,12 @@ function App() {
   const selectedIsFileSource = selected ? ['text_file_source', 'text_file_symbol_source', 'image_file_source'].includes(selected.data.blockType) : false
   useEffect(() => {
     if (!fitRequest || !flowInstanceRef.current) return
-    const frame = window.requestAnimationFrame(() => flowInstanceRef.current?.fitView({ padding: 0.18, duration: 320 }))
-    return () => window.cancelAnimationFrame(frame)
-  }, [fitRequest])
+    // React Flow measures node dimensions after the React commit. Waiting a
+    // couple of frames avoids fitting against zero-sized nodes (which zooms to
+    // maxZoom and makes a newly opened sample appear enormous).
+    const timer = window.setTimeout(() => flowInstanceRef.current?.fitView({ padding: 0.18, duration: 320 }), 100)
+    return () => window.clearTimeout(timer)
+  }, [fitRequest, nodes.length])
   const visibleParams = selected ? Object.entries(selected.data.params).filter(([key]) => {
     if (key === 'data_base64' || key === 'file_name') return false
     if (selected.data.blockType === 'variables' && key === 'definitions') return false
@@ -516,7 +519,7 @@ function App() {
 
       <main className="canvas-wrap">
         <div className="canvas-label"><span>FLOWGRAPH</span><span>{nodes.length} blocks · {edges.length} links</span></div>
-        <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running' }))} nodeTypes={{ signal: SignalNode }} onInit={instance => { flowInstanceRef.current = instance; window.requestAnimationFrame(() => instance.fitView({ padding: 0.18, duration: 320 })) }} onDrop={onCanvasDrop} onDragOver={onCanvasDragOver} onNodesChange={onNodesChange} onEdgesChange={onEdgesChangeWithPreview} onConnect={onConnect} onNodeClick={onNodeClick} onNodeDragStart={onNodeDragStart} onPaneClick={() => setSelectedId(null)} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
+        <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running' }))} nodeTypes={{ signal: SignalNode }} onInit={instance => { flowInstanceRef.current = instance; window.setTimeout(() => instance.fitView({ padding: 0.18, duration: 320 }), 100) }} onDrop={onCanvasDrop} onDragOver={onCanvasDragOver} onNodesChange={onNodesChange} onEdgesChange={onEdgesChangeWithPreview} onConnect={onConnect} onNodeClick={onNodeClick} onNodeDragStart={onNodeDragStart} onPaneClick={() => setSelectedId(null)} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
           <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#ccd3dc" />
           <Controls position="bottom-left" />
           <MiniMap position="bottom-right" pannable zoomable offsetScale={4} nodeColor={node => miniMapColor(String((node.data as Record<string, unknown>)?.blockType || ''))} nodeStrokeColor="#ffffff" nodeStrokeWidth={1} nodeBorderRadius={3} nodeComponent={FlowMiniMapNode} bgColor="#f9fbfd" maskColor="rgba(226,233,242,.62)" maskStrokeColor="#8ea8ca" maskStrokeWidth={1} style={{ width: 150, height: 92, border: '1px solid #cbd6e3', borderRadius: 8, boxShadow: '0 3px 12px rgba(36,55,78,.14)' }} />

@@ -37,6 +37,7 @@ export type RunOnceResult = {
   snr_db: number
   elapsed_seconds: number
   metrics: Record<string, number>
+  sink_metrics: Record<string, number>
   port_previews: PortPreviewMap
   snapshot_id: string
   warnings: string[]

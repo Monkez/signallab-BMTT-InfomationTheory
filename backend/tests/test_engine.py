@@ -75,6 +75,23 @@ def test_run_once_captures_input_and_output_port_samples():
     assert result["_port_values"]["1"]["inputs"]["in"] is result["_port_values"]["0"]["outputs"]["out"]
 
 
+def test_run_once_returns_presentation_metrics_for_power_and_constellation_sinks():
+    graph = Graph(nodes=[
+        {"id": "src", "type": "bit_source", "label": "Bits", "params": {"length": 8, "seed": 1}},
+        {"id": "mod", "type": "bpsk_mod", "label": "BPSK", "params": {}},
+        {"id": "power", "type": "power_meter", "label": "TX Power", "params": {}},
+        {"id": "const", "type": "constellation", "label": "Constellation", "params": {}},
+    ], edges=[
+        {"id": "e1", "source": "src", "target": "mod"},
+        {"id": "e2", "source": "mod", "target": "power"},
+        {"id": "e3", "source": "mod", "target": "const"},
+    ])
+    result = run_once(graph, SimulationConfig(seed=42, device="cpu"))
+    assert result["sink_metrics"]["power_mean"] == pytest.approx(1.0)
+    assert "constellation_mean_i" in result["sink_metrics"]
+    assert result["port_previews"]["const"]["inputs"]["in"]["size"] == 8
+
+
 def test_run_once_snapshot_exposes_every_port_value_by_page():
     client = TestClient(app)
     response = client.post("/api/run-once", json={

@@ -294,6 +294,7 @@ def run_once(graph: Graph, config: SimulationConfig) -> dict[str, Any]:
         "snr_db": config.snr_db_start,
         "elapsed_seconds": time.perf_counter() - started,
         "metrics": captured["metrics"],
+        "sink_metrics": _sink_metrics(captured["metrics"]),
         "port_previews": captured["port_previews"],
         "_port_values": captured["_port_values"],
         "warnings": validation.warnings + device_warnings,
@@ -323,6 +324,34 @@ def _merge_metrics(target: dict[str, float], source: dict[str, float]) -> None:
             target[key] = max(target.get(key, 0), value)
         else:
             target[key] = target.get(key, 0) + value
+
+
+def _sink_metrics(aggregate: dict[str, float]) -> dict[str, float]:
+    """Convert raw per-frame sink counters into presentation-ready metrics."""
+    sink_metrics: dict[str, float] = {}
+    if aggregate.get("power_count", 0):
+        sink_metrics["power_mean"] = aggregate.get("power_sum", 0) / aggregate["power_count"]
+    if aggregate.get("scope_count", 0):
+        sink_metrics["scope_mean_amplitude"] = aggregate.get("scope_sum", 0) / aggregate["scope_count"]
+        sink_metrics["scope_peak_amplitude"] = aggregate.get("scope_peak", 0)
+    if aggregate.get("constellation_count", 0):
+        count = aggregate["constellation_count"]
+        sink_metrics["constellation_mean_i"] = aggregate.get("constellation_i_sum", 0) / count
+        sink_metrics["constellation_mean_q"] = aggregate.get("constellation_q_sum", 0) / count
+        sink_metrics["constellation_mean_power"] = aggregate.get("constellation_power_sum", 0) / count
+    if aggregate.get("source_frame_count", 0):
+        frames = aggregate["source_frame_count"]
+        symbols = aggregate.get("source_symbol_count", 0)
+        sink_metrics["source_entropy"] = aggregate.get("source_entropy_sum", 0) / frames
+        sink_metrics["source_max_entropy"] = aggregate.get("source_max_entropy_sum", 0) / frames
+        sink_metrics["source_efficiency_percent"] = aggregate.get("source_efficiency_sum", 0) / frames
+        sink_metrics["source_average_information"] = aggregate.get("source_information_sum", 0) / symbols if symbols else 0
+        sink_metrics["source_alphabet_size"] = aggregate.get("source_alphabet_size_peak", 0)
+    if aggregate.get("total_symbols", 0):
+        sink_metrics["symbol_errors"] = aggregate.get("symbol_errors", 0)
+        sink_metrics["total_symbols"] = aggregate["total_symbols"]
+        sink_metrics["ser"] = aggregate.get("symbol_errors", 0) / aggregate["total_symbols"]
+    return sink_metrics
 
 
 def run_simulation(

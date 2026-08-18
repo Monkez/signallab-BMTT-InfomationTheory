@@ -14,6 +14,7 @@ import { initialEdges, initialNodes, pythonTemplate } from './sample'
 import type { BlockSpec, FlowEdge, FlowNode, Job, PortPreviewMap, SimulationConfig } from './types'
 import { BerChart } from './SinkChart'
 import { ResultsTable } from './ResultsTable'
+import { SinkResults } from './SinkResults'
 import { FlowMiniMapNode } from './components/FlowMiniMapNode'
 import { fallbackSpecs, iconFor, miniMapColor } from './features/blocks/catalog'
 import { PortDataInspector } from './features/blocks/PortDataInspector'
@@ -55,6 +56,7 @@ function App() {
   const [job, setJob] = useState<Job | null>(null)
   const [runOnceActive, setRunOnceActive] = useState(false)
   const [runOnceMetrics, setRunOnceMetrics] = useState<Record<string, number>>({})
+  const [runOnceSinkMetrics, setRunOnceSinkMetrics] = useState<Record<string, number>>({})
   const [snapshotId, setSnapshotId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [rightTab, setRightTab] = useState<'block' | 'run'>('run')
@@ -113,6 +115,7 @@ function App() {
   const clearDiagnostics = useCallback(() => {
     setSnapshotId(null)
     setRunOnceMetrics({})
+    setRunOnceSinkMetrics({})
     setNodes(items => items.map(node => node.data.portPreviews || node.data.runtimeError ? { ...node, data: { ...node.data, portPreviews: undefined, runtimeError: undefined } } : node))
   }, [setNodes])
   const applyNodeErrors = useCallback((errors: Record<string, string[]>) => {
@@ -258,13 +261,14 @@ function App() {
       applyPortPreviews(snapshot.port_previews)
       setSnapshotId(snapshot.snapshot_id)
       setRunOnceMetrics(snapshot.metrics)
+      setRunOnceSinkMetrics(snapshot.sink_metrics || {})
       appendLog('success', `Run once completed in ${(snapshot.elapsed_seconds * 1000).toFixed(1)} ms on ${snapshot.device.toUpperCase()} · hover any port to inspect data.`)
     } catch (e) { executionError(e) } finally { setRunOnceActive(false) }
   }
 
   const runBenchmark = async () => {
     if (configIssue) { setError(configIssue); return }
-    setError(''); setRightTab('run'); lastSnrRef.current = null; setRunOnceMetrics({})
+    setError(''); setRightTab('run'); lastSnrRef.current = null; setRunOnceMetrics({}); setRunOnceSinkMetrics({})
     clearDiagnostics()
     appendLog('info', `Starting Monte-Carlo benchmark ${config.snr_db_start}…${config.snr_db_stop} dB.`)
     try {
@@ -411,16 +415,19 @@ function App() {
   const grouped = useMemo(() => specs.filter(s => `${s.label} ${s.category}`.toLowerCase().includes(search.toLowerCase())).reduce<Record<string, BlockSpec[]>>((acc, spec) => ((acc[spec.category] ||= []).push(spec), acc), {}), [specs, search])
   const result = job?.result
   const livePoints = job?.status === 'running' ? (job.snr_points || []) : (result?.snr_points || job?.snr_points || [])
+  const activeSinkMetrics = result?.sink_metrics || runOnceSinkMetrics
+  const sinkNodes = nodes.filter(node => ['ber', 'power_meter', 'constellation', 'scope', 'source_analyzer', 'ser'].includes(node.data.blockType))
+  const hasSinkResults = sinkNodes.some(node => node.data.blockType !== 'ber') && Object.keys(activeSinkMetrics).length > 0
   const sourceFrames = runOnceMetrics.source_frame_count || 0
   const sourceSymbols = runOnceMetrics.source_symbol_count || 0
-  const sourceTheoryMetrics = result?.sink_metrics?.source_entropy !== undefined ? result.sink_metrics : sourceFrames ? {
+  const sourceTheoryMetrics = activeSinkMetrics.source_entropy !== undefined ? activeSinkMetrics : sourceFrames ? {
     source_entropy: runOnceMetrics.source_entropy_sum / sourceFrames,
     source_max_entropy: runOnceMetrics.source_max_entropy_sum / sourceFrames,
     source_efficiency_percent: runOnceMetrics.source_efficiency_sum / sourceFrames,
     source_average_information: sourceSymbols ? runOnceMetrics.source_information_sum / sourceSymbols : 0,
     source_alphabet_size: runOnceMetrics.source_alphabet_size_peak,
   } : undefined
-  const symbolMetrics = result?.sink_metrics?.ser !== undefined ? result.sink_metrics : runOnceMetrics.total_symbols ? {
+  const symbolMetrics = activeSinkMetrics.ser !== undefined ? activeSinkMetrics : runOnceMetrics.total_symbols ? {
     ser: runOnceMetrics.symbol_errors / runOnceMetrics.total_symbols,
     symbol_errors: runOnceMetrics.symbol_errors,
     total_symbols: runOnceMetrics.total_symbols,
@@ -493,9 +500,9 @@ function App() {
           <div className="section-rule"><span>CURRENT PORT DATA</span><em>representative frame</em></div>
           <PortDataInspector snapshotId={snapshotId} nodeId={selected.id} previews={selected.data.portPreviews} />
           {selected.data.blockType === 'ber' && livePoints.length ? <><div className="section-rule"><span>SINK PREVIEW</span></div><BerChart points={livePoints} live={job?.status === 'running'} /></> : null}
-          {result?.sink_metrics && selected.data.blockType === 'power_meter' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean power</span><strong>{result.sink_metrics.power_mean?.toExponential(3) ?? '—'}</strong></div></div></>}
-          {result?.sink_metrics && selected.data.blockType === 'scope' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean amplitude</span><strong>{result.sink_metrics.scope_mean_amplitude?.toFixed(4) ?? '—'}</strong></div><div><span>Peak</span><strong>{result.sink_metrics.scope_peak_amplitude?.toFixed(4) ?? '—'}</strong></div></div></>}
-          {result?.sink_metrics && selected.data.blockType === 'constellation' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean I / Q</span><strong>{`${result.sink_metrics.constellation_mean_i?.toFixed(3) ?? '—'} / ${result.sink_metrics.constellation_mean_q?.toFixed(3) ?? '—'}`}</strong></div><div><span>Mean |x|</span><strong>{result.sink_metrics.constellation_mean_power?.toFixed(4) ?? '—'}</strong></div></div></>}
+          {activeSinkMetrics.power_mean !== undefined && selected.data.blockType === 'power_meter' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean power</span><strong>{activeSinkMetrics.power_mean.toExponential(3)}</strong></div></div></>}
+          {activeSinkMetrics.scope_mean_amplitude !== undefined && selected.data.blockType === 'scope' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean amplitude</span><strong>{activeSinkMetrics.scope_mean_amplitude.toFixed(4)}</strong></div><div><span>Peak</span><strong>{activeSinkMetrics.scope_peak_amplitude?.toFixed(4) ?? '—'}</strong></div></div></>}
+          {activeSinkMetrics.constellation_mean_i !== undefined && selected.data.blockType === 'constellation' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean I / Q</span><strong>{`${activeSinkMetrics.constellation_mean_i.toFixed(3)} / ${activeSinkMetrics.constellation_mean_q.toFixed(3)}`}</strong></div><div><span>Mean |x|</span><strong>{activeSinkMetrics.constellation_mean_power?.toFixed(4) ?? '—'}</strong></div></div></>}
           {sourceTheoryMetrics && selected.data.blockType === 'source_analyzer' && <><div className="section-rule"><span>SOURCE THEORY RESULTS</span></div><div className="source-theory-result"><div><span>Entropy H(X)</span><strong>{sourceTheoryMetrics.source_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Average information</span><strong>{sourceTheoryMetrics.source_average_information?.toFixed(4)} bit/symbol</strong></div><div><span>Maximum entropy</span><strong>{sourceTheoryMetrics.source_max_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Source efficiency</span><strong>{sourceTheoryMetrics.source_efficiency_percent?.toFixed(2)}%</strong></div><div><span>Alphabet size</span><strong>{sourceTheoryMetrics.source_alphabet_size}</strong></div></div></>}
           {symbolMetrics && selected.data.blockType === 'ser' && <><div className="section-rule"><span>SYMBOL RESULT</span></div><div className="source-theory-result"><div><span>Symbol error rate</span><strong>{symbolMetrics.ser?.toExponential(3)}</strong></div><div><span>Symbol errors</span><strong>{symbolMetrics.symbol_errors} / {symbolMetrics.total_symbols}</strong></div></div></>}
           {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><div className="python-editor-inline-toolbar"><div><Braces size={14} /><span><b>process.py</b><small>Python 3 · UTF-8</small></span></div><button type="button" onClick={() => setPythonEditorOpen(true)}><Maximize2 size={14} /> Open editor</button></div><Suspense fallback={<div className="python-editor-loading">Loading Python editor…</div>}><PythonCodeEditor value={selected.data.code || pythonTemplate} onChange={updatePythonCode} /></Suspense><p className="code-hint">Read the current sweep point with <code>params["snr_db"]</code>. For flexible ports, declare <code>PORTS = {'{'}"inputs": ["signal", "noise"], "outputs": ["out", "residual"]{'}'}</code> and write <code>process(inputs, params)</code> returning a dictionary. <button type="button" onClick={openDocuments}>Read Python API</button></p></>}
@@ -514,11 +521,12 @@ function App() {
           <button className="run-wide" onClick={runBenchmark} disabled={executionActive || Boolean(configIssue)} title={configIssue || undefined}><Play size={16} fill="currentColor" /> {jobActive ? 'Benchmark running…' : 'Run Benchmark'}</button>
           {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} frames processed · {job.trials} max</span><span>{job.device || result?.device || 'preparing'}</span></div>{job.status === 'running' && <button className="cancel" onClick={() => cancelJob(job.id)}><CircleStop size={14} /> Cancel</button>}</div>}
           {error && <div className="error-box">{error}</div>}
-          {(result || livePoints.length > 0) && <div className="results" ref={resultsRef}>
+          {(result || livePoints.length > 0 || hasSinkResults) && <div className="results" ref={resultsRef}>
             <div className="section-rule"><span>{job?.status === 'running' ? 'LIVE RESULTS' : 'RESULTS'}</span></div>
             {result && <div className="overall-ber-card"><div><span>OVERALL BIT ERROR RATE</span><small>Aggregate across the complete experiment</small></div><strong>{result.ber === null ? '—' : result.ber.toExponential(3)}</strong></div>}
             <div className="ber-plot-section"><BerChart points={livePoints} live={job?.status === 'running'} /></div>
             <ResultsTable points={livePoints} />
+            <SinkResults nodes={sinkNodes} metrics={activeSinkMetrics} />
             {result && <><div className="metric-row"><div className="metric"><span>Bit errors</span><strong>{formatNumber(result.bit_errors)}</strong></div><div className="metric"><span>Total bits</span><strong>{formatNumber(result.total_bits)}</strong></div></div><div className="metric-row"><div className="metric"><span>Elapsed</span><strong>{result.elapsed_seconds.toFixed(2)} s</strong></div><div className="metric"><span>Throughput</span><strong>{formatNumber(result.throughput_bps / 1000)} kb/s</strong></div></div>{result.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}</>}
           </div>}
         </div>}

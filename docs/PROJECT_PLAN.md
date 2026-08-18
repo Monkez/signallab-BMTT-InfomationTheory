@@ -6,7 +6,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 
 ## 2. Phạm vi MVP
 
-- Canvas kéo-thả, nối cổng, phóng to/thu nhỏ, lưu/mở dự án JSON.
+- Canvas kéo-thả, nối cổng, phóng to/thu nhỏ, lưu/mở file mô phỏng `.slab.json`; Save ghi lại file hiện tại và hỗ trợ `Ctrl+S`.
 - Thư viện khối: nguồn bit, Hamming(7,4), BPSK, AWGN, giải điều chế, giải mã, BER và Python tùy biến.
 - Panel thuộc tính và trình soạn Python có mẫu NumPy.
 - Kiểm tra DAG, cổng kết nối và tham số trước khi chạy.

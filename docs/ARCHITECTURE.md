@@ -29,6 +29,7 @@ frontend/src/
   components/FlowMiniMapNode.tsx renderer MiniMap
   features/blocks/catalog.ts      catalog offline + icon/màu nhóm block
   features/experiment/config.ts   mặc định và phép tính SNR sweep
+  features/projects/projectFiles.ts Save/Open đa nền tảng và desktop bridge
   features/ber/
     BerPlot.tsx                   SVG plot dùng chung preview/report
     BerLegend.tsx                 legend dùng chung preview/report
@@ -50,6 +51,8 @@ Backend tách hợp đồng block khỏi thuật toán xử lý: `block_registry
 ## Bản desktop Windows
 
 PyWebView tạo cửa sổ native dùng WebView2. Một tiến trình Uvicorn nội bộ phục vụ cả API và frontend production trên loopback với port trống được chọn tự động. PyInstaller gom Python runtime, backend và `frontend/dist` vào thư mục phát hành onedir chứa `SignalLab.exe`. Onedir được chọn để khởi động nhanh và tránh mỗi worker Monte-Carlo phải giải nén lại toàn bộ onefile. Người dùng cuối không chạy Vite, Node.js hoặc hai terminal; Vite chỉ còn dành cho phát triển giao diện qua `run_dev.bat`.
+
+`DesktopProjectApi` là bridge nhỏ giữa React và hộp thoại file native. Open đọc UTF-8, Save As chọn đường dẫn, còn Save/`Ctrl+S` ghi lại đường dẫn đang liên kết. `project_files.py` ghi qua file tạm cùng thư mục rồi `os.replace`, tránh để lại file JSON dở dang nếu quá trình ghi lỗi. Bản web ưu tiên File System Access API và dùng download/upload làm fallback; logic lựa chọn nền tảng nằm riêng trong `features/projects/projectFiles.ts`.
 
 ## Mô hình thực thi
 
@@ -83,7 +86,7 @@ def process(signal, params):
 
 ## Định dạng dự án
 
-Project là JSON versioned chứa metadata, nodes, edges và cấu hình simulation. UI có thể xuất/nhập trực tiếp; backend dùng Pydantic để kiểm tra.
+Project là JSON versioned với định dạng `signallab-simulation`, chứa graph và toàn bộ cấu hình Experiment. File mặc định có đuôi `.slab.json`, nhưng vẫn mở được project `.json` cũ. UI theo dõi chữ ký chỉ của dữ liệu có thể lưu (không gồm preview/runtime error) để hiện trạng thái Unsaved chính xác.
 
 Mỗi node có `port_orientation` (`standard` hoặc `reversed`). Đây là thuộc tính trình bày của canvas: `standard` đặt input bên trái/output bên phải, còn `reversed` đặt input bên phải/output bên trái. Engine chỉ dùng id/handle nên kết quả mô phỏng không thay đổi.
 

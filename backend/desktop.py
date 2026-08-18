@@ -18,6 +18,49 @@ import webview
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.main import app
+from backend.app.project_files import read_project_text, write_project_text
+
+
+PROJECT_FILE_TYPES = (
+    "SignalLab simulation (*.json)",
+)
+
+
+class DesktopProjectApi:
+    def __init__(self) -> None:
+        self._current_path: Path | None = None
+        self._lock = threading.Lock()
+
+    def open_project(self) -> dict[str, object]:
+        selection = webview.windows[0].create_file_dialog(webview.FileDialog.OPEN, file_types=PROJECT_FILE_TYPES)
+        if not selection:
+            return {"cancelled": True}
+        path = Path(selection[0]).resolve()
+        content = read_project_text(path)
+        with self._lock:
+            self._current_path = path
+        return {"cancelled": False, "content": content, "name": path.name, "path": str(path)}
+
+    def save_project(self, content: str, save_as: bool = False, suggested_name: str = "untitled-simulation.slab.json") -> dict[str, object]:
+        with self._lock:
+            path = self._current_path
+        if save_as or path is None:
+            selection = webview.windows[0].create_file_dialog(
+                webview.FileDialog.SAVE,
+                save_filename=suggested_name,
+                file_types=PROJECT_FILE_TYPES,
+            )
+            if not selection:
+                return {"cancelled": True}
+            path = Path(selection[0]).resolve()
+        path = write_project_text(path, content)
+        with self._lock:
+            self._current_path = path
+        return {"cancelled": False, "name": path.name, "path": str(path), "direct": True}
+
+    def clear_project_path(self) -> None:
+        with self._lock:
+            self._current_path = None
 
 
 def resource_path(*parts: str) -> Path:
@@ -57,6 +100,7 @@ def run() -> None:
     server_thread.start()
     wait_until_ready(port)
 
+    project_api = DesktopProjectApi()
     webview.create_window(
         "SignalLab — Digital Communications Studio",
         f"http://127.0.0.1:{port}",
@@ -64,6 +108,7 @@ def run() -> None:
         height=900,
         min_size=(1100, 700),
         background_color="#f4f6f8",
+        js_api=project_api,
     )
     try:
         webview.start(gui="edgechromium", debug=False, private_mode=False)
@@ -75,4 +120,3 @@ def run() -> None:
 if __name__ == "__main__":
     multiprocessing.freeze_support()
     run()
-

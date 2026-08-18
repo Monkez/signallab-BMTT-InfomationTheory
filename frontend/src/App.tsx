@@ -5,23 +5,30 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
-  Activity, ArrowLeftRight, Box, Braces, CircleStop, Download,
-  Layers3, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Search, Terminal, Trash2, Upload, X,
+  Activity, ArrowLeftRight, Box, Braces, CircleStop, FolderOpen,
+  Layers3, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Save, SaveAll, Search, Terminal, Trash2, X,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
 import { cancelJob, createJob, getJob, graphPayload, GraphApiError, runGraphOnce } from './api'
 import { initialEdges, initialNodes, pythonTemplate } from './sample'
-import type { BlockSpec, FlowNode, Job, PortPreviewMap, SimulationConfig } from './types'
+import type { BlockSpec, FlowEdge, FlowNode, Job, PortPreviewMap, SimulationConfig } from './types'
 import { BerChart } from './SinkChart'
 import { ResultsTable } from './ResultsTable'
 import { FlowMiniMapNode } from './components/FlowMiniMapNode'
 import { fallbackSpecs, iconFor, miniMapColor } from './features/blocks/catalog'
 import { PortDataInspector } from './features/blocks/PortDataInspector'
 import { defaultSimulationConfig, snrPointCount, validateSimulationConfig } from './features/experiment/config'
+import {
+  attachBrowserProjectFile, clearProjectFileTarget, openProjectFile, projectDisplayName,
+  saveProjectFile, supportsProjectOpenDialog,
+} from './features/projects/projectFiles'
 
 const formatNumber = (n: number) => new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(n)
 type ConsoleLevel = 'info' | 'success' | 'warning' | 'error'
 type ConsoleEntry = { id: number; time: string; level: ConsoleLevel; message: string }
+
+const projectSignature = (nodes: FlowNode[], edges: FlowEdge[], config: SimulationConfig) =>
+  JSON.stringify({ graph: graphPayload(nodes, edges), config })
 
 function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initialNodes)
@@ -42,6 +49,9 @@ function App() {
   const [consoleOpen, setConsoleOpen] = useState(true)
   const [consoleHeight, setConsoleHeight] = useState(156)
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([])
+  const [projectName, setProjectName] = useState('Hamming BPSK over AWGN')
+  const [savedSignature, setSavedSignature] = useState(() => projectSignature(initialNodes, initialEdges, defaultSimulationConfig))
+  const [savingProject, setSavingProject] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
   const bootLoggedRef = useRef(false)
@@ -52,6 +62,8 @@ function App() {
   const selectedSpec = selected ? specs.find(spec => spec.type === selected.data.blockType) : undefined
   const jobActive = job?.status === 'queued' || job?.status === 'running'
   const executionActive = jobActive || runOnceActive
+  const currentSignature = useMemo(() => projectSignature(nodes, edges, config), [config, edges, nodes])
+  const projectDirty = currentSignature !== savedSignature
   const configIssue = validateSimulationConfig(config)
   const visibleParams = selected ? Object.entries(selected.data.params).filter(([key]) => {
     if (key === 'data_base64' || key === 'file_name') return false
@@ -212,28 +224,97 @@ function App() {
     } catch (e) { executionError(e) }
   }
 
-  const exportProject = () => {
-    const blob = new Blob([JSON.stringify({ graph: graphPayload(nodes, edges), config }, null, 2)], { type: 'application/json' })
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'signallab-project.json'; a.click(); URL.revokeObjectURL(a.href)
-  }
-  const importProject = async (file?: File) => {
-    if (!file) return
+  const projectDocument = useCallback(() => JSON.stringify({
+    format: 'signallab-simulation',
+    version: '1.0',
+    saved_at: new Date().toISOString(),
+    graph: graphPayload(nodes, edges),
+    config,
+  }, null, 2), [config, edges, nodes])
+
+  const applyProject = useCallback((content: string, filename: string) => {
     try {
-      const project = JSON.parse(await file.text())
+      const project = JSON.parse(content)
+      if (!project?.graph || !Array.isArray(project.graph.nodes) || !Array.isArray(project.graph.edges)) throw new Error('Missing graph data')
       const specMap = new Map(specs.map(s => [s.type, s]))
-      setNodes(project.graph.nodes.map((n: any) => ({
+      const importedNodes = project.graph.nodes.map((n: any) => ({
         id: n.id, type: 'signal', position: n.position,
         data: { label: n.label, blockType: n.type, category: specMap.get(n.type)?.category || '', params: n.params || {}, code: n.code, portOrientation: n.port_orientation || 'standard', inputs: specMap.get(n.type)?.inputs || ['in'], outputs: specMap.get(n.type)?.outputs || ['out'] },
-      })))
-      setEdges(project.graph.edges.map((e: any) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.source_handle, targetHandle: e.target_handle })))
-      if (project.config) {
-        const imported = project.config
-        const importedMaxFrames = imported.max_frames ?? imported.trials ?? defaultSimulationConfig.max_frames
-        setConfig({ ...defaultSimulationConfig, ...imported, trials: imported.trials ?? importedMaxFrames, max_frames: importedMaxFrames })
+      })) as FlowNode[]
+      const importedEdges = project.graph.edges.map((e: any) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.source_handle, targetHandle: e.target_handle }))
+      const imported = project.config || {}
+      const importedMaxFrames = imported.max_frames ?? imported.trials ?? defaultSimulationConfig.max_frames
+      const importedConfig = { ...defaultSimulationConfig, ...imported, trials: imported.trials ?? importedMaxFrames, max_frames: importedMaxFrames }
+      setNodes(importedNodes)
+      setEdges(importedEdges)
+      setConfig(importedConfig)
+      setSavedSignature(projectSignature(importedNodes, importedEdges, importedConfig))
+      setProjectName(projectDisplayName(filename))
+      setSelectedId(null); setJob(null); setSnapshotId(null); setError('')
+      appendLog('success', `${filename} opened · ${importedNodes.length} blocks and ${importedEdges.length} links.`)
+      return true
+    } catch {
+      setError('This SignalLab simulation file is not valid.')
+      appendLog('error', `Could not open ${filename}: invalid simulation file.`)
+      return false
+    }
+  }, [appendLog, setEdges, setNodes, specs])
+
+  const saveProject = useCallback(async (saveAs = false) => {
+    if (savingProject) return
+    setSavingProject(true)
+    try {
+      const result = await saveProjectFile(projectDocument(), projectName, saveAs)
+      if (!result) return
+      const filename = result.name || `${projectName}.slab.json`
+      setProjectName(projectDisplayName(filename))
+      setSavedSignature(currentSignature)
+      appendLog('success', `${filename} saved${result.direct === false ? ' as a download' : ''}.`)
+    } catch (cause) {
+      if ((cause as DOMException).name !== 'AbortError') {
+        const message = (cause as Error).message || 'Could not save the simulation file.'
+        setError(message); appendLog('error', message)
       }
-      setSelectedId(null); setError('')
-    } catch { setError('This project file is not valid JSON.') }
+    } finally { setSavingProject(false) }
+  }, [appendLog, currentSignature, projectDocument, projectName, savingProject])
+
+  const openProject = useCallback(async () => {
+    if (projectDirty && !window.confirm('Discard unsaved changes and open another simulation?')) return
+    try {
+      if (!supportsProjectOpenDialog()) { fileRef.current?.click(); return }
+      const opened = await openProjectFile()
+      if (opened?.content && !applyProject(opened.content, opened.name || 'simulation.slab.json')) await clearProjectFileTarget()
+    } catch (cause) {
+      if ((cause as DOMException).name !== 'AbortError') {
+        const message = (cause as Error).message || 'Could not open the simulation file.'
+        setError(message); appendLog('error', message)
+      }
+    }
+  }, [appendLog, applyProject, projectDirty])
+
+  const importProject = async (file?: File) => {
+    if (!file) return
+    const opened = await attachBrowserProjectFile(file)
+    applyProject(opened.content, opened.name)
   }
+
+  const resetSample = () => {
+    if (projectDirty && !window.confirm('Discard unsaved changes and reset the sample simulation?')) return
+    clearDiagnostics(); setNodes(initialNodes); setEdges(initialEdges); setSelectedId('channel'); setJob(null)
+    setProjectName('Hamming BPSK over AWGN'); setSavedSignature('')
+    void clearProjectFileTarget()
+    appendLog('info', 'Sample simulation restored. Save it to create a new project file.')
+  }
+
+  useEffect(() => {
+    const onSaveShortcut = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 's') return
+      event.preventDefault()
+      void saveProject(event.shiftKey)
+    }
+    window.addEventListener('keydown', onSaveShortcut)
+    return () => window.removeEventListener('keydown', onSaveShortcut)
+  }, [saveProject])
   const grouped = useMemo(() => specs.filter(s => `${s.label} ${s.category}`.toLowerCase().includes(search.toLowerCase())).reduce<Record<string, BlockSpec[]>>((acc, spec) => ((acc[spec.category] ||= []).push(spec), acc), {}), [specs, search])
   const result = job?.result
   const livePoints = job?.status === 'running' ? (job.snr_points || []) : (result?.snr_points || job?.snr_points || [])
@@ -242,15 +323,16 @@ function App() {
     <div className="app-shell" style={{ gridTemplateRows: `60px minmax(0, 1fr) ${consoleOpen ? consoleHeight : 0}px`, gridTemplateColumns: `${leftOpen ? leftWidth : 0}px minmax(0, 1fr) ${rightOpen ? rightWidth : 0}px` }}>
       <header className="topbar">
         <div className="brand"><div className="brand-mark"><img src="/app-icon.svg" alt="SignalLab logo" /></div><div><strong>SignalLab</strong><span>Communications Studio</span></div></div>
-        <div className="project-name"><span className="status-dot" /> <span>Hamming BPSK over AWGN</span></div>
+        <div className={`project-name ${projectDirty ? 'dirty' : ''}`} title={projectDirty ? 'Unsaved changes' : 'All changes saved'}><span className="status-dot" /><span>{projectName}</span>{projectDirty && <small>Unsaved</small>}</div>
         <div className="top-actions">
           <button className="ghost" onClick={() => setLeftOpen(value => !value)} title={leftOpen ? 'Hide block library' : 'Show block library'}><PanelLeft size={16} /></button>
           <button className="ghost" onClick={() => setRightOpen(value => !value)} title={rightOpen ? 'Hide inspector' : 'Show inspector'}><PanelRight size={16} /></button>
           <button className={`ghost ${consoleOpen ? 'active' : ''}`} onClick={() => setConsoleOpen(value => !value)} title={consoleOpen ? 'Hide console' : 'Show console'}><PanelBottom size={16} /></button>
-          <button className="ghost" onClick={() => { clearDiagnostics(); setNodes(initialNodes); setEdges(initialEdges); setSelectedId('channel') }} title="Reset sample"><RotateCcw size={16} /></button>
-          <button className="ghost labeled" onClick={() => fileRef.current?.click()}><Upload size={15} /> Import</button>
-          <input ref={fileRef} type="file" accept=".json" hidden onChange={e => importProject(e.target.files?.[0])} />
-          <button className="ghost labeled" onClick={exportProject}><Download size={15} /> Export</button>
+          <button className="ghost" onClick={resetSample} title="Reset sample"><RotateCcw size={16} /></button>
+          <button className="ghost labeled" onClick={() => void openProject()} title="Open a SignalLab simulation"><FolderOpen size={15} /> Open</button>
+          <input ref={fileRef} type="file" accept=".slab.json,.json,application/json" hidden onChange={e => { void importProject(e.target.files?.[0]); e.target.value = '' }} />
+          <button className="ghost labeled save-action" onClick={() => void saveProject(false)} disabled={savingProject} title="Save simulation (Ctrl+S)"><Save size={15} /> {savingProject ? 'Saving…' : 'Save'}</button>
+          <button className="ghost labeled" onClick={() => void saveProject(true)} disabled={savingProject} title="Save simulation as a new file (Ctrl+Shift+S)"><SaveAll size={15} /> Save As</button>
         </div>
       </header>
 

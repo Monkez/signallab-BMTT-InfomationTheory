@@ -68,7 +68,13 @@ Các tham số `length`, `repeat`, `weights`, SNR và `output_size` được ki�
 
 ## Lưu dự án
 
-Nút Export tải file `.json`; Import đọc lại file đó. Với Python Block, viết tự nhiên theo mẫu:
+- **Save** lưu toàn bộ sơ đồ, vị trí block, code Python, tham số block và cấu hình Experiment. Lần đầu lưu sẽ hỏi vị trí/tên file; các lần sau ghi lại đúng file đó.
+- Nhấn `Ctrl+S` để Save, hoặc `Ctrl+Shift+S` để **Save As** sang một file mới.
+- **Open** duyệt và mở file mô phỏng. SignalLab dùng đuôi `.slab.json` để dễ phân biệt, đồng thời vẫn mở được file project `.json` cũ.
+- Chấm vàng và nhãn **Unsaved** cạnh tên project báo có thay đổi chưa lưu. Khi Open hoặc Reset trong trạng thái này, ứng dụng yêu cầu xác nhận để tránh mất dữ liệu.
+- Bản desktop dùng hộp thoại file Windows và ghi file an toàn qua bản tạm; bản web dùng File System Access API nếu trình duyệt hỗ trợ, nếu không Save sẽ tải file xuống.
+
+Với Python Block, viết tự nhiên theo mẫu:
 
 ```python
 def process(signal, params):

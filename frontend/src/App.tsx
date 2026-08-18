@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import {
   ReactFlow, Background, Controls, MiniMap, addEdge, useNodesState, useEdgesState,
   BackgroundVariant, MarkerType, type Connection, type EdgeChange, type NodeMouseHandler, type OnNodeDrag,
@@ -75,12 +75,14 @@ function App() {
   const [samplesOpen, setSamplesOpen] = useState(false)
   const [pythonEditorOpen, setPythonEditorOpen] = useState(false)
   const [experimentSettingsOpen, setExperimentSettingsOpen] = useState(true)
+  const [fitRequest, setFitRequest] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
   const bootLoggedRef = useRef(false)
   const lastSnrRef = useRef<number | null>(null)
   const consoleResizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
   const resizeRef = useRef<{ side: 'left' | 'right'; startX: number; startWidth: number } | null>(null)
+  const flowInstanceRef = useRef<{ fitView: (options?: Record<string, unknown>) => void; screenToFlowPosition: (position: { x: number; y: number }) => { x: number; y: number } } | null>(null)
   const selected = nodes.find(n => n.id === selectedId)
   const selectedSpec = selected ? specs.find(spec => spec.type === selected.data.blockType) : undefined
   const jobActive = job?.status === 'queued' || job?.status === 'running'
@@ -90,6 +92,11 @@ function App() {
   const configIssue = validateSimulationConfig(config)
   const selectedIsStochasticChannel = selected ? ['awgn', 'rayleigh'].includes(selected.data.blockType) : false
   const selectedIsFileSource = selected ? ['text_file_source', 'text_file_symbol_source', 'image_file_source'].includes(selected.data.blockType) : false
+  useEffect(() => {
+    if (!fitRequest || !flowInstanceRef.current) return
+    const frame = window.requestAnimationFrame(() => flowInstanceRef.current?.fitView({ padding: 0.18, duration: 320 }))
+    return () => window.cancelAnimationFrame(frame)
+  }, [fitRequest])
   const visibleParams = selected ? Object.entries(selected.data.params).filter(([key]) => {
     if (key === 'data_base64' || key === 'file_name') return false
     if (selected.data.blockType === 'variables' && key === 'definitions') return false
@@ -243,7 +250,7 @@ function App() {
     window.addEventListener('pointerup', stop)
   }
 
-  const addBlock = (spec: BlockSpec) => {
+  const addBlock = (spec: BlockSpec, position?: { x: number; y: number }) => {
     if (spec.type === 'variables' && nodes.some(node => node.data.blockType === 'variables')) {
       const existing = nodes.find(node => node.data.blockType === 'variables')!
       setSelectedId(existing.id); setRightTab('block')
@@ -253,10 +260,29 @@ function App() {
     clearDiagnostics()
     const id = `${spec.type}-${Date.now()}`
     const node: FlowNode = {
-      id, type: 'signal', position: { x: 300 + Math.random() * 300, y: 140 + Math.random() * 300 },
+      id, type: 'signal', position: position || { x: 300 + Math.random() * 300, y: 140 + Math.random() * 300 },
       data: { label: spec.label, blockType: spec.type, category: spec.category, params: { ...spec.defaults }, inputs: spec.inputs, outputs: spec.outputs, portOrientation: 'standard', code: spec.type === 'python' ? pythonTemplate : undefined },
     }
     setNodes(ns => [...ns, node]); setSelectedId(id); setRightTab('block')
+  }
+
+  const onLibraryDragStart = (event: DragEvent<HTMLButtonElement>, spec: BlockSpec) => {
+    event.dataTransfer.setData('application/signallab-block', spec.type)
+    event.dataTransfer.effectAllowed = 'move'
+  }
+
+  const onCanvasDrop = (event: DragEvent) => {
+    event.preventDefault()
+    const type = event.dataTransfer.getData('application/signallab-block')
+    const spec = specs.find(item => item.type === type)
+    if (!spec || !flowInstanceRef.current) return
+    addBlock(spec, flowInstanceRef.current.screenToFlowPosition({ x: event.clientX, y: event.clientY }))
+  }
+
+  const onCanvasDragOver = (event: DragEvent) => {
+    if (!event.dataTransfer.types.includes('application/signallab-block')) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
   }
 
   const runOnce = async () => {
@@ -314,6 +340,7 @@ function App() {
       const importedConfig = { ...defaultSimulationConfig, ...imported, mode: imported.mode === 'ber_benchmark' ? 'ber_benchmark' : 'specific_steps', snr_db_points: Array.isArray(imported.snr_db_points) && imported.snr_db_points.length ? imported.snr_db_points : [0], trials: imported.trials ?? importedMaxFrames, max_frames: importedMaxFrames }
       setNodes(importedNodes)
       setEdges(importedEdges)
+      setFitRequest(value => value + 1)
       setConfig(importedConfig)
       setSavedSignature(projectSignature(importedNodes, importedEdges, importedConfig))
       setProjectName(projectDisplayName(filename))
@@ -385,7 +412,7 @@ function App() {
 
   const resetSample = () => {
     if (projectDirty && !window.confirm('Discard unsaved changes and reset the sample simulation?')) return
-    clearDiagnostics(); setNodes(initialNodes); setEdges(initialEdges); setSelectedId('channel'); setJob(null)
+    clearDiagnostics(); setNodes(initialNodes); setEdges(initialEdges); setFitRequest(value => value + 1); setSelectedId('channel'); setJob(null)
     setProjectName('Hamming BPSK over AWGN'); setSavedSignature('')
     void clearProjectFileTarget()
     appendLog('info', 'Sample simulation restored. Save it to create a new project file.')
@@ -397,6 +424,7 @@ function App() {
     clearDiagnostics()
     setNodes(materialized.nodes)
     setEdges(materialized.edges)
+    setFitRequest(value => value + 1)
     setConfig(materialized.config)
     setSelectedId(null)
     setJob(null)
@@ -481,14 +509,14 @@ function App() {
         <div className="panel-title"><Layers3 size={16} /><span>Block library</span><small>{specs.length} blocks</small></div>
         <div className="search"><Search size={15} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search blocks…" /></div>
         <div className="library-list">
-          {Object.entries(grouped).map(([category, blocks]) => <section key={category}><h4>{category}</h4>{blocks.map(spec => { const Icon = iconFor(spec.type); return <button className="block-item" key={spec.type} onClick={() => addBlock(spec)}><span className="block-icon"><Icon size={16} /></span><span><b>{spec.label}</b><small>{spec.description}</small></span><Plus size={14} /></button> })}</section>)}
+          {Object.entries(grouped).map(([category, blocks]) => <section key={category}><h4>{category}</h4>{blocks.map(spec => { const Icon = iconFor(spec.type); return <button className="block-item" key={spec.type} draggable onDragStart={event => onLibraryDragStart(event, spec)} onClick={() => addBlock(spec)}><span className="block-icon"><Icon size={16} /></span><span><b>{spec.label}</b><small>{spec.description}</small></span><Plus size={14} /></button> })}</section>)}
         </div>
         {leftOpen && <div className="sidebar-resizer left-resizer" onPointerDown={event => startResize('left', event)} title="Resize block library" />}
       </aside>
 
       <main className="canvas-wrap">
         <div className="canvas-label"><span>FLOWGRAPH</span><span>{nodes.length} blocks · {edges.length} links</span></div>
-        <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running' }))} nodeTypes={{ signal: SignalNode }} onNodesChange={onNodesChange} onEdgesChange={onEdgesChangeWithPreview} onConnect={onConnect} onNodeClick={onNodeClick} onNodeDragStart={onNodeDragStart} onPaneClick={() => setSelectedId(null)} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
+        <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running' }))} nodeTypes={{ signal: SignalNode }} onInit={instance => { flowInstanceRef.current = instance; window.requestAnimationFrame(() => instance.fitView({ padding: 0.18, duration: 320 })) }} onDrop={onCanvasDrop} onDragOver={onCanvasDragOver} onNodesChange={onNodesChange} onEdgesChange={onEdgesChangeWithPreview} onConnect={onConnect} onNodeClick={onNodeClick} onNodeDragStart={onNodeDragStart} onPaneClick={() => setSelectedId(null)} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
           <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#ccd3dc" />
           <Controls position="bottom-left" />
           <MiniMap position="bottom-right" pannable zoomable offsetScale={4} nodeColor={node => miniMapColor(String((node.data as Record<string, unknown>)?.blockType || ''))} nodeStrokeColor="#ffffff" nodeStrokeWidth={1} nodeBorderRadius={3} nodeComponent={FlowMiniMapNode} bgColor="#f9fbfd" maskColor="rgba(226,233,242,.62)" maskStrokeColor="#8ea8ca" maskStrokeWidth={1} style={{ width: 150, height: 92, border: '1px solid #cbd6e3', borderRadius: 8, boxShadow: '0 3px 12px rgba(36,55,78,.14)' }} />

@@ -131,7 +131,8 @@ button { color: inherit; border: 0; cursor: pointer; }
 .search input::placeholder { color: #929baa; }
 .library-list { min-height: 0; overflow-y: auto; padding: 0 10px 16px; }
 .library-list section h4 { margin: 15px 7px 7px; font-size: 9px; color: #7b8796; text-transform: uppercase; letter-spacing: .1em; }
-.block-item { width: 100%; min-height: 49px; padding: 7px; display: grid; grid-template-columns: 32px 1fr 16px; align-items: center; gap: 8px; text-align: left; background: transparent; border-radius: 6px; border: 1px solid transparent; }
+.block-item { width: 100%; min-height: 49px; padding: 7px; display: grid; grid-template-columns: 32px 1fr 16px; align-items: center; gap: 8px; text-align: left; background: transparent; border-radius: 6px; border: 1px solid transparent; cursor: grab; }
+.block-item:active { cursor: grabbing; }
 .block-item:hover { background: #f5f7fa; border-color: var(--line); }
 .block-icon { width: 31px; height: 31px; display: grid; place-items: center; color: #344155; background: #eef1f4; border-radius: 6px; }
 .block-item b { display: block; font-size: 10px; font-weight: 600; }

@@ -16,6 +16,21 @@ Ghép hai bit liên tiếp thành nhánh I và Q theo ánh xạ `(1-2bI) + j(1-2
 
 Quyết định cứng dấu phần thực/ảo và trả bit xen kẽ I/Q đúng thứ tự của modulator.
 
+## OOK
+
+- `sl.modulation.ook_modulate(bits, amplitude=1.0)` ánh xạ `0 → 0`, `1 → amplitude`.
+- `sl.modulation.ook_demodulate(symbols, threshold=0.5)` quyết định cứng theo phần thực tại ngưỡng cấu hình.
+
+## 8-PSK Gray
+
+- `sl.modulation.psk8_modulate(bits)` ghép ba bit thành một trong tám pha trên đường tròn đơn vị. Số bit phải chia hết cho 3.
+- `sl.modulation.psk8_demodulate(symbols)` chọn pha gần nhất và khôi phục ba bit Gray trên mỗi symbol.
+
+## 16-QAM Gray
+
+- `sl.modulation.qam16_modulate(bits, normalize=True)` ghép bốn bit thành symbol vuông I/Q; mặc định chia `sqrt(10)` để năng lượng symbol trung bình bằng 1 với dữ liệu đều.
+- `sl.modulation.qam16_demodulate(symbols, normalized=True)` quyết định cứng theo các biên `-2, 0, +2` trong constellation chưa chuẩn hóa và trả bốn bit trên mỗi symbol.
+
 ## `sl.channels.awgn(signal, snr_db, seed=-1, measured=True)`
 
 Thêm nhiễu Gaussian trắng thực hoặc phức. Khi `measured=True`, công suất tín hiệu được đo trên chính frame input; khi `False`, hàm giả định công suất tín hiệu bằng 1.

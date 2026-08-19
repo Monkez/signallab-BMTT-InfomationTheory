@@ -395,6 +395,30 @@ def qpsk_mod(inputs, params, context):
     return {"out": symbols.astype(context.xp.complex64) / context.xp.sqrt(2.0)}
 
 
+def ook_mod(inputs, params, context):
+    bits = context.xp.asarray(inputs["in"], dtype=context.xp.float32).reshape(-1)
+    return {"out": bits}
+
+
+def psk8_mod(inputs, params, context):
+    xp = context.xp
+    bits = xp.asarray(inputs["in"], dtype=xp.int8).reshape(-1, 3)
+    gray = (bits[:, 0].astype(xp.int16) << 2) | (bits[:, 1].astype(xp.int16) << 1) | bits[:, 2].astype(xp.int16)
+    phase_index = gray ^ (gray >> 1) ^ (gray >> 2)
+    phase = (2.0 * xp.pi / 8.0) * phase_index
+    return {"out": xp.exp(1j * phase).astype(xp.complex64)}
+
+
+def qam16_mod(inputs, params, context):
+    xp = context.xp
+    bits = xp.asarray(inputs["in"], dtype=xp.int8).reshape(-1, 4)
+    levels = xp.asarray([-3.0, -1.0, 3.0, 1.0], dtype=xp.float32)
+    i_index = (bits[:, 0].astype(xp.int16) << 1) | bits[:, 1].astype(xp.int16)
+    q_index = (bits[:, 2].astype(xp.int16) << 1) | bits[:, 3].astype(xp.int16)
+    symbols = levels[i_index] + 1j * levels[q_index]
+    return {"out": symbols.astype(xp.complex64) / xp.sqrt(10.0)}
+
+
 def awgn(inputs, params, context):
     samples = context.xp.asarray(inputs["in"])
     # Legacy projects without snr_mode keep their fixed Eb/N0 behavior.
@@ -432,6 +456,36 @@ def qpsk_demod(inputs, params, context):
     bits = context.xp.empty(samples.size * 2, dtype=context.xp.int8)
     bits[0::2] = (context.xp.real(samples) < 0).astype(context.xp.int8)
     bits[1::2] = (context.xp.imag(samples) < 0).astype(context.xp.int8)
+    return {"out": bits}
+
+
+def ook_demod(inputs, params, context):
+    samples = context.xp.real(context.xp.asarray(inputs["in"]).reshape(-1))
+    return {"out": (samples >= 0.5).astype(context.xp.int8)}
+
+
+def psk8_demod(inputs, params, context):
+    xp = context.xp
+    samples = xp.asarray(inputs["in"]).reshape(-1)
+    phase_index = xp.rint(xp.mod(xp.angle(samples), 2.0 * xp.pi) * (8.0 / (2.0 * xp.pi))).astype(xp.int16) % 8
+    gray = phase_index ^ (phase_index >> 1)
+    bits = xp.empty(samples.size * 3, dtype=xp.int8)
+    bits[0::3] = (gray >> 2) & 1
+    bits[1::3] = (gray >> 1) & 1
+    bits[2::3] = gray & 1
+    return {"out": bits}
+
+
+def qam16_demod(inputs, params, context):
+    xp = context.xp
+    samples = xp.asarray(inputs["in"]).reshape(-1) * xp.sqrt(10.0)
+    i_values = xp.real(samples)
+    q_values = xp.imag(samples)
+    bits = xp.empty(samples.size * 4, dtype=xp.int8)
+    bits[0::4] = (i_values > 0).astype(xp.int8)
+    bits[1::4] = (xp.abs(i_values) < 2.0).astype(xp.int8)
+    bits[2::4] = (q_values > 0).astype(xp.int8)
+    bits[3::4] = (xp.abs(q_values) < 2.0).astype(xp.int8)
     return {"out": bits}
 
 
@@ -621,10 +675,16 @@ PROCESSORS: dict[str, Callable] = {
     "repetition3_decode": repetition3_decode,
     "bpsk_mod": bpsk_mod,
     "qpsk_mod": qpsk_mod,
+    "ook_mod": ook_mod,
+    "psk8_mod": psk8_mod,
+    "qam16_mod": qam16_mod,
     "awgn": awgn,
     "rayleigh": rayleigh,
     "bpsk_demod": bpsk_demod,
     "qpsk_demod": qpsk_demod,
+    "ook_demod": ook_demod,
+    "psk8_demod": psk8_demod,
+    "qam16_demod": qam16_demod,
     "hamming74_decode": hamming74_decode,
     "scope": scope,
     "constellation": constellation,

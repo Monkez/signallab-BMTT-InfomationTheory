@@ -269,10 +269,16 @@ def test_static_validation_marks_duplicate_input_connection():
     ("repetition3_decode", np.zeros(12, dtype=np.int8), 4),
     ("bpsk_mod", np.zeros(8, dtype=np.int8), 8),
     ("qpsk_mod", np.zeros(8, dtype=np.int8), 4),
+    ("ook_mod", np.zeros(8, dtype=np.int8), 8),
+    ("psk8_mod", np.zeros(12, dtype=np.int8), 4),
+    ("qam16_mod", np.zeros(16, dtype=np.int8), 4),
     ("awgn", np.ones(8, dtype=np.float32), 8),
     ("rayleigh", np.ones(8, dtype=np.float32), 8),
     ("bpsk_demod", np.ones(8, dtype=np.float32), 8),
     ("qpsk_demod", np.ones(4, dtype=np.complex64), 8),
+    ("ook_demod", np.ones(8, dtype=np.float32), 8),
+    ("psk8_demod", np.ones(4, dtype=np.complex64), 12),
+    ("qam16_demod", np.ones(4, dtype=np.complex64), 16),
 ])
 def test_builtin_signal_processors_obey_declared_size_contract(block_type, signal, expected_size):
     context = make_context(np, np.random.default_rng(7), 0, 7, "cpu", 4.0)
@@ -281,6 +287,18 @@ def test_builtin_signal_processors_obey_declared_size_contract(block_type, signa
     outputs = PROCESSORS[block_type](inputs, {}, context)
     validate_outputs(block_type, inputs, outputs, SPEC_BY_TYPE[block_type].outputs, {})
     assert outputs["out"].size == expected_size
+
+
+@pytest.mark.parametrize(("modulator", "demodulator", "bits"), [
+    ("ook_mod", "ook_demod", np.asarray([0, 1, 1, 0, 1, 0], dtype=np.int8)),
+    ("psk8_mod", "psk8_demod", np.asarray(list(np.ndindex((2, 2, 2))), dtype=np.int8).reshape(-1)),
+    ("qam16_mod", "qam16_demod", np.asarray(list(np.ndindex((2, 2, 2, 2))), dtype=np.int8).reshape(-1)),
+])
+def test_additional_modulation_blocks_round_trip_without_noise(modulator, demodulator, bits):
+    context = make_context(np, np.random.default_rng(7), 0, 7, "cpu", 20.0)
+    symbols = PROCESSORS[modulator]({"in": bits}, {}, context)["out"]
+    recovered = PROCESSORS[demodulator]({"in": symbols}, {}, context)["out"]
+    assert np.array_equal(recovered, bits)
 
 
 def test_cycle_is_rejected():

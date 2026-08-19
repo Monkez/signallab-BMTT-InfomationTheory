@@ -56,13 +56,13 @@ Hai bài Python minh họa đúng mô hình lập trình của SignalLab: ngư�
 ## Thao tác canvas
 
 - Click block để chọn và sửa trong panel **Block**.
-- Nhấn `Delete` để xóa block đang chọn cùng các đường nối của block đó.
-- Khi đang nhập trong ô text hoặc Python editor, `Delete` chỉ sửa nội dung đang nhập và không xóa block.
+- Bấm trực tiếp vào một đường nối để chọn; line được tô xanh. Nhấn `Delete` hoặc `Backspace` để xóa riêng đường nối đó. Chọn block rồi nhấn `Delete`/`Backspace` để xóa block cùng các đường nối liên quan.
+- Khi đang nhập trong ô text hoặc Python editor, `Delete`/`Backspace` chỉ sửa nội dung đang nhập và không xóa phần tử canvas.
 - Dùng các nút zoom ở góc dưới canvas nếu sơ đồ lớn.
 - MiniMap ở góc dưới phải được thu gọn để tiết kiệm diện tích; màu node thể hiện nhóm Sources/Source coding/Modulation/Channels/Sinks, có thể pan/zoom để xem nhanh toàn bộ graph.
 - Trong panel **Block**, dùng **Port layout** để đổi giữa `Input left · Output right` và `Input right · Output left`. Cấu hình được lưu cùng file Export.
 - Sau khi đổi layout, các đường nối hiện tại tự động được đo lại và bám theo handle mới.
-- **Run once** hữu ích để kiểm tra nhanh luồng dữ liệu trước khi benchmark. Sau **Run once** hoặc **Run Benchmark**, hover hay focus bằng bàn phím vào từng port để xem bản tóm tắt dữ liệu mới nhất. Trong tab **Block**, mục **Current port data** liệt kê đầy đủ mọi input/output của block đang chọn, gồm dtype, shape, tổng số phần tử và từng giá trị kèm chỉ số. Dùng nút Previous/Next để duyệt hết mảng theo trang hoặc **Copy all** để sao chép toàn bộ port. Khi sửa graph/tham số, snapshot cũ tự bị xóa để tránh hiểu nhầm.
+- **Run once** hữu ích để kiểm tra nhanh luồng dữ liệu trước khi benchmark. Sau **Run once** hoặc **Run Benchmark**, hover hay focus bằng bàn phím vào từng port để xem bản tóm tắt dữ liệu mới nhất. Trong tab **Block**, mục **Current port data** liệt kê đầy đủ mọi input/output của block đang chọn, gồm dtype, shape, tổng số phần tử và từng giá trị kèm chỉ số. Dùng nút Previous/Next để duyệt hết mảng theo trang hoặc **Copy all** để sao chép toàn bộ port. Khi đang kéo một đường nối, tooltip và Current port data tạm ẩn để không che các handle; thả chuột xong chúng tự hiện lại. Khi sửa graph/tham số, snapshot cũ tự bị xóa để tránh hiểu nhầm.
 - Mỗi block có ô **Signal size contract** trong inspector. Nếu tham số, input hoặc output vi phạm hợp đồng, quá trình dừng tại đúng block đó: node có viền đỏ và badge **Contract error**, còn Console ghi tên block, kích thước mong đợi và kích thước thực tế. Sửa graph/tham số sẽ xóa trạng thái lỗi cũ để có thể kiểm tra lại.
 - Dùng các nút panel trên thanh trên để ẩn/hiện **Block library**, **Inspector** hoặc **Console**. Kéo mép sidebar/console để đổi kích thước. Console giữ nguyên trạng thái ẩn/hiện khi chạy mô phỏng.
 
@@ -76,13 +76,13 @@ Hai bài Python minh họa đúng mô hình lập trình của SignalLab: ngư�
 - Random Bits, AWGN và Rayleigh có thêm `seed` riêng ở tab **Block**. Giá trị mặc định `-1` sinh dữ liệu/nhiễu mới ở mỗi lần Run once hoặc Run Benchmark. Đặt số nguyên từ `0` đến `4294967295` để tái lập kết quả; runtime vẫn tự tạo stream khác nhau cho từng block và từng frame.
 - Muốn benchmark tái lập hoàn toàn, đặt seed cụ thể cho tất cả block ngẫu nhiên và giữ nguyên Seed trong Experiment. Chỉ cần một block còn `-1` thì lần chạy sau có thể cho chuỗi mẫu/BER khác.
 - `Auto`: chọn GPU nếu có và phù hợp, nếu không dùng CPU.
-- Trong thư viện block, **Variables** và **Python Block** được đặt ở đầu để truy cập nhanh. Ở tab Experiment, bấm **Experiment parameters** để thu gọn/mở các tham số; **Run once** và **Run Benchmark** luôn nằm riêng ở đầu panel.
+- Trong thư viện block, **Variables** và **Python Block** được đặt ở đầu để truy cập nhanh. Ở tab Experiment, bấm **Experiment parameters** để thu gọn/mở các tham số; **Run once** và **Run Benchmark** nằm trong dock cố định ở đáy inspector, luôn truy cập được khi phần cấu hình/kết quả phía trên cuộn.
 - Sau khi chạy, chọn từng sink trên canvas để xem kết quả ngay trong tab **Block**. Constellation Sink hiển thị đồ thị I/Q với đầy đủ trục, vạch chia và nhãn I/Q. Trong **Details → Edit & Data**, có thể đặt giới hạn đối xứng `I limit (±)` và `Q limit (±)`; các giới hạn này được lưu cùng reference JSON. Tab **Experiment** chỉ tổng hợp lại các sink results này.
 - Với tín hiệu phức như QPSK, AWGN tạo nhiễu độc lập trên cả hai thành phần I và Q. Vì vậy constellation đúng sẽ tạo bốn cụm quanh bốn điểm lý tưởng (+I,+Q), (+I,-Q), (-I,+Q), (-I,-Q), sau đó lan rộng theo mức nhiễu.
 - **Run Benchmark** là nút chạy thí nghiệm theo mode hiện tại. Sau khi hoàn tất, port preview đại diện được lấy từ một frame xác định tại SNR đầu tiên; dữ liệu đầy đủ của mọi frame không được gửi lên UI nên app vẫn nhẹ với mô phỏng lớn.
 - Reference BER được lưu theo tên trong trình duyệt; khi Browse/load một đường có cùng tên, đường cũ được thay thế để legend không xuất hiện các curve trùng tên.
 - Trên biểu đồ BER, chọn **Copy** để copy ảnh PNG hoặc **PNG** để tải ảnh. Bảng **Results by SNR** hỗ trợ **Copy** (TSV), **CSV** và **PNG**, thuận tiện đưa vào báo cáo.
-- Thư viện có thêm Text Source, Text File Source, Image File Source, Differential Encoder/Decoder, Huffman, Shannon-Fano, Run-Length, ZIP/DEFLATE, Repetition-3, QPSK, Rayleigh Fading, Signal Scope, Constellation Sink và Power Meter. File Source cho phép chọn file trực tiếp trong panel Block; dữ liệu được lưu trong project dưới dạng base64 để chạy được cả desktop và dev server.
+- Thư viện có thêm Text Source, Text File Source, Image File Source, Differential Encoder/Decoder, Huffman, Shannon-Fano, Run-Length, ZIP/DEFLATE, Repetition-3, QPSK, **OOK, 8-PSK Gray, 16-QAM Gray**, Rayleigh Fading, Signal Scope, Constellation Sink và Power Meter. File Source cho phép chọn file trực tiếp trong panel Block; dữ liệu được lưu trong project dưới dạng base64 để chạy được cả desktop và dev server.
 - Các codec nguồn kinh điển làm việc trên stream bit: Encoder có cổng `reference` để nối vào BER, Decoder dùng cùng tham số codebook/codec để khôi phục stream. Huffman và Shannon-Fano dùng nhóm symbol 2-bit với trọng số có thể chỉnh; RLE dùng cặp count/value; ZIP dùng DEFLATE chuẩn.
 
 ## Thực hành lý thuyết nguồn với text
@@ -105,7 +105,10 @@ Mọi port phải mang mảng một chiều, không rỗng. Runtime không còn 
 - Hamming (7,4): encoder dùng dạng hệ thống quen thuộc trong giáo trình `c = [d1 d2 d3 d4 p1 p2 p3]`, yêu cầu input chia hết cho 4 và tạo `7/4` số phần tử. Decoder yêu cầu input chia hết cho 7, sửa tối đa một bit lỗi trong mỗi codeword rồi trả về bốn bit dữ liệu đầu tiên.
 - Repetition-3: encoder tạo kích thước gấp 3; decoder yêu cầu input chia hết cho 3.
 - QPSK: modulator yêu cầu số bit chẵn và tạo một symbol trên hai bit; demodulator khôi phục hai bit trên một symbol.
-- Differential, BPSK, AWGN và Rayleigh phải bảo toàn chính xác kích thước input/output.
+- OOK: mỗi bit tạo một biên độ `0` hoặc `1`; demodulator quyết định cứng tại ngưỡng `0.5`, nên kích thước được bảo toàn.
+- 8-PSK Gray: input chia hết cho 3, mỗi ba bit tạo một symbol pha phức; demodulator trả ba bit trên mỗi symbol.
+- 16-QAM Gray: input chia hết cho 4, mỗi bốn bit tạo một symbol I/Q được chuẩn hóa theo `sqrt(10)`; demodulator trả bốn bit trên mỗi symbol.
+- Differential, BPSK, OOK, AWGN và Rayleigh phải bảo toàn chính xác kích thước input/output.
 - Huffman, Shannon-Fano, RLE và ZIP kiểm tra output decoder theo header/count trong stream; dữ liệu lỗi hoặc thiếu không được âm thầm chấp nhận.
 - BER Meter yêu cầu `reference` và `estimate` có kích thước hoàn toàn bằng nhau.
 - Python Block mặc định `output_size = same`. Chỉ đặt một số nguyên dương hoặc `any` khi block được chủ ý thiết kế để thay đổi kích thước.

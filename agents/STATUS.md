@@ -1,6 +1,6 @@
 # Trạng thái dự án
 
-- Ngày cập nhật: 2026-08-18
+- Ngày cập nhật: 2026-08-19
 - Giai đoạn: bản desktop Windows hoàn tất và đã kiểm thử
 - Kiến trúc: React/TypeScript + React Flow, FastAPI/Python, NumPy/CuPy tùy chọn.
 - Đã hoàn thành: đặc tả, engine DAG, Monte-Carlo CPU/GPU tùy chọn, REST jobs, canvas React Flow, editor Python, dashboard và script Windows.
@@ -78,6 +78,8 @@
 - Xác minh Open Samples: backend 54/54 pass; frontend production build pass; browser UI hiển thị 9 bài, search `BSC` còn đúng 1 bài, mở Python BSC thành graph 3 block/3 link ở trạng thái Unsaved và Run once hoàn tất trên CPU không có console error.
 - Bản desktop Open Samples đã build tại `dist\SignalLab\SignalLab.exe`; smoke test 5 giây xác nhận tiến trình khởi động và duy trì ổn định.
 - Python Block đã thay textarea bằng CodeMirror 6 Python IDE editor: line number, syntax color, fold gutter, active line, bracket matching, auto-close, autocomplete và Tab=4 spaces. Tab Block có editor inline và nút **Open editor** mở modal lớn với draft Apply/Cancel, Copy, Reset, API docs, status bar và `Ctrl+S`/`Ctrl+Enter` để Apply.
+- Hoàn tất UX canvas/sidebar 2026-08-19: click đường nối để chọn/highlight và xóa riêng bằng Delete/Backspace; trong lúc kéo nối, tooltip port và Current port data tạm ẩn; Run once/Run Benchmark nằm trong dock cố định ở đáy inspector. Browser QA xác nhận line giảm 7→6 sau Delete, dock không dịch chuyển khi cuộn và không có console warning/error.
+- Bổ sung 6 block OOK, 8-PSK Gray, 16-QAM Gray Modulator/Demodulator, contract tỷ lệ bit/symbol và API tương ứng trong `signallab.modulation`. Backend 73/73 test pass; frontend production build pass.
 - CodeMirror/Python grammar được lazy-load thành chunk riêng để workspace ban đầu giữ bundle gần như cũ. Browser QA xác nhận 10 line number, syntax rendering, modal lớn, trạng thái Modified, Apply cập nhật lại inline editor và không có browser console warning/error.
 - Xác minh cuối: backend 54/54 pass, frontend production build pass. EXE chuẩn đang bị Windows khóa nên `build_app.bat` tạo bản mới tại `dist-update\SignalLab\SignalLab.exe`; `run.bat --print-path` chọn đúng bản update và smoke test 5 giây thành công.
 - Hoàn tất Variables/Experiment params: Python Block nhận `snr_db`, `trial_index`, `frame_seed`, `device`, `experiment` theo từng frame; Variables block dùng AST literal an toàn, không cổng, tối đa một block và phát globals trực tiếp cùng namespace `params["variables"]`. Inspector có editor/preview chuyên biệt; docs Python ghi rõ precedence và ví dụ. Backend 57/57 pass, frontend production build pass; EXE mới tại `dist\SignalLab\SignalLab.exe` và smoke test sống ổn định sau 5 giây.

@@ -5,7 +5,7 @@ SignalLab is a local, visual digital-communications simulator inspired by Simuli
 Python Blocks include a CodeMirror-based IDE editor with Python syntax highlighting, line numbers, bracket matching and a large draft-based editing window.
 At runtime they receive the current Experiment point through `params["snr_db"]` and related keys. A port-free Variables block declares safe typed globals shared by every Python Block without coupling user code to the parallel scheduler.
 
-The interface uses a high-contrast light layout with a bundled SignalLab logo and app icon. Select a block and press `Delete` to remove it and its links.
+The interface uses a high-contrast light layout with a bundled SignalLab logo and app icon. Select a block to remove it and its links, or select a connection line and press `Delete`/`Backspace` to remove only that link. The block library includes BPSK, QPSK, OOK, Gray-coded 8-PSK and Gray-coded 16-QAM modulator/demodulator pairs.
 
 Use **Open Samples** on the top bar to browse nine complete learning labs for BPSK/QPSK, channel coding, source entropy, Huffman/Shannon–Fano and custom Python blocks. Every sample includes learning objectives, guided steps and expected observations before it is opened as an editable simulation.
 

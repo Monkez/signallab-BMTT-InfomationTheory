@@ -23,7 +23,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 - Python Block đọc trực tiếp SNR/trial/seed/device của frame hiện tại qua `params`; khối Variables không cổng khai báo literal toàn cục một lần cho mọi Python Block.
 - Package `signallab` trên NumPy/SciPy cung cấp API nhất quán cho nguồn, tín hiệu, lọc, điều chế, kênh, mã và metric; NumPy/SciPy trực tiếp vẫn được hỗ trợ.
 - Menu Documents mở cửa sổ offline độc lập, có tìm kiếm full-text và tài liệu hàm/quickstart chi tiết cho người học.
-- Thư viện mở rộng với Text Source, differential source coding, repetition code, QPSK, Rayleigh fading, Scope, Constellation và Power Meter.
+- Thư viện mở rộng với Text Source, differential source coding, repetition code, QPSK, OOK, 8-PSK Gray, 16-QAM Gray, Rayleigh fading, Scope, Constellation và Power Meter.
 - Bổ sung Text File Source và Image File Source (file picker, base64 project payload), cùng các codec nguồn kinh điển Huffman, Shannon-Fano, RLE và ZIP/DEFLATE theo cặp Encoder/Decoder.
 - Script Windows một lần bấm cho cài đặt, chạy và build.
 - Bản desktop Windows có `SignalLab.exe`, chứa frontend production và backend local, không cần Vite khi sử dụng.
@@ -32,7 +32,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 
 ### V1 — Công cụ giảng dạy
 
-- QPSK/QAM/FSK, pulse shaping, đồng bộ, fading Rayleigh/Rician.
+- FSK, QAM bậc cao, pulse shaping, đồng bộ và fading Rician (QPSK/8-PSK/16-QAM/Rayleigh đã có).
 - Scope miền thời gian, phổ, constellation, eye diagram.
 - Subsystem, nhóm khối, annotation, undo/redo đầy đủ.
 - Notebook/report thí nghiệm và sweep Eb/N0.

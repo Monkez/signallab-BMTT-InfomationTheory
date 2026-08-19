@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import {
   ReactFlow, Background, Controls, MiniMap, addEdge, useNodesState, useEdgesState,
-  BackgroundVariant, MarkerType, type Connection, type EdgeChange, type NodeMouseHandler, type OnNodeDrag,
+  BackgroundVariant, MarkerType, type Connection, type EdgeChange, type EdgeMouseHandler, type NodeMouseHandler, type OnNodeDrag,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
@@ -51,6 +51,8 @@ function App() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([])
   const [specs, setSpecs] = useState<BlockSpec[]>(fallbackSpecs)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
+  const [isConnecting, setIsConnecting] = useState(false)
   const [search, setSearch] = useState('')
   const [config, setConfig] = useState<SimulationConfig>(defaultSimulationConfig)
   const [job, setJob] = useState<Job | null>(null)
@@ -157,17 +159,24 @@ function App() {
   }, [appendLog])
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Delete' || !selectedId) return
+      if (!['Delete', 'Backspace'].includes(event.key) || (!selectedId && !selectedEdgeId)) return
       const target = event.target as HTMLElement | null
-      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
-      setNodes(items => items.filter(node => node.id !== selectedId).map(node => ({ ...node, data: { ...node.data, portPreviews: undefined, runtimeError: undefined } })))
-      setEdges(items => items.filter(edge => edge.source !== selectedId && edge.target !== selectedId))
-      setSelectedId(null)
-      setRightTab('run')
+      if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return
+      event.preventDefault()
+      if (selectedEdgeId) {
+        setEdges(items => items.filter(edge => edge.id !== selectedEdgeId))
+        setSelectedEdgeId(null)
+        clearDiagnostics()
+      } else if (selectedId) {
+        setNodes(items => items.filter(node => node.id !== selectedId).map(node => ({ ...node, data: { ...node.data, portPreviews: undefined, runtimeError: undefined } })))
+        setEdges(items => items.filter(edge => edge.source !== selectedId && edge.target !== selectedId))
+        setSelectedId(null)
+        setRightTab('run')
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedId, setEdges, setNodes])
+  }, [clearDiagnostics, selectedEdgeId, selectedId, setEdges, setNodes])
   useEffect(() => {
     if (!job || !['queued', 'running'].includes(job.status)) return
     const timer = window.setInterval(async () => {
@@ -199,13 +208,14 @@ function App() {
     appendLog('info', `SNR ${job.snr_db.toFixed(2)} dB · point ${(job.snr_index ?? 0) + 1}/${job.snr_count ?? '?'}`)
   }, [appendLog, job?.snr_count, job?.snr_db, job?.snr_index, job?.status])
 
-  const onConnect = useCallback((connection: Connection) => { clearDiagnostics(); setEdges(eds => addEdge({ ...connection, markerEnd: { type: MarkerType.ArrowClosed }, animated: true }, eds)) }, [clearDiagnostics, setEdges])
+  const onConnect = useCallback((connection: Connection) => { clearDiagnostics(); setSelectedEdgeId(null); setEdges(eds => addEdge({ ...connection, markerEnd: { type: MarkerType.ArrowClosed }, animated: true }, eds)) }, [clearDiagnostics, setEdges])
   const onEdgesChangeWithPreview = useCallback((changes: EdgeChange[]) => {
     if (changes.some(change => change.type === 'remove')) clearDiagnostics()
     onEdgesChange(changes)
   }, [clearDiagnostics, onEdgesChange])
-  const onNodeClick: NodeMouseHandler<FlowNode> = (_, node) => { setSelectedId(node.id); setRightTab('block') }
-  const onNodeDragStart: OnNodeDrag<FlowNode> = (_, node) => { setSelectedId(node.id); setRightTab('block') }
+  const onNodeClick: NodeMouseHandler<FlowNode> = (_, node) => { setSelectedEdgeId(null); setSelectedId(node.id); setRightTab('block') }
+  const onNodeDragStart: OnNodeDrag<FlowNode> = (_, node) => { setSelectedEdgeId(null); setSelectedId(node.id); setRightTab('block') }
+  const onEdgeClick: EdgeMouseHandler<FlowEdge> = (_, edge) => { setSelectedId(null); setSelectedEdgeId(edge.id) }
   const updateSelected = (patch: Partial<FlowNode['data']>) => setNodes(items => items.map(n => ({ ...n, data: { ...n.data, ...(n.id === selectedId ? patch : {}), portPreviews: undefined, runtimeError: undefined } })))
   const updatePythonCode = (code: string) => {
     if (!selected || selected.data.blockType !== 'python') return
@@ -479,7 +489,7 @@ function App() {
   } : undefined
 
   return (
-    <><div className={`startup-splash ${splashVisible ? '' : 'hidden'}`} aria-hidden={!splashVisible}><div className="startup-logo"><img src="/app-icon.svg" alt="" /></div><strong>SignalLab</strong><span>Digital Communications Studio</span><i /></div><div className="app-shell" style={{ gridTemplateRows: `60px minmax(0, 1fr) ${consoleOpen ? consoleHeight : 0}px`, gridTemplateColumns: `${leftOpen ? leftWidth : 0}px minmax(0, 1fr) ${rightOpen ? rightWidth : 0}px` }}>
+    <><div className={`startup-splash ${splashVisible ? '' : 'hidden'}`} aria-hidden={!splashVisible}><div className="startup-logo"><img src="/app-icon.svg" alt="" /></div><strong>SignalLab</strong><span>Digital Communications Studio</span><i /></div><div className={`app-shell ${isConnecting ? 'connecting' : ''}`} style={{ gridTemplateRows: `60px minmax(0, 1fr) ${consoleOpen ? consoleHeight : 0}px`, gridTemplateColumns: `${leftOpen ? leftWidth : 0}px minmax(0, 1fr) ${rightOpen ? rightWidth : 0}px` }}>
       <header className="topbar">
         <div className="brand"><div className="brand-mark"><img src="/app-icon.svg" alt="SignalLab logo" /></div><div><strong>SignalLab</strong><span>Communications Studio</span></div></div>
         <div className={`project-name ${projectDirty ? 'dirty' : ''}`} title={projectDirty ? 'Unsaved changes' : 'All changes saved'}><span className="status-dot" /><span>{projectName}</span>{projectDirty && <small>Unsaved</small>}</div>
@@ -519,7 +529,7 @@ function App() {
 
       <main className="canvas-wrap">
         <div className="canvas-label"><span>FLOWGRAPH</span><span>{nodes.length} blocks · {edges.length} links</span></div>
-        <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running' }))} nodeTypes={{ signal: SignalNode }} onInit={instance => { flowInstanceRef.current = instance; window.setTimeout(() => instance.fitView({ padding: 0.18, duration: 320 }), 100) }} onDrop={onCanvasDrop} onDragOver={onCanvasDragOver} onNodesChange={onNodesChange} onEdgesChange={onEdgesChangeWithPreview} onConnect={onConnect} onNodeClick={onNodeClick} onNodeDragStart={onNodeDragStart} onPaneClick={() => setSelectedId(null)} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
+        <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, selected: e.id === selectedEdgeId, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running', style: e.id === selectedEdgeId ? { strokeWidth: 3, stroke: '#2563eb' } : undefined }))} nodeTypes={{ signal: SignalNode }} onInit={instance => { flowInstanceRef.current = instance; window.setTimeout(() => instance.fitView({ padding: 0.18, duration: 320 }), 100) }} onDrop={onCanvasDrop} onDragOver={onCanvasDragOver} onNodesChange={onNodesChange} onEdgesChange={onEdgesChangeWithPreview} onConnect={onConnect} onConnectStart={() => setIsConnecting(true)} onConnectEnd={() => setIsConnecting(false)} onNodeClick={onNodeClick} onNodeDragStart={onNodeDragStart} onEdgeClick={onEdgeClick} onPaneClick={() => { setSelectedId(null); setSelectedEdgeId(null) }} deleteKeyCode={null} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
           <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#ccd3dc" />
           <Controls position="bottom-left" />
           <MiniMap position="bottom-right" pannable zoomable offsetScale={4} nodeColor={node => miniMapColor(String((node.data as Record<string, unknown>)?.blockType || ''))} nodeStrokeColor="#ffffff" nodeStrokeWidth={1} nodeBorderRadius={3} nodeComponent={FlowMiniMapNode} bgColor="#f9fbfd" maskColor="rgba(226,233,242,.62)" maskStrokeColor="#8ea8ca" maskStrokeWidth={1} style={{ width: 150, height: 92, border: '1px solid #cbd6e3', borderRadius: 8, boxShadow: '0 3px 12px rgba(36,55,78,.14)' }} />
@@ -542,8 +552,8 @@ function App() {
            {visibleParams.length ? visibleParams.map(([key, value]) => typeof value === 'boolean' ? <label className="boolean-param" key={key}><span>{parameterLabel(key)}</span><input type="checkbox" checked={value} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: e.target.checked } })} />{key === 'include_header' && <small>Enable the same option on the matching decoder.</small>}</label> : <label key={key}>{parameterLabel(key)}<input type={typeof value === 'number' ? 'number' : 'text'} value={String(value)} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: typeof value === 'number' ? Number(e.target.value) : e.target.value } })} />{key === 'seed' && <small>-1 = random each run · 0+ = reproducible</small>}</label>) : !['variables', 'awgn', 'rayleigh', 'text_file_source', 'image_file_source'].includes(selected.data.blockType) && <p className="muted">This block has no parameters.</p>}
           {selected.data.blockType === 'variables' && <VariablesEditor definitions={String(selected.data.params.definitions || '')} onChange={definitions => updateSelected({ params: { ...selected.data.params, definitions } })} />}
           {selected.data.blockType === 'symbol_huffman_encode' && <><div className="section-rule"><span>CURRENT HUFFMAN CODEBOOK</span><em>updates with P(x)</em></div><HuffmanCodebookTable params={selected.data.params} inputPreview={selected.data.portPreviews?.inputs.in} /></>}
-          <div className="section-rule"><span>CURRENT PORT DATA</span><em>representative frame</em></div>
-          <PortDataInspector snapshotId={snapshotId} nodeId={selected.id} previews={selected.data.portPreviews} />
+           {!isConnecting && <><div className="section-rule"><span>CURRENT PORT DATA</span><em>representative frame</em></div>
+           <PortDataInspector snapshotId={snapshotId} nodeId={selected.id} previews={selected.data.portPreviews} /></>}
           {selected.data.blockType === 'ber' && livePoints.length ? <><div className="section-rule"><span>SINK PREVIEW</span></div><BerChart points={livePoints} live={job?.status === 'running'} /></> : null}
           {activeSinkMetrics.power_mean !== undefined && selected.data.blockType === 'power_meter' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean power</span><strong>{activeSinkMetrics.power_mean.toExponential(3)}</strong></div></div></>}
           {activeSinkMetrics.scope_mean_amplitude !== undefined && selected.data.blockType === 'scope' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean amplitude</span><strong>{activeSinkMetrics.scope_mean_amplitude.toFixed(4)}</strong></div><div><span>Peak</span><strong>{activeSinkMetrics.scope_peak_amplitude?.toFixed(4) ?? '—'}</strong></div></div></>}
@@ -552,8 +562,8 @@ function App() {
           {symbolMetrics && selected.data.blockType === 'ser' && <><div className="section-rule"><span>SYMBOL RESULT</span></div><div className="source-theory-result"><div><span>Symbol error rate</span><strong>{symbolMetrics.ser?.toExponential(3)}</strong></div><div><span>Symbol errors</span><strong>{symbolMetrics.symbol_errors} / {symbolMetrics.total_symbols}</strong></div></div></>}
           {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><div className="python-editor-inline-toolbar"><div><Braces size={14} /><span><b>process.py</b><small>Python 3 · UTF-8</small></span></div><button type="button" onClick={() => setPythonEditorOpen(true)}><Maximize2 size={14} /> Open editor</button></div><Suspense fallback={<div className="python-editor-loading">Loading Python editor…</div>}><PythonCodeEditor value={selected.data.code || pythonTemplate} onChange={updatePythonCode} /></Suspense><p className="code-hint">Read the current sweep point with <code>params["snr_db"]</code>. For flexible ports, declare <code>PORTS = {'{'}"inputs": ["signal", "noise"], "outputs": ["out", "residual"]{'}'}</code> and write <code>process(inputs, params)</code> returning a dictionary. <button type="button" onClick={openDocuments}>Read Python API</button></p></>}
         </div> : <div className="empty-state"><Box size={32} /><h3>No block selected</h3><p>Select a block on the canvas to edit its parameters and Python code.</p></div> :
-        <div className="inspector-content">
-          <div className="experiment-title"><div className="experiment-actions"><button className="run-once" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} title="Execute one frame and capture data at every port"><Play size={13} fill="currentColor" />{runOnceActive ? 'Running…' : 'Run once'}</button><button className="run-wide experiment-benchmark" onClick={runBenchmark} disabled={executionActive || Boolean(configIssue)} title={configIssue || undefined}><Play size={14} fill="currentColor" />{jobActive ? 'Benchmark running…' : 'Run Benchmark'}</button></div></div>
+        <div className="inspector-content experiment-panel">
+          <div className="experiment-scroll">
           <div className={`experiment-settings ${experimentSettingsOpen ? 'open' : ''}`}>
           <button className="experiment-settings-toggle" onClick={() => setExperimentSettingsOpen(value => !value)} aria-expanded={experimentSettingsOpen}><span>Experiment parameters</span><ChevronDown size={15} /></button>
           <div className="experiment-settings-content">
@@ -576,6 +586,8 @@ function App() {
             <SinkResults nodes={sinkNodes} metrics={activeSinkMetrics} berPoints={livePoints} berLive={job?.status === 'running'} />
             {result?.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}
           </div>}
+          </div>
+          <div className="experiment-actions-dock"><div className="experiment-actions"><button className="run-once" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} title="Execute one frame and capture data at every port"><Play size={13} fill="currentColor" />{runOnceActive ? 'Running…' : 'Run once'}</button><button className="run-wide experiment-benchmark" onClick={runBenchmark} disabled={executionActive || Boolean(configIssue)} title={configIssue || undefined}><Play size={14} fill="currentColor" />{jobActive ? 'Benchmark running…' : 'Run Benchmark'}</button></div></div>
         </div>}
         {rightOpen && <div className="sidebar-resizer right-resizer" onPointerDown={event => startResize('right', event)} title="Resize inspector" />}
       </aside>

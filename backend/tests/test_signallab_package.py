@@ -49,8 +49,17 @@ def test_modulators_round_trip_without_noise():
     bits = np.asarray([0, 1, 1, 0, 0, 0], dtype=np.int8)
     assert np.array_equal(sl.modulation.bpsk_demodulate(sl.modulation.bpsk_modulate(bits)), bits)
     assert np.array_equal(sl.modulation.qpsk_demodulate(sl.modulation.qpsk_modulate(bits)), bits)
+    assert np.array_equal(sl.modulation.ook_demodulate(sl.modulation.ook_modulate(bits)), bits)
+    psk8_bits = np.asarray(list(np.ndindex((2, 2, 2))), dtype=np.int8).reshape(-1)
+    assert np.array_equal(sl.modulation.psk8_demodulate(sl.modulation.psk8_modulate(psk8_bits)), psk8_bits)
+    qam16_bits = np.asarray(list(np.ndindex((2, 2, 2, 2))), dtype=np.int8).reshape(-1)
+    assert np.array_equal(sl.modulation.qam16_demodulate(sl.modulation.qam16_modulate(qam16_bits)), qam16_bits)
     with pytest.raises(ValueError, match="even bit count"):
         sl.modulation.qpsk_modulate([0, 1, 0])
+    with pytest.raises(ValueError, match="divisible by 3"):
+        sl.modulation.psk8_modulate([0, 1])
+    with pytest.raises(ValueError, match="divisible by 4"):
+        sl.modulation.qam16_modulate([0, 1, 0])
 
 
 def test_channels_are_reproducible_and_meet_statistical_targets():

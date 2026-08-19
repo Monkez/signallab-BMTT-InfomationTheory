@@ -61,6 +61,8 @@ Backend tách hợp đồng block khỏi thuật toán xử lý: `block_registry
 
 `snapshots.py` giữ tối đa bốn frame đại diện gần nhất bằng LRU trong RAM. Kết quả Run once/Benchmark chỉ trả `snapshot_id` và summary nhỏ; tab Block gọi API port theo trang 128 phần tử, còn Copy all đọc tuần tự theo chunk 4096. Vì vậy polling job không mang buffer lớn lặp lại, block ảnh không khiến DOM render hàng triệu dòng cùng lúc, nhưng người dùng vẫn truy cập được mọi phần tử. Mỗi output chỉ được đóng băng/copy về host một lần; input downstream tham chiếu lại snapshot output upstream nên không nhân đôi buffer trên từng cạnh.
 
+Canvas quản lý selection của node và edge tách biệt: click edge đặt trạng thái chọn để highlight/xóa riêng bằng bàn phím, còn click node chuyển inspector sang Block. Sự kiện bắt đầu/kết thúc connection đặt cờ UI dùng chung để tạm ẩn tooltip port và Current port data trong lúc kéo. Tab Experiment chia thành vùng nội dung cuộn và action dock cố định ở đáy inspector.
+
 `SinkChart.tsx` hiện là component điều phối trạng thái BER và dùng các module feature trên. Mọi plot đều đi qua `BerPlot`, nên preview, report, đường reference, marker và quy tắc điểm BER bằng 0 có một nguồn logic duy nhất.
 
 ## Bản desktop Windows
@@ -88,6 +90,8 @@ Job **Run Benchmark** vẫn chạy Monte-Carlo bất đồng bộ qua polling. K
 - CPU: trial độc lập được chia thành chunk và chạy bằng `ProcessPoolExecutor`. `workers=0` nghĩa là tự chọn.
 - GPU: runtime thử nạp CuPy và kiểm tra device. Các khối built-in dùng namespace mảng `context.xp`. Bản MVP dùng một GPU worker theo batch nhỏ để tránh nhiều process tranh cùng device.
 - Auto: ưu tiên GPU khi khả dụng và graph tương thích, ngược lại dùng CPU; workload nhỏ chạy inline để tránh overhead.
+
+Các built-in OOK, 8-PSK Gray và 16-QAM Gray dùng phép toán tương thích namespace NumPy/CuPy. Contract tập trung buộc input 8-PSK chia hết cho 3, 16-QAM chia hết cho 4 và khóa tỷ lệ bit/symbol ở cả modulator/demodulator. Package `signallab.modulation` cung cấp cùng ánh xạ để Python Block và built-in cho kết quả nhất quán.
 
 ## Source và file blocks
 

@@ -132,6 +132,10 @@ def validate_inputs(block_type: str, inputs: dict[str, Any], params: dict[str, A
             _multiple(primary, 3, "in", "Repetition-3 decoding")
         elif block_type == "qpsk_mod":
             _multiple(primary, 2, "in", "QPSK modulation")
+        elif block_type == "psk8_mod":
+            _multiple(primary, 3, "in", "8-PSK modulation")
+        elif block_type == "qam16_mod":
+            _multiple(primary, 4, "in", "16-QAM modulation")
         elif block_type == "rle_decode":
             _multiple(primary, 9, "in", "Run-Length decoding")
         elif block_type in {"huffman_decode", "shannon_fano_decode", "symbol_shannon_fano_decode", "zip_decode"} and primary < 32:
@@ -186,7 +190,7 @@ def validate_outputs(
     out_size = output_sizes.get("out")
 
     same_size = {
-        "differential_encode", "differential_decode", "bpsk_mod", "bpsk_demod", "awgn", "rayleigh",
+        "differential_encode", "differential_decode", "bpsk_mod", "bpsk_demod", "ook_mod", "ook_demod", "awgn", "rayleigh",
     }
     if block_type in same_size and out_size != in_size:
         raise SignalContractError(f"Output 'out' must match input 'in': expected {in_size}, received {out_size}")
@@ -228,6 +232,10 @@ def validate_outputs(
         "repetition3_decode": (1, 3),
         "qpsk_mod": (1, 2),
         "qpsk_demod": (2, 1),
+        "psk8_mod": (1, 3),
+        "psk8_demod": (3, 1),
+        "qam16_mod": (1, 4),
+        "qam16_demod": (4, 1),
     }
     if block_type in ratios and in_size is not None:
         numerator, denominator = ratios[block_type]

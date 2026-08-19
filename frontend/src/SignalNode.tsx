@@ -6,7 +6,8 @@ import type { FlowNode, PortPreview } from './types'
 const icons: Record<string, typeof Box> = {
   bit_source: Binary, text_source: Binary, text_file_source: Binary, image_file_source: Binary,
   python: Braces, awgn: Waves, ber: Gauge,
-  bpsk_mod: Radio, bpsk_demod: Radio,
+  bpsk_mod: Radio, bpsk_demod: Radio, qpsk_mod: Radio, qpsk_demod: Radio,
+  ook_mod: Radio, ook_demod: Radio, psk8_mod: Radio, psk8_demod: Radio, qam16_mod: Radio, qam16_demod: Radio,
 }
 
 const metric = (value?: number) => value === undefined ? '—' : Math.abs(value) >= 1000 || (Math.abs(value) > 0 && Math.abs(value) < .001) ? value.toExponential(3) : value.toPrecision(4)

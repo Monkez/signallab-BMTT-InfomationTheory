@@ -176,6 +176,7 @@ button { color: inherit; border: 0; cursor: pointer; }
 .signal-node.ports-reversed .port-label.input .port-tooltip { right: auto; left: calc(100% + 11px); }
 .signal-node.ports-reversed .port-label.output .port-tooltip { right: calc(100% + 11px); left: auto; }
 .port-label:hover .port-tooltip, .port-label:focus-within .port-tooltip { visibility: visible; opacity: 1; transform: translateY(-50%) scale(1); }
+.app-shell.connecting .port-tooltip { display: none; }
 .port-tooltip-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 7px; border-bottom: 1px solid #e4e9ef; }
 .port-tooltip-title span { color: #758297; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
 .port-tooltip-title strong { overflow: hidden; color: #213047; font: 600 14px Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
@@ -192,7 +193,10 @@ button { color: inherit; border: 0; cursor: pointer; }
 .tabs { height: 48px; display: grid; grid-template-columns: 1fr 1fr; padding: 0 14px; border-bottom: 1px solid var(--line); }
 .tabs button { background: transparent; color: #788493; border-bottom: 2px solid transparent; font-size: 10px; }
 .tabs button.active { color: #1e2938; border-color: var(--accent); font-weight: 600; }
-.inspector-content { padding: 16px; overflow-x: hidden; overflow-y: auto; }
+.inspector-content { min-height: 0; padding: 16px; overflow-x: hidden; overflow-y: auto; }
+.experiment-panel { display: flex; flex: 1; flex-direction: column; padding: 0; overflow: hidden; }
+.experiment-scroll { flex: 1; min-height: 0; padding: 16px; overflow-x: hidden; overflow-y: auto; }
+.experiment-actions-dock { flex: 0 0 auto; padding: 12px 16px 14px; border-top: 1px solid var(--line); background: rgba(255,255,255,.98); box-shadow: 0 -5px 16px rgba(42,58,79,.07); }
 .selection-heading { display: grid; grid-template-columns: 39px 1fr 27px; align-items: center; gap: 10px; margin-bottom: 19px; }
 .large-icon { width: 39px; height: 39px; display: grid; place-items: center; border-radius: 7px; background: #edf1f5; color: #354255; }
 .selection-heading small, .experiment-title small { font-size: 7px; color: #7e8998; letter-spacing: .12em; }
@@ -279,8 +283,6 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .empty-state { margin: auto; padding: 25px; text-align: center; color: #8a95a3; }
 .empty-state h3 { color: #536071; font-size: 13px; }
 .empty-state p { font-size: 9px; line-height: 1.6; }
-.experiment-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 19px; }
-.experiment-title h2 { margin: 3px 0 0; font-size: 18px; letter-spacing: -.03em; }
 .experiment-actions { display: flex; flex-direction: column; align-items: stretch; gap: 7px; width: 100%; max-width: none; }
 .experiment-actions .run-once, .experiment-actions .run-wide { width: 100%; justify-content: center; margin: 0; }
 .experiment-settings { margin: 0 0 14px; border: 1px solid #d5deea; border-radius: 8px; background: #fff; overflow: hidden; box-shadow: 0 1px 2px rgba(46, 66, 91, .03); }

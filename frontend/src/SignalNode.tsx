@@ -42,16 +42,20 @@ export function SignalNode({ id, data, selected }: NodeProps<FlowNode>) {
       {data.runtimeError && <div className="node-error-badge" title={data.runtimeError}><AlertTriangle size={13} /> Contract error</div>}
       <div className="node-header"><span className="node-icon"><Icon size={15} /></span><span>{data.label}</span></div>
       <div className="node-type">{data.blockType.replaceAll('_', ' ')}</div>
-      {data.inputs.map((port, index) => (
-        <div className="port-label input" key={port} style={{ top: 52 + index * 22 }} tabIndex={0}>
-          <Handle type="target" position={inputPosition} id={port} />{port}<PortTooltip direction="Input" port={port} preview={data.portPreviews?.inputs[port]} />
+      {data.inputs.map((port, index) => {
+        const preview = data.portPreviews?.inputs[port]
+        const hasData = Boolean(preview && preview.size > 0)
+        return <div className={`port-label input ${hasData ? 'has-data' : ''}`} key={port} style={{ top: 52 + index * 22 }} tabIndex={0}>
+          <Handle className={hasData ? 'has-data' : ''} type="target" position={inputPosition} id={port} aria-label={`Input ${port}${hasData ? ' has data' : ' is empty'}`} />{port}<PortTooltip direction="Input" port={port} preview={preview} />
         </div>
-      ))}
-      {data.outputs.map((port, index) => (
-        <div className="port-label output" key={port} style={{ top: 52 + index * 22 }} tabIndex={0}>
-          {port}<Handle type="source" position={outputPosition} id={port} /><PortTooltip direction="Output" port={port} preview={data.portPreviews?.outputs[port]} />
+      })}
+      {data.outputs.map((port, index) => {
+        const preview = data.portPreviews?.outputs[port]
+        const hasData = Boolean(preview && preview.size > 0)
+        return <div className={`port-label output ${hasData ? 'has-data' : ''}`} key={port} style={{ top: 52 + index * 22 }} tabIndex={0}>
+          {port}<Handle className={hasData ? 'has-data' : ''} type="source" position={outputPosition} id={port} aria-label={`Output ${port}${hasData ? ' has data' : ' is empty'}`} /><PortTooltip direction="Output" port={port} preview={preview} />
         </div>
-      ))}
+      })}
     </div>
   )
 }

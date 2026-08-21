@@ -5,15 +5,14 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
-  Activity, ArrowLeftRight, BookOpen, Box, Braces, ChevronDown, CircleStop, FilePlus2, FolderOpen,
+  Activity, ArrowLeftRight, BookOpen, Box, Braces, CircleStop, FilePlus2, FolderOpen, Settings2,
   Copy, Layers3, LibraryBig, Maximize2, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Save, SaveAll, Search, Terminal, Trash2, X,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
 import { cancelJob, createJob, getJob, graphPayload, GraphApiError, runGraphOnce } from './api'
-import { initialEdges, initialNodes, pythonTemplate } from './sample'
+import { pythonTemplate } from './sample'
 import type { BlockSpec, FlowEdge, FlowNode, Job, PortPreviewMap, SimulationConfig } from './types'
 import { BerChart } from './SinkChart'
-import { ResultsTable } from './ResultsTable'
 import { ConstellationPreview, SinkResults } from './SinkResults'
 import { FlowMiniMapNode } from './components/FlowMiniMapNode'
 import { fallbackSpecs, iconFor, miniMapColor } from './features/blocks/catalog'
@@ -61,7 +60,7 @@ function App() {
   const [runOnceSinkMetrics, setRunOnceSinkMetrics] = useState<Record<string, number>>({})
   const [snapshotId, setSnapshotId] = useState<string | null>(null)
   const [error, setError] = useState('')
-  const [rightTab, setRightTab] = useState<'block' | 'run'>('run')
+  const [experimentConfigOpen, setExperimentConfigOpen] = useState(false)
   const [leftOpen, setLeftOpen] = useState(true)
   const [rightOpen, setRightOpen] = useState(true)
   const [leftWidth, setLeftWidth] = useState(270)
@@ -76,7 +75,6 @@ function App() {
   const [savingProject, setSavingProject] = useState(false)
   const [samplesOpen, setSamplesOpen] = useState(false)
   const [pythonEditorOpen, setPythonEditorOpen] = useState(false)
-  const [experimentSettingsOpen, setExperimentSettingsOpen] = useState(true)
   const [fitRequest, setFitRequest] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
@@ -86,6 +84,9 @@ function App() {
   const resizeRef = useRef<{ side: 'left' | 'right'; startX: number; startWidth: number } | null>(null)
   const flowInstanceRef = useRef<{ fitView: (options?: Record<string, unknown>) => void; screenToFlowPosition: (position: { x: number; y: number }) => { x: number; y: number } } | null>(null)
   const selected = nodes.find(n => n.id === selectedId)
+  const selectedEdge = edges.find(edge => edge.id === selectedEdgeId)
+  const selectedEdgeSource = selectedEdge ? nodes.find(node => node.id === selectedEdge.source) : undefined
+  const selectedEdgeTarget = selectedEdge ? nodes.find(node => node.id === selectedEdge.target) : undefined
   const selectedSpec = selected ? specs.find(spec => spec.type === selected.data.blockType) : undefined
   const jobActive = job?.status === 'queued' || job?.status === 'running'
   const executionActive = jobActive || runOnceActive
@@ -171,7 +172,6 @@ function App() {
         setNodes(items => items.filter(node => node.id !== selectedId).map(node => ({ ...node, data: { ...node.data, portPreviews: undefined, runtimeError: undefined } })))
         setEdges(items => items.filter(edge => edge.source !== selectedId && edge.target !== selectedId))
         setSelectedId(null)
-        setRightTab('run')
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -213,9 +213,9 @@ function App() {
     if (changes.some(change => change.type === 'remove')) clearDiagnostics()
     onEdgesChange(changes)
   }, [clearDiagnostics, onEdgesChange])
-  const onNodeClick: NodeMouseHandler<FlowNode> = (_, node) => { setSelectedEdgeId(null); setSelectedId(node.id); setRightTab('block') }
-  const onNodeDragStart: OnNodeDrag<FlowNode> = (_, node) => { setSelectedEdgeId(null); setSelectedId(node.id); setRightTab('block') }
-  const onEdgeClick: EdgeMouseHandler<FlowEdge> = (_, edge) => { setSelectedId(null); setSelectedEdgeId(edge.id) }
+  const onNodeClick: NodeMouseHandler<FlowNode> = (_, node) => { setSelectedEdgeId(null); setSelectedId(node.id); setRightOpen(true) }
+  const onNodeDragStart: OnNodeDrag<FlowNode> = (_, node) => { setSelectedEdgeId(null); setSelectedId(node.id); setRightOpen(true) }
+  const onEdgeClick: EdgeMouseHandler<FlowEdge> = (_, edge) => { setSelectedId(null); setSelectedEdgeId(edge.id); setRightOpen(true) }
   const updateSelected = (patch: Partial<FlowNode['data']>) => setNodes(items => items.map(n => ({ ...n, data: { ...n.data, ...(n.id === selectedId ? patch : {}), portPreviews: undefined, runtimeError: undefined } })))
   const updatePythonCode = (code: string) => {
     if (!selected || selected.data.blockType !== 'python') return
@@ -266,7 +266,7 @@ function App() {
   const addBlock = (spec: BlockSpec, position?: { x: number; y: number }) => {
     if (spec.type === 'variables' && nodes.some(node => node.data.blockType === 'variables')) {
       const existing = nodes.find(node => node.data.blockType === 'variables')!
-      setSelectedId(existing.id); setRightTab('block')
+      setSelectedId(existing.id); setRightOpen(true)
       appendLog('warning', 'A simulation can contain only one Variables block; selected the existing block.')
       return
     }
@@ -276,7 +276,7 @@ function App() {
       id, type: 'signal', position: position || { x: 300 + Math.random() * 300, y: 140 + Math.random() * 300 },
       data: { label: spec.label, blockType: spec.type, category: spec.category, params: { ...spec.defaults }, inputs: spec.inputs, outputs: spec.outputs, portOrientation: 'standard', code: spec.type === 'python' ? pythonTemplate : undefined },
     }
-    setNodes(ns => [...ns, node]); setSelectedId(id); setRightTab('block')
+    setNodes(ns => [...ns, node]); setSelectedId(id); setRightOpen(true)
   }
 
   const onLibraryDragStart = (event: DragEvent<HTMLButtonElement>, spec: BlockSpec) => {
@@ -301,7 +301,7 @@ function App() {
   const runOnce = async () => {
     if (configIssue) { setError(configIssue); return }
     clearDiagnostics()
-    setError(''); setRightTab('run'); setRunOnceActive(true); setJob(null)
+    setError(''); setRunOnceActive(true); setJob(null)
     appendLog('info', config.mode === 'specific_steps' ? 'Running specific steps with channel defaults…' : `Running one frame at ${config.snr_db_start} dB…`)
     try {
       const snapshot = await runGraphOnce(nodes, edges, config)
@@ -315,7 +315,7 @@ function App() {
 
   const runBenchmark = async () => {
     if (configIssue) { setError(configIssue); return }
-    setError(''); setRightTab('run'); lastSnrRef.current = null; setRunOnceMetrics({}); setRunOnceSinkMetrics({})
+    setError(''); lastSnrRef.current = null; setRunOnceMetrics({}); setRunOnceSinkMetrics({})
     clearDiagnostics()
     const sweepLabel = config.mode === 'specific_steps' ? `${config.max_frames} fixed steps (channel defaults)` : `${config.snr_db_start}…${config.snr_db_stop} dB`
     appendLog('info', `Starting ${config.mode === 'ber_benchmark' ? 'BER benchmark' : 'specific-step experiment'}: ${sweepLabel}.`)
@@ -415,7 +415,6 @@ function App() {
     setJob(null)
     setSnapshotId(null)
     setError('')
-    setRightTab('run')
     setProjectName('Untitled simulation')
     setSavedSignature('')
     lastSnrRef.current = null
@@ -423,12 +422,12 @@ function App() {
     appendLog('info', 'New blank simulation created. Use Save to choose a project file.')
   }
 
-  const resetSample = () => {
-    if (projectDirty && !window.confirm('Discard unsaved changes and reset the sample simulation?')) return
-    clearDiagnostics(); setNodes(initialNodes); setEdges(initialEdges); setFitRequest(value => value + 1); setSelectedId('channel'); setJob(null)
-    setProjectName('Hamming BPSK over AWGN'); setSavedSignature('')
-    void clearProjectFileTarget()
-    appendLog('info', 'Sample simulation restored. Save it to create a new project file.')
+  const resetPortData = () => {
+    clearDiagnostics()
+    setJob(null)
+    setError('')
+    lastSnrRef.current = null
+    appendLog('info', 'All runtime data and port previews were cleared. The graph and experiment configuration were kept.')
   }
 
   const openCatalogSample = (sample: SampleProject) => {
@@ -443,7 +442,6 @@ function App() {
     setJob(null)
     setSnapshotId(null)
     setError('')
-    setRightTab('run')
     setProjectName(sample.sample.title)
     setSavedSignature('')
     lastSnrRef.current = null
@@ -497,7 +495,6 @@ function App() {
           <button className="ghost" onClick={() => setLeftOpen(value => !value)} title={leftOpen ? 'Hide block library' : 'Show block library'}><PanelLeft size={16} /></button>
           <button className="ghost" onClick={() => setRightOpen(value => !value)} title={rightOpen ? 'Hide inspector' : 'Show inspector'}><PanelRight size={16} /></button>
           <button className={`ghost ${consoleOpen ? 'active' : ''}`} onClick={() => setConsoleOpen(value => !value)} title={consoleOpen ? 'Hide console' : 'Show console'}><PanelBottom size={16} /></button>
-          <button className="ghost" onClick={resetSample} title="Reset sample"><RotateCcw size={16} /></button>
           <button className="ghost labeled compact-label" onClick={newSimulation} disabled={executionActive} title="Create a blank simulation"><FilePlus2 size={15} /><span>New</span></button>
           <button className="ghost labeled compact-label" onClick={() => void openProject()} title="Open a SignalLab simulation"><FolderOpen size={15} /><span>Open</span></button>
           <button className="ghost labeled samples-action" onClick={() => setSamplesOpen(true)} title="Open a complete learning sample"><LibraryBig size={15} /><span>Open Samples</span></button>
@@ -508,6 +505,30 @@ function App() {
         </div>
       </header>
       <SampleLibraryModal open={samplesOpen} onClose={() => setSamplesOpen(false)} onOpenSample={openCatalogSample} />
+      {experimentConfigOpen && <div className="experiment-config-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setExperimentConfigOpen(false) }}>
+        <section className="experiment-config-modal" role="dialog" aria-modal="true" aria-labelledby="experiment-config-title">
+          <header className="experiment-config-header"><div><span>SIMULATION SETTINGS</span><h2 id="experiment-config-title">Experiment config</h2><p>Configure execution, review progress, and inspect aggregate results.</p></div><button type="button" onClick={() => setExperimentConfigOpen(false)} title="Close experiment config"><X size={18} /></button></header>
+          <div className="experiment-config-body">
+            <div className="experiment-config-form">
+              <div className="section-rule"><span>EXPERIMENT MODE</span></div>
+              <label>Mode<select disabled={executionActive} value={config.mode} onChange={e => setConfig({ ...config, mode: e.target.value as SimulationConfig['mode'] })}><option value="specific_steps">Specific steps · fixed count</option><option value="ber_benchmark">BER benchmark · SNR sweep</option></select><small>{config.mode === 'specific_steps' ? 'Run fixed steps at one SNR; channels use it unless set to Fixed block value.' : 'Sweep SNR and stop each point after enough errors or the frame limit.'}</small></label>
+              <div className="section-rule"><span>{config.mode === 'specific_steps' ? 'FIXED STEPS' : 'SNR SWEEP (dB)'}</span></div>
+              {config.mode === 'specific_steps' ? <><div className="form-grid"><label>SNR (dB)<input disabled={executionActive} type="number" step="any" value={config.snr_db_start} onChange={e => setConfig({ ...config, snr_db_start: Number(e.target.value) })} /></label><label>Steps<input disabled={executionActive} type="number" min="1" value={config.max_frames} onChange={e => { const value = Number(e.target.value); setConfig({ ...config, max_frames: value, trials: value, min_frames: value }) }} /></label></div><small>Run a fixed number of steps at this SNR; AWGN/Rayleigh use it instead of their default.</small></> : <><div className="form-grid"><label>Start<input disabled={executionActive} type="number" step="any" value={config.snr_db_start} onChange={e => setConfig({ ...config, snr_db_start: Number(e.target.value) })} /></label><label>Stop<input disabled={executionActive} type="number" step="any" value={config.snr_db_stop} onChange={e => setConfig({ ...config, snr_db_stop: Number(e.target.value) })} /></label></div><label>Step<input disabled={executionActive} type="number" min="0.01" step="any" value={config.snr_db_step} onChange={e => setConfig({ ...config, snr_db_step: Number(e.target.value) })} /></label><div className="form-grid"><label>Max frames / SNR<input disabled={executionActive} type="number" min="1" value={config.max_frames} onChange={e => { const value = Number(e.target.value); setConfig({ ...config, max_frames: value, trials: value }) }} /></label><label>Min frames / SNR<input disabled={executionActive} type="number" min="1" value={config.min_frames} onChange={e => setConfig({ ...config, min_frames: Number(e.target.value) })} /></label></div><label>Min errors / SNR<input disabled={executionActive} type="number" min="0" value={config.min_errors} onChange={e => setConfig({ ...config, min_errors: Number(e.target.value) })} /><small>Benchmark stops early after this many bit errors.</small></label></>}
+              <div className="section-rule"><span>RUNTIME</span></div>
+              <div className="form-grid"><label>Workers<input disabled={executionActive} type="number" min="0" value={config.workers} onChange={e => setConfig({ ...config, workers: Number(e.target.value) })} /><small>0 = auto</small></label><label>Seed<input disabled={executionActive} type="number" value={config.seed} onChange={e => setConfig({ ...config, seed: Number(e.target.value) })} /></label></div>
+              <label>Chunk size<input disabled={executionActive} type="number" min="1" value={config.chunk_size} onChange={e => setConfig({ ...config, chunk_size: Number(e.target.value) })} /></label>
+              <label>Compute device<select disabled={executionActive} value={config.device} onChange={e => setConfig({ ...config, device: e.target.value as SimulationConfig['device'] })}><option value="auto">Auto · best available</option><option value="cpu">CPU · multiprocessing</option><option value="gpu">GPU · CUDA/CuPy</option></select></label>
+              {configIssue && <div className="config-issue" role="alert">{configIssue}</div>}
+            </div>
+            <div className="experiment-config-results">
+              <div className="section-rule"><span>EXECUTION & RESULTS</span></div>
+              {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} frames processed · {job.trials} max</span><span>{job.device || result?.device || 'preparing'}</span></div>{job.status === 'running' && <button className="cancel" onClick={() => cancelJob(job.id)}><CircleStop size={14} /> Cancel</button>}</div>}
+              {error && <div className="error-box">{error}</div>}
+              {(result || hasVisibleSinkResults) ? <div className="results" ref={resultsRef}>{result && <div className="metric-row results-runtime"><div className="metric"><span>Elapsed</span><strong>{result.elapsed_seconds.toFixed(2)} s</strong></div><div className="metric"><span>Throughput</span><strong>{formatNumber(result.throughput_bps / 1000)} kb/s</strong></div></div>}<SinkResults nodes={sinkNodes} metrics={activeSinkMetrics} berPoints={livePoints} berLive={job?.status === 'running'} />{result?.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}</div> : <div className="experiment-config-empty"><Activity size={28} /><strong>No runtime results</strong><span>Run once or Run Benchmark from the floating toolbar.</span></div>}
+            </div>
+          </div>
+        </section>
+      </div>}
       {pythonEditorOpen && selected?.data.blockType === 'python' && <Suspense fallback={null}><PythonEditorModal
         open={pythonEditorOpen && selected?.data.blockType === 'python'}
         blockName={selected?.data.label || 'Python Block'}
@@ -529,6 +550,14 @@ function App() {
 
       <main className="canvas-wrap">
         <div className="canvas-label"><span>FLOWGRAPH</span><span>{nodes.length} blocks · {edges.length} links</span></div>
+        <div className="simulation-toolbar" role="toolbar" aria-label="Simulation controls">
+          <button className="run-once" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} title="Execute one frame and capture data at every port"><Play size={13} fill="currentColor" />{runOnceActive ? 'Running…' : 'Run once'}</button>
+          <button className="run-wide experiment-benchmark" onClick={runBenchmark} disabled={executionActive || Boolean(configIssue)} title={configIssue || undefined}><Play size={14} fill="currentColor" />{jobActive ? 'Benchmark running…' : 'Run Benchmark'}</button>
+          <button className="simulation-tool-button" onClick={() => setExperimentConfigOpen(true)}><Settings2 size={14} /> Experiment config</button>
+          <span className="simulation-toolbar-divider" />
+          <button className="simulation-tool-button reset" onClick={resetPortData} disabled={executionActive || (!snapshotId && !hasVisibleSinkResults && !error)} title="Clear data from every block port"><RotateCcw size={14} /> Reset</button>
+          {jobActive && <span className="simulation-progress">{Math.round((job?.progress || 0) * 100)}%</span>}
+        </div>
         <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, selected: e.id === selectedEdgeId, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running', style: e.id === selectedEdgeId ? { strokeWidth: 3, stroke: '#2563eb' } : undefined }))} nodeTypes={{ signal: SignalNode }} onInit={instance => { flowInstanceRef.current = instance; window.setTimeout(() => instance.fitView({ padding: 0.18, duration: 320 }), 100) }} onDrop={onCanvasDrop} onDragOver={onCanvasDragOver} onNodesChange={onNodesChange} onEdgesChange={onEdgesChangeWithPreview} onConnect={onConnect} onConnectStart={() => setIsConnecting(true)} onConnectEnd={() => setIsConnecting(false)} onNodeClick={onNodeClick} onNodeDragStart={onNodeDragStart} onEdgeClick={onEdgeClick} onPaneClick={() => { setSelectedId(null); setSelectedEdgeId(null) }} deleteKeyCode={null} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
           <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#ccd3dc" />
           <Controls position="bottom-left" />
@@ -537,8 +566,8 @@ function App() {
       </main>
 
       <aside className={`inspector ${rightOpen ? '' : 'collapsed'}`}>
-        <div className="tabs"><button className={rightTab === 'run' ? 'active' : ''} onClick={() => setRightTab('run')}>Experiment</button><button className={rightTab === 'block' ? 'active' : ''} onClick={() => setRightTab('block')}>Block</button></div>
-        {rightTab === 'block' ? selected ? <div className="inspector-content">
+        <div className="panel-title"><Settings2 size={16} /><span>Properties</span><small>{selected ? 'Block' : selectedEdge ? 'Connection' : 'No selection'}</small></div>
+        {selected ? <div className="inspector-content">
           <div className="selection-heading"><span className="large-icon">{selected.data.blockType === 'python' ? <Braces /> : <Box />}</span><div><small>SELECTED BLOCK</small><h3>{selected.data.label}</h3></div><button className="icon-danger" onClick={() => { setNodes(ns => ns.filter(n => n.id !== selected.id).map(n => ({ ...n, data: { ...n.data, portPreviews: undefined, runtimeError: undefined } }))); setEdges(es => es.filter(e => e.source !== selected.id && e.target !== selected.id)); setSelectedId(null) }}><X size={16} /></button></div>
           {selected.data.runtimeError && <div className="error-box"><strong>Signal size contract failed</strong><br />{selected.data.runtimeError}</div>}
           {selectedSpec?.size_contract && <div className="signal-contract"><strong>Signal size contract</strong><span>{selectedSpec.size_contract}</span></div>}
@@ -561,34 +590,12 @@ function App() {
           {sourceTheoryMetrics && selected.data.blockType === 'source_analyzer' && <><div className="section-rule"><span>SOURCE THEORY RESULTS</span></div><div className="source-theory-result"><div><span>Entropy H(X)</span><strong>{sourceTheoryMetrics.source_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Average information</span><strong>{sourceTheoryMetrics.source_average_information?.toFixed(4)} bit/symbol</strong></div><div><span>Maximum entropy</span><strong>{sourceTheoryMetrics.source_max_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Source efficiency</span><strong>{sourceTheoryMetrics.source_efficiency_percent?.toFixed(2)}%</strong></div><div><span>Alphabet size</span><strong>{sourceTheoryMetrics.source_alphabet_size}</strong></div></div></>}
           {symbolMetrics && selected.data.blockType === 'ser' && <><div className="section-rule"><span>SYMBOL RESULT</span></div><div className="source-theory-result"><div><span>Symbol error rate</span><strong>{symbolMetrics.ser?.toExponential(3)}</strong></div><div><span>Symbol errors</span><strong>{symbolMetrics.symbol_errors} / {symbolMetrics.total_symbols}</strong></div></div></>}
           {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><div className="python-editor-inline-toolbar"><div><Braces size={14} /><span><b>process.py</b><small>Python 3 · UTF-8</small></span></div><button type="button" onClick={() => setPythonEditorOpen(true)}><Maximize2 size={14} /> Open editor</button></div><Suspense fallback={<div className="python-editor-loading">Loading Python editor…</div>}><PythonCodeEditor value={selected.data.code || pythonTemplate} onChange={updatePythonCode} /></Suspense><p className="code-hint">Read the current sweep point with <code>params["snr_db"]</code>. For flexible ports, declare <code>PORTS = {'{'}"inputs": ["signal", "noise"], "outputs": ["out", "residual"]{'}'}</code> and write <code>process(inputs, params)</code> returning a dictionary. <button type="button" onClick={openDocuments}>Read Python API</button></p></>}
-        </div> : <div className="empty-state"><Box size={32} /><h3>No block selected</h3><p>Select a block on the canvas to edit its parameters and Python code.</p></div> :
-        <div className="inspector-content experiment-panel">
-          <div className="experiment-scroll">
-          <div className={`experiment-settings ${experimentSettingsOpen ? 'open' : ''}`}>
-          <button className="experiment-settings-toggle" onClick={() => setExperimentSettingsOpen(value => !value)} aria-expanded={experimentSettingsOpen}><span>Experiment parameters</span><ChevronDown size={15} /></button>
-          <div className="experiment-settings-content">
-          <div className="section-rule"><span>EXPERIMENT MODE</span></div>
-          <label>Mode<select disabled={executionActive} value={config.mode} onChange={e => setConfig({ ...config, mode: e.target.value as SimulationConfig['mode'] })}><option value="specific_steps">Specific steps · fixed count</option><option value="ber_benchmark">BER benchmark · SNR sweep</option></select><small>{config.mode === 'specific_steps' ? 'Run fixed steps at one SNR; channels use it unless set to Fixed block value.' : 'Sweep SNR and stop each point after enough errors or the frame limit.'}</small></label>
-          <div className="section-rule"><span>{config.mode === 'specific_steps' ? 'FIXED STEPS' : 'SNR SWEEP (dB)'}</span></div>
-          {config.mode === 'specific_steps' ? <><div className="form-grid"><label>SNR (dB)<input disabled={executionActive} type="number" step="any" value={config.snr_db_start} onChange={e => setConfig({ ...config, snr_db_start: Number(e.target.value) })} /></label><label>Steps<input disabled={executionActive} type="number" min="1" value={config.max_frames} onChange={e => { const value = Number(e.target.value); setConfig({ ...config, max_frames: value, trials: value, min_frames: value }) }} /></label></div><small>Run a fixed number of steps at this SNR; AWGN/Rayleigh use it instead of their default.</small></> : <><div className="form-grid"><label>Start<input disabled={executionActive} type="number" step="any" value={config.snr_db_start} onChange={e => setConfig({ ...config, snr_db_start: Number(e.target.value) })} /></label><label>Stop<input disabled={executionActive} type="number" step="any" value={config.snr_db_stop} onChange={e => setConfig({ ...config, snr_db_stop: Number(e.target.value) })} /></label></div><label>Step<input disabled={executionActive} type="number" min="0.01" step="any" value={config.snr_db_step} onChange={e => setConfig({ ...config, snr_db_step: Number(e.target.value) })} /></label><div className="form-grid"><label>Max frames / SNR<input disabled={executionActive} type="number" min="1" value={config.max_frames} onChange={e => { const value = Number(e.target.value); setConfig({ ...config, max_frames: value, trials: value }) }} /></label><label>Min frames / SNR<input disabled={executionActive} type="number" min="1" value={config.min_frames} onChange={e => setConfig({ ...config, min_frames: Number(e.target.value) })} /></label></div><label>Min errors / SNR<input disabled={executionActive} type="number" min="0" value={config.min_errors} onChange={e => setConfig({ ...config, min_errors: Number(e.target.value) })} /><small>Benchmark stops early after this many bit errors.</small></label></>}
-          <div className="section-rule"><span>RUNTIME</span></div>
-          <div className="form-grid"><label>Workers<input disabled={executionActive} type="number" min="0" value={config.workers} onChange={e => setConfig({ ...config, workers: Number(e.target.value) })} /><small>0 = auto</small></label><label>Seed<input disabled={executionActive} type="number" value={config.seed} onChange={e => setConfig({ ...config, seed: Number(e.target.value) })} /></label></div>
-          <label>Chunk size<input disabled={executionActive} type="number" min="1" value={config.chunk_size} onChange={e => setConfig({ ...config, chunk_size: Number(e.target.value) })} /></label>
-          <label>Compute device<select disabled={executionActive} value={config.device} onChange={e => setConfig({ ...config, device: e.target.value as SimulationConfig['device'] })}><option value="auto">Auto · best available</option><option value="cpu">CPU · multiprocessing</option><option value="gpu">GPU · CUDA/CuPy</option></select></label>
-          {configIssue && <div className="config-issue" role="alert">{configIssue}</div>}
-          </div>
-          </div>
-          {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} frames processed · {job.trials} max</span><span>{job.device || result?.device || 'preparing'}</span></div>{job.status === 'running' && <button className="cancel" onClick={() => cancelJob(job.id)}><CircleStop size={14} /> Cancel</button>}</div>}
-          {error && <div className="error-box">{error}</div>}
-          {(result || hasVisibleSinkResults) && <div className="results" ref={resultsRef}>
-            <div className="section-rule"><span>{job?.status === 'running' ? 'LIVE RESULTS' : 'RESULTS'}</span></div>
-            {result && <div className="metric-row results-runtime"><div className="metric"><span>Elapsed</span><strong>{result.elapsed_seconds.toFixed(2)} s</strong></div><div className="metric"><span>Throughput</span><strong>{formatNumber(result.throughput_bps / 1000)} kb/s</strong></div></div>}
-            <SinkResults nodes={sinkNodes} metrics={activeSinkMetrics} berPoints={livePoints} berLive={job?.status === 'running'} />
-            {result?.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}
-          </div>}
-          </div>
-          <div className="experiment-actions-dock"><div className="experiment-actions"><button className="run-once" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} title="Execute one frame and capture data at every port"><Play size={13} fill="currentColor" />{runOnceActive ? 'Running…' : 'Run once'}</button><button className="run-wide experiment-benchmark" onClick={runBenchmark} disabled={executionActive || Boolean(configIssue)} title={configIssue || undefined}><Play size={14} fill="currentColor" />{jobActive ? 'Benchmark running…' : 'Run Benchmark'}</button></div></div>
-        </div>}
+        </div> : selectedEdge ? <div className="inspector-content connection-properties">
+          <div className="selection-heading"><span className="large-icon"><ArrowLeftRight /></span><div><small>SELECTED CONNECTION</small><h3>{selectedEdgeSource?.data.label || selectedEdge.source} → {selectedEdgeTarget?.data.label || selectedEdge.target}</h3></div><button className="icon-danger" onClick={() => { setEdges(items => items.filter(edge => edge.id !== selectedEdge.id)); setSelectedEdgeId(null); clearDiagnostics() }} title="Delete connection"><X size={16} /></button></div>
+          <div className="section-rule"><span>CONNECTION PROPERTIES</span></div>
+          <dl><div><dt>Source block</dt><dd>{selectedEdgeSource?.data.label || selectedEdge.source}</dd></div><div><dt>Output port</dt><dd>{selectedEdge.sourceHandle || 'out'}</dd></div><div><dt>Target block</dt><dd>{selectedEdgeTarget?.data.label || selectedEdge.target}</dd></div><div><dt>Input port</dt><dd>{selectedEdge.targetHandle || 'in'}</dd></div></dl>
+          <p className="muted">Select either endpoint block to edit its parameters and inspect current port data.</p>
+        </div> : <div className="empty-state"><Settings2 size={32} /><h3>No object selected</h3><p>Select a block or connection on the canvas to view its properties.</p></div>}
         {rightOpen && <div className="sidebar-resizer right-resizer" onPointerDown={event => startResize('right', event)} title="Resize inspector" />}
       </aside>
 

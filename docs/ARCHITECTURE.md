@@ -61,7 +61,9 @@ Backend tách hợp đồng block khỏi thuật toán xử lý: `block_registry
 
 `snapshots.py` giữ tối đa bốn frame đại diện gần nhất bằng LRU trong RAM. Kết quả Run once/Benchmark chỉ trả `snapshot_id` và summary nhỏ; tab Block gọi API port theo trang 128 phần tử, còn Copy all đọc tuần tự theo chunk 4096. Vì vậy polling job không mang buffer lớn lặp lại, block ảnh không khiến DOM render hàng triệu dòng cùng lúc, nhưng người dùng vẫn truy cập được mọi phần tử. Mỗi output chỉ được đóng băng/copy về host một lần; input downstream tham chiếu lại snapshot output upstream nên không nhân đôi buffer trên từng cạnh.
 
-Canvas quản lý selection của node và edge tách biệt: click edge đặt trạng thái chọn để highlight/xóa riêng bằng bàn phím, còn click node chuyển inspector sang Block. Sự kiện bắt đầu/kết thúc connection đặt cờ UI dùng chung để tạm ẩn tooltip port và Current port data trong lúc kéo. Tab Experiment chia thành vùng nội dung cuộn và action dock cố định ở đáy inspector.
+Canvas quản lý selection của node và edge tách biệt: click edge đặt trạng thái chọn để highlight và đưa thông tin hai endpoint/port vào Properties inspector; click node đưa tham số và port data của block vào cùng inspector. Sidebar phải không còn sở hữu cấu hình chạy. Run once/Run Benchmark/Experiment config/Reset nằm trong toolbar nổi phía trên canvas; cấu hình, tiến độ và kết quả tổng hợp nằm trong modal Experiment config. Reset chỉ xóa runtime state/snapshot/preview, không sửa graph hoặc config. Sự kiện bắt đầu/kết thúc connection đặt cờ UI dùng chung để tạm ẩn tooltip port và Current port data trong lúc kéo.
+
+`SignalNode` suy ra trạng thái marker trực tiếp từ `portPreviews[direction][port].size`: chưa có preview hoặc size bằng 0 dùng marker vàng; preview có dữ liệu dùng marker xanh lá. Vì topology/parameter edit và Reset đều đi qua `clearDiagnostics()`, trạng thái màu không cần một state song song và không thể lệch khỏi snapshot đang hiển thị.
 
 `SinkChart.tsx` hiện là component điều phối trạng thái BER và dùng các module feature trên. Mọi plot đều đi qua `BerPlot`, nên preview, report, đường reference, marker và quy tắc điểm BER bằng 0 có một nguồn logic duy nhất.
 

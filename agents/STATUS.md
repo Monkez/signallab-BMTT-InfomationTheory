@@ -1,6 +1,6 @@
 # Trạng thái dự án
 
-- Ngày cập nhật: 2026-08-19
+- Ngày cập nhật: 2026-08-21
 - Giai đoạn: bản desktop Windows hoàn tất và đã kiểm thử
 - Kiến trúc: React/TypeScript + React Flow, FastAPI/Python, NumPy/CuPy tùy chọn.
 - Đã hoàn thành: đặc tả, engine DAG, Monte-Carlo CPU/GPU tùy chọn, REST jobs, canvas React Flow, editor Python, dashboard và script Windows.
@@ -97,9 +97,11 @@
 - Experiment header cleanup: đã bỏ nhãn `MONTE-CARLO` và tiêu đề `Experiment` ở đầu panel, chỉ giữ hai button chạy và cho chúng dùng toàn bộ chiều rộng inspector.
 - Experiment settings card: gom header và toàn bộ tham số vào một area có viền/phân cách; mở/đóng dùng animation max-height/opacity và giữ hai nút chạy ở phía trên.
 - Sink Results layout: bỏ khung ngoài và lớp BER card dư thừa; chỉ giữ một đường phân cách, tiêu đề Sink Results, rồi hiển thị trực tiếp biểu đồ/bảng và các card sink cần thiết.
-- Canvas interaction: block library hỗ trợ kéo-thả block trực tiếp vào canvas (tọa độ được chuyển đúng theo zoom/pan); mở file, sample hoặc reset sample tự động fit toàn bộ graph vào vùng nhìn.
+- Canvas interaction: block library hỗ trợ kéo-thả block trực tiếp vào canvas (tọa độ được chuyển đúng theo zoom/pan); mở file hoặc sample tự động fit toàn bộ graph vào vùng nhìn.
 - QPSK/AWGN audit: sửa AWGN cho tín hiệu phức tạo nhiễu độc lập trên cả I và Q. Lỗi cũ chỉ cộng nhiễu thực, làm constellation QPSK thành hai dải ngang. Đã thêm regression test xác nhận cả hai thành phần đều có nhiễu.
 - Results UX/sinks: tách khoảng cách giữa BER chart và bảng SNR; Run once nay trả `sink_metrics` giống Benchmark; Experiment render card/visualization theo đúng các sink hiện có (TX Power, Scope, Constellation, Source Analyzer, SER), gồm preview scatter I/Q từ frame đại diện. Backend test đạt 61/61, frontend build pass.
 - Refactor Results theo ownership của sink: bỏ Overall BER khỏi Experiment; BER chart và bảng SNR chỉ render khi graph có BER Meter. Các sink khác có nút Details mở report riêng với tab Chart, Edit & Data và References, hỗ trợ đổi tên/màu/style, sửa metrics, lưu JSON, Browse/Load và xóa reference.
-- Startup/Results UX: app mở mặc định bằng simulation trắng (Reset sample/Open Samples vẫn giữ sample học tập); thêm splash screen thương hiệu khi frontend khởi động; elapsed/throughput đưa lên đầu Results và BER chart/bảng được gộp vào BER Meter trong nhóm Sink Results.
+- Startup/Results UX: app mở mặc định bằng simulation trắng; Open Samples cung cấp các graph học tập; thêm splash screen thương hiệu khi frontend khởi động; elapsed/throughput đưa lên đầu Results và BER chart/bảng được gộp vào BER Meter trong nhóm Sink Results.
 - Sửa lỗi Python source block không có input: `PORTS = {"inputs": [], ...}` nay hỗ trợ tự nhiên `process(params)`, nên các file dùng Variables như `Untitled simulation.slab.json` chạy đúng. Python exception được chuẩn hóa thành lỗi có số dòng, câu lệnh, loại lỗi, khóa thiếu và danh sách params khả dụng. Console có thể bôi chọn text và nút Copy toàn bộ log.
+- Canvas controls 2026-08-21: Run once/Run Benchmark chuyển sang toolbar nổi ở mép trên graph; thêm Experiment config modal và Reset runtime data. Inspector phải chỉ hiển thị properties của block/connection đang chọn. Marker port mặc định vàng, đổi xanh khi preview có dữ liệu và trở lại vàng sau Reset/edit.
+- Xác minh canvas controls: frontend production build pass; browser QA xác nhận modal/config, selection inspector, chu trình port vàng → xanh → vàng, Reset tự disable khi hết runtime data và không có console warning/error.

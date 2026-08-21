@@ -154,7 +154,11 @@ Trong tab **Block**, vùng `process.py` là Python IDE editor thật với:
 Nhấn **Open editor** để mở cửa sổ code lớn. Cửa sổ này giữ một bản nháp riêng: **Cancel** đóng mà không thay đổi block, **Apply changes** mới đưa code về simulation. Có thể dùng `Ctrl+S` hoặc `Ctrl+Enter` ngay trong editor để Apply; các phím này không ghi file project khi cửa sổ code đang mở. Thanh trạng thái hiển thị Python 3, UTF-8, số dòng, số ký tự và trạng thái Modified. Các nút **API docs**, **Copy** và **Reset** giúp mở tài liệu, sao chép toàn bộ hoặc khôi phục code template.
 ## Experiment modes
 
-The Experiment tab starts with a mode selector so the same canvas can be used for BER lessons, signal measurements, and other sink-based exercises:
+Thanh điều khiển nổi ở phía trên canvas gồm **Run once**, **Run Benchmark**, **Experiment config** và **Reset**. Hai nút chạy luôn ở gần graph; **Experiment config** mở cửa sổ riêng để chỉnh tham số, theo dõi tiến độ và xem kết quả tổng hợp. Sidebar bên phải chỉ hiển thị properties của block hoặc connection đang được chọn.
+
+**Reset** chỉ xóa snapshot, runtime result, lỗi và dữ liệu preview trên toàn bộ port. Graph, connection, tham số block và cấu hình Experiment không thay đổi. Port chưa có dữ liệu hiển thị marker vàng; sau Run once/Run Benchmark, port có dữ liệu chuyển sang xanh lá và trở lại vàng sau Reset hoặc khi graph/parameter thay đổi.
+
+Cửa sổ **Experiment config** có mode selector để cùng một canvas dùng được cho bài BER, phép đo tín hiệu và các bài có sink khác:
 
 - **Specific steps** runs a fixed number of steps and does not sweep SNR. Channels use their own block parameters.
 - **BER benchmark** is the adaptive Monte-Carlo mode. Each SNR point runs until `Min frames / SNR` and `Min errors / SNR` are reached, or until the frame limit is reached. Use this for BER curves.

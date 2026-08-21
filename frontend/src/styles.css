@@ -114,6 +114,31 @@ button { color: inherit; border: 0; cursor: pointer; }
   .samples-body { grid-template-columns: 300px minmax(0, 1fr); }
   .sample-learning-grid { grid-template-columns: 1fr; gap: 13px; }
 }
+.experiment-config-overlay { position: fixed; inset: 0; z-index: 5200; display: grid; place-items: center; padding: 24px; background: rgba(21,31,45,.46); backdrop-filter: blur(4px); }
+.experiment-config-modal { width: min(1120px, calc(100vw - 48px)); height: min(780px, calc(100vh - 48px)); min-height: 560px; overflow: hidden; display: grid; grid-template-rows: auto minmax(0,1fr); border: 1px solid #c5cfdb; border-radius: 12px; background: #fff; box-shadow: 0 28px 80px rgba(17,27,40,.3); }
+.experiment-config-header { min-height: 105px; padding: 20px 23px; display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; border-bottom: 1px solid #dce3eb; background: #fbfcfe; }
+.experiment-config-header span { color: #55749d; font: 9px Consolas, monospace; letter-spacing: .13em; }
+.experiment-config-header h2 { margin: 5px 0 0; color: #1f2d40; font-size: 22px; }
+.experiment-config-header p { margin: 6px 0 0; color: #6f7d90; font-size: 11px; }
+.experiment-config-header button { flex: 0 0 auto; width: 35px; height: 35px; display: grid; place-items: center; border-radius: 7px; background: transparent; color: #748196; }
+.experiment-config-header button:hover { background: #eef2f7; color: #26374d; }
+.experiment-config-body { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(340px, .8fr) minmax(420px, 1.2fr); }
+.experiment-config-form, .experiment-config-results { min-width: 0; min-height: 0; overflow: auto; padding: 6px 22px 24px; }
+.experiment-config-form { border-right: 1px solid #dce3eb; background: #fbfcfd; }
+.experiment-config-results { background: #fff; }
+.experiment-config-empty { min-height: 300px; display: grid; place-content: center; justify-items: center; gap: 7px; color: #8490a0; text-align: center; }
+.experiment-config-empty strong { color: #526174; font-size: 12px; }
+.experiment-config-empty span { font-size: 10px; }
+.connection-properties dl { margin: 0; overflow: hidden; border: 1px solid #d7e0ea; border-radius: 7px; background: #fff; }
+.connection-properties dl > div { min-height: 43px; padding: 7px 10px; display: grid; grid-template-columns: 92px minmax(0,1fr); align-items: center; gap: 9px; border-bottom: 1px solid #e8edf3; }
+.connection-properties dl > div:last-child { border-bottom: 0; }
+.connection-properties dt { color: #7a8798; font-size: 9px; }
+.connection-properties dd { min-width: 0; margin: 0; overflow: hidden; color: #2f4f78; font: 600 10px Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1000px), (max-height: 640px) {
+  .experiment-config-overlay { padding: 10px; }
+  .experiment-config-modal { width: calc(100vw - 20px); height: calc(100vh - 20px); min-height: 0; }
+  .experiment-config-body { grid-template-columns: minmax(320px, .9fr) minmax(360px, 1.1fr); }
+}
 .config-issue { margin: 2px 0 8px; padding: 8px 9px; border: 1px solid #efbdc5; border-radius: 6px; background: #fff2f4; color: #ad2e44; font-size: 11px; line-height: 1.4; }
 .library, .inspector { grid-row: 2 / 4; background: var(--panel); min-height: 0; z-index: 5; position: relative; transition: opacity .15s ease; }
 .library { grid-column: 1; }
@@ -144,6 +169,15 @@ button { color: inherit; border: 0; cursor: pointer; }
 .canvas-wrap { grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; position: relative; background: #f5f7f9; }
 .canvas-label { position: absolute; z-index: 4; left: 16px; top: 13px; display: flex; gap: 8px; font-family: Consolas, monospace; font-size: 8px; color: #8893a1; }
 .canvas-label span:first-child { color: #596575; }
+.simulation-toolbar { position: absolute; z-index: 30; top: 12px; left: 50%; max-width: calc(100% - 230px); min-height: 47px; padding: 6px; display: flex; align-items: center; gap: 6px; transform: translateX(-50%); border: 1px solid #cbd5e1; border-radius: 10px; background: rgba(255,255,255,.97); box-shadow: 0 8px 24px rgba(31,46,67,.14); backdrop-filter: blur(8px); }
+.simulation-toolbar .run-once, .simulation-toolbar .run-wide { width: auto; height: 35px; min-height: 35px; margin: 0; justify-content: center; }
+.simulation-tool-button { height: 35px; padding: 0 11px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #ccd7e4; border-radius: 6px; background: #fff; color: #45566d; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.simulation-tool-button:hover:not(:disabled) { border-color: #8aa9d3; background: #f0f5fc; color: #2459a6; }
+.simulation-tool-button.reset { color: #8a5a20; }
+.simulation-tool-button.reset:hover:not(:disabled) { border-color: #d2ad71; background: #fff8ec; color: #754510; }
+.simulation-tool-button:disabled { opacity: .45; cursor: default; }
+.simulation-toolbar-divider { width: 1px; height: 24px; background: #dce3eb; }
+.simulation-progress { min-width: 35px; color: #2563eb; font: 600 10px Consolas, monospace; text-align: center; }
 .react-flow__attribution { display: none; }
 .react-flow__controls { border: 1px solid var(--line-strong) !important; border-radius: 7px !important; overflow: hidden; box-shadow: 0 2px 8px rgba(25,35,48,.07) !important; }
 .react-flow__controls-button { background: #fff !important; color: #5a6676 !important; border-bottom-color: var(--line) !important; }
@@ -163,7 +197,10 @@ button { color: inherit; border: 0; cursor: pointer; }
 .port-label:focus { outline: none; color: #1f57ba; }
 .port-label.input { left: 8px; padding-left: 1px; }
 .port-label.output { right: 8px; padding-right: 1px; }
-.react-flow__handle { width: 8px !important; height: 8px !important; border: 2px solid #fff !important; background: #5477a7 !important; }
+.react-flow__handle { width: 12px !important; height: 12px !important; border: 2px solid #fff !important; background: #f2bd2e !important; box-shadow: 0 0 0 1px #bb8610, 0 2px 5px rgba(75,55,10,.28); transition: background .16s ease, box-shadow .16s ease, transform .16s ease; }
+.react-flow__handle.has-data { background: #27b96f !important; box-shadow: 0 0 0 1px #14864d, 0 0 0 4px rgba(39,185,111,.13), 0 2px 5px rgba(15,97,55,.25); }
+.port-label:hover .react-flow__handle, .port-label:focus-within .react-flow__handle { transform: scale(1.16); }
+.port-label.has-data { color: #168052; font-weight: 700; }
 .port-label.input .react-flow__handle { left: -13px !important; }
 .port-label.output .react-flow__handle { right: -13px !important; }
 .signal-node.ports-reversed .port-label.input { left: auto; right: 8px; padding-left: 0; padding-right: 1px; text-align: right; }

@@ -15,7 +15,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 - Dashboard tiến độ, BER, số lỗi bit, throughput, thời gian và cảnh báo.
 - Quét SNR dB theo start/stop/step; mỗi điểm có giới hạn frame tối thiểu/tối đa và số lỗi tối thiểu.
 - AWGN tham chiếu SNR của Experiment hoặc giữ giá trị cố định; Sink BER hiển thị đồ thị BER theo SNR.
-- Chọn block ngay khi bắt đầu kéo; sidebar thư viện và inspector có thể ẩn/hiện, kéo đổi kích thước.
+- Canvas dùng toàn bộ vùng bên trái; thư viện block mở từ nút Add trên toolbar, có search và các nhóm thu gọn mặc định. Chỉ Properties inspector bên phải có thể ẩn/hiện và kéo đổi kích thước.
 - Console dock phía dưới ghi lại trạng thái job, cảnh báo và lỗi để debug mô phỏng ngay trong app.
 - Dashboard realtime cập nhật BER theo SNR khi simulation đang chạy; biểu đồ và bảng có thao tác copy/export PNG, TSV và CSV.
 - Engine tối ưu graph lookup, seed theo batch và tái sử dụng process pool; auto mode tránh multiprocessing cho workload nhỏ để giảm độ trễ.

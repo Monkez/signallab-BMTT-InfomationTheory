@@ -1,12 +1,12 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow, Background, Controls, MiniMap, addEdge, useNodesState, useEdgesState,
   BackgroundVariant, MarkerType, type Connection, type EdgeChange, type EdgeMouseHandler, type NodeMouseHandler, type OnNodeDrag,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
-  Activity, ArrowLeftRight, BookOpen, Box, Braces, CircleStop, FilePlus2, FolderOpen, Settings2,
-  Copy, Layers3, LibraryBig, Maximize2, PanelBottom, PanelLeft, PanelRight, Play, Plus, RotateCcw, Save, SaveAll, Search, Terminal, Trash2, X,
+  Activity, ArrowLeftRight, BarChart3, BookOpen, Box, Braces, CircleStop, FilePlus2, FolderOpen, Settings2,
+  Copy, LibraryBig, Maximize2, PanelBottom, PanelRight, Play, Plus, RotateCcw, Save, SaveAll, Terminal, Trash2, X,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
 import { cancelJob, createJob, getJob, graphPayload, GraphApiError, runGraphOnce } from './api'
@@ -15,7 +15,8 @@ import type { BlockSpec, FlowEdge, FlowNode, Job, PortPreviewMap, SimulationConf
 import { BerChart } from './SinkChart'
 import { ConstellationPreview, SinkResults } from './SinkResults'
 import { FlowMiniMapNode } from './components/FlowMiniMapNode'
-import { fallbackSpecs, iconFor, miniMapColor } from './features/blocks/catalog'
+import { fallbackSpecs, miniMapColor } from './features/blocks/catalog'
+import { BlockPickerModal } from './features/blocks/BlockPickerModal'
 import { PortDataInspector } from './features/blocks/PortDataInspector'
 import { defaultSimulationConfig, snrPointCount, validateSimulationConfig } from './features/experiment/config'
 import { HuffmanCodebookTable } from './features/sourceTheory/HuffmanCodebookTable'
@@ -52,7 +53,6 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
-  const [search, setSearch] = useState('')
   const [config, setConfig] = useState<SimulationConfig>(defaultSimulationConfig)
   const [job, setJob] = useState<Job | null>(null)
   const [runOnceActive, setRunOnceActive] = useState(false)
@@ -61,9 +61,9 @@ function App() {
   const [snapshotId, setSnapshotId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [experimentConfigOpen, setExperimentConfigOpen] = useState(false)
-  const [leftOpen, setLeftOpen] = useState(true)
+  const [blockPickerOpen, setBlockPickerOpen] = useState(false)
+  const [resultsOpen, setResultsOpen] = useState(false)
   const [rightOpen, setRightOpen] = useState(true)
-  const [leftWidth, setLeftWidth] = useState(270)
   const [rightWidth, setRightWidth] = useState(360)
   const [consoleOpen, setConsoleOpen] = useState(true)
   const [consoleHeight, setConsoleHeight] = useState(156)
@@ -81,7 +81,7 @@ function App() {
   const bootLoggedRef = useRef(false)
   const lastSnrRef = useRef<number | null>(null)
   const consoleResizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
-  const resizeRef = useRef<{ side: 'left' | 'right'; startX: number; startWidth: number } | null>(null)
+  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null)
   const flowInstanceRef = useRef<{ fitView: (options?: Record<string, unknown>) => void; screenToFlowPosition: (position: { x: number; y: number }) => { x: number; y: number } } | null>(null)
   const selected = nodes.find(n => n.id === selectedId)
   const selectedEdge = edges.find(edge => edge.id === selectedEdgeId)
@@ -236,15 +236,14 @@ function App() {
     updateSelected({ params: { ...selected.data.params, file_name: file.name, data_base64: btoa(binary) } })
     appendLog('success', `${file.name} loaded into ${selected.data.label} (${bytes.length.toLocaleString()} bytes).`)
   }
-  const startResize = (side: 'left' | 'right', event: React.PointerEvent) => {
+  const startResize = (event: React.PointerEvent) => {
     event.preventDefault()
-    resizeRef.current = { side, startX: event.clientX, startWidth: side === 'left' ? leftWidth : rightWidth }
+    resizeRef.current = { startX: event.clientX, startWidth: rightWidth }
     const move = (moveEvent: PointerEvent) => {
       const current = resizeRef.current
       if (!current) return
       const delta = moveEvent.clientX - current.startX
-      if (current.side === 'left') setLeftWidth(Math.min(420, Math.max(210, current.startWidth + delta)))
-      else setRightWidth(Math.min(520, Math.max(300, current.startWidth - delta)))
+      setRightWidth(Math.min(520, Math.max(300, current.startWidth - delta)))
     }
     const stop = () => { resizeRef.current = null; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop) }
     window.addEventListener('pointermove', move)
@@ -277,25 +276,6 @@ function App() {
       data: { label: spec.label, blockType: spec.type, category: spec.category, params: { ...spec.defaults }, inputs: spec.inputs, outputs: spec.outputs, portOrientation: 'standard', code: spec.type === 'python' ? pythonTemplate : undefined },
     }
     setNodes(ns => [...ns, node]); setSelectedId(id); setRightOpen(true)
-  }
-
-  const onLibraryDragStart = (event: DragEvent<HTMLButtonElement>, spec: BlockSpec) => {
-    event.dataTransfer.setData('application/signallab-block', spec.type)
-    event.dataTransfer.effectAllowed = 'move'
-  }
-
-  const onCanvasDrop = (event: DragEvent) => {
-    event.preventDefault()
-    const type = event.dataTransfer.getData('application/signallab-block')
-    const spec = specs.find(item => item.type === type)
-    if (!spec || !flowInstanceRef.current) return
-    addBlock(spec, flowInstanceRef.current.screenToFlowPosition({ x: event.clientX, y: event.clientY }))
-  }
-
-  const onCanvasDragOver = (event: DragEvent) => {
-    if (!event.dataTransfer.types.includes('application/signallab-block')) return
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
   }
 
   const runOnce = async () => {
@@ -460,10 +440,6 @@ function App() {
     window.addEventListener('keydown', onSaveShortcut)
     return () => window.removeEventListener('keydown', onSaveShortcut)
   }, [saveProject])
-  const grouped = useMemo(() => {
-    const priority = (spec: BlockSpec) => spec.type === 'variables' ? 0 : spec.type === 'python' ? 1 : 2
-    return specs.filter(s => `${s.label} ${s.category}`.toLowerCase().includes(search.toLowerCase())).sort((a, b) => priority(a) - priority(b)).reduce<Record<string, BlockSpec[]>>((acc, spec) => ((acc[spec.category] ||= []).push(spec), acc), {})
-  }, [specs, search])
   const result = job?.result
   const livePointsRaw = job?.status === 'running' ? (job.snr_points || []) : (result?.snr_points || job?.snr_points || [])
   const livePoints = livePointsRaw.filter(point => Number.isFinite(point.snr_db)).map(point => ({ ...point, snr_db: point.snr_db as number }))
@@ -487,12 +463,11 @@ function App() {
   } : undefined
 
   return (
-    <><div className={`startup-splash ${splashVisible ? '' : 'hidden'}`} aria-hidden={!splashVisible}><div className="startup-logo"><img src="/app-icon.svg" alt="" /></div><strong>SignalLab</strong><span>Digital Communications Studio</span><i /></div><div className={`app-shell ${isConnecting ? 'connecting' : ''}`} style={{ gridTemplateRows: `60px minmax(0, 1fr) ${consoleOpen ? consoleHeight : 0}px`, gridTemplateColumns: `${leftOpen ? leftWidth : 0}px minmax(0, 1fr) ${rightOpen ? rightWidth : 0}px` }}>
+    <><div className={`startup-splash ${splashVisible ? '' : 'hidden'}`} aria-hidden={!splashVisible}><div className="startup-logo"><img src="/app-icon.svg" alt="" /></div><strong>SignalLab</strong><span>Digital Communications Studio</span><i /></div><div className={`app-shell ${isConnecting ? 'connecting' : ''}`} style={{ gridTemplateRows: `60px minmax(0, 1fr) ${consoleOpen ? consoleHeight : 0}px`, gridTemplateColumns: `minmax(0, 1fr) ${rightOpen ? rightWidth : 0}px` }}>
       <header className="topbar">
         <div className="brand"><div className="brand-mark"><img src="/app-icon.svg" alt="SignalLab logo" /></div><div><strong>SignalLab</strong><span>Communications Studio</span></div></div>
         <div className={`project-name ${projectDirty ? 'dirty' : ''}`} title={projectDirty ? 'Unsaved changes' : 'All changes saved'}><span className="status-dot" /><span>{projectName}</span>{projectDirty && <small>Unsaved</small>}</div>
         <div className="top-actions">
-          <button className="ghost" onClick={() => setLeftOpen(value => !value)} title={leftOpen ? 'Hide block library' : 'Show block library'}><PanelLeft size={16} /></button>
           <button className="ghost" onClick={() => setRightOpen(value => !value)} title={rightOpen ? 'Hide inspector' : 'Show inspector'}><PanelRight size={16} /></button>
           <button className={`ghost ${consoleOpen ? 'active' : ''}`} onClick={() => setConsoleOpen(value => !value)} title={consoleOpen ? 'Hide console' : 'Show console'}><PanelBottom size={16} /></button>
           <button className="ghost labeled compact-label" onClick={newSimulation} disabled={executionActive} title="Create a blank simulation"><FilePlus2 size={15} /><span>New</span></button>
@@ -505,10 +480,11 @@ function App() {
         </div>
       </header>
       <SampleLibraryModal open={samplesOpen} onClose={() => setSamplesOpen(false)} onOpenSample={openCatalogSample} />
+      {blockPickerOpen && <BlockPickerModal specs={specs} onClose={() => setBlockPickerOpen(false)} onAdd={spec => { addBlock(spec); setBlockPickerOpen(false) }} />}
       {experimentConfigOpen && <div className="experiment-config-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setExperimentConfigOpen(false) }}>
-        <section className="experiment-config-modal" role="dialog" aria-modal="true" aria-labelledby="experiment-config-title">
-          <header className="experiment-config-header"><div><span>SIMULATION SETTINGS</span><h2 id="experiment-config-title">Experiment config</h2><p>Configure execution, review progress, and inspect aggregate results.</p></div><button type="button" onClick={() => setExperimentConfigOpen(false)} title="Close experiment config"><X size={18} /></button></header>
-          <div className="experiment-config-body">
+        <section className="experiment-config-modal config-only" role="dialog" aria-modal="true" aria-labelledby="experiment-config-title">
+          <header className="experiment-config-header"><div><span>SIMULATION SETTINGS</span><h2 id="experiment-config-title">Experiment config</h2><p>Configure the experiment mode and runtime settings.</p></div><button type="button" onClick={() => setExperimentConfigOpen(false)} title="Close experiment config"><X size={18} /></button></header>
+          <div className="experiment-config-body config-only">
             <div className="experiment-config-form">
               <div className="section-rule"><span>EXPERIMENT MODE</span></div>
               <label>Mode<select disabled={executionActive} value={config.mode} onChange={e => setConfig({ ...config, mode: e.target.value as SimulationConfig['mode'] })}><option value="specific_steps">Specific steps · fixed count</option><option value="ber_benchmark">BER benchmark · SNR sweep</option></select><small>{config.mode === 'specific_steps' ? 'Run fixed steps at one SNR; channels use it unless set to Fixed block value.' : 'Sweep SNR and stop each point after enough errors or the frame limit.'}</small></label>
@@ -520,12 +496,16 @@ function App() {
               <label>Compute device<select disabled={executionActive} value={config.device} onChange={e => setConfig({ ...config, device: e.target.value as SimulationConfig['device'] })}><option value="auto">Auto · best available</option><option value="cpu">CPU · multiprocessing</option><option value="gpu">GPU · CUDA/CuPy</option></select></label>
               {configIssue && <div className="config-issue" role="alert">{configIssue}</div>}
             </div>
-            <div className="experiment-config-results">
-              <div className="section-rule"><span>EXECUTION & RESULTS</span></div>
-              {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} frames processed · {job.trials} max</span><span>{job.device || result?.device || 'preparing'}</span></div>{job.status === 'running' && <button className="cancel" onClick={() => cancelJob(job.id)}><CircleStop size={14} /> Cancel</button>}</div>}
-              {error && <div className="error-box">{error}</div>}
-              {(result || hasVisibleSinkResults) ? <div className="results" ref={resultsRef}>{result && <div className="metric-row results-runtime"><div className="metric"><span>Elapsed</span><strong>{result.elapsed_seconds.toFixed(2)} s</strong></div><div className="metric"><span>Throughput</span><strong>{formatNumber(result.throughput_bps / 1000)} kb/s</strong></div></div>}<SinkResults nodes={sinkNodes} metrics={activeSinkMetrics} berPoints={livePoints} berLive={job?.status === 'running'} />{result?.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}</div> : <div className="experiment-config-empty"><Activity size={28} /><strong>No runtime results</strong><span>Run once or Run Benchmark from the floating toolbar.</span></div>}
-            </div>
+          </div>
+        </section>
+      </div>}
+      {resultsOpen && <div className="experiment-config-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setResultsOpen(false) }}>
+        <section className="experiment-config-modal results-modal" role="dialog" aria-modal="true" aria-labelledby="results-title">
+          <header className="experiment-config-header"><div><span>SIMULATION OUTPUT</span><h2 id="results-title">Results</h2><p>Review execution progress and aggregate sink results.</p></div><button type="button" onClick={() => setResultsOpen(false)} title="Close results"><X size={18} /></button></header>
+          <div className="results-modal-body">
+            {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} frames processed · {job.trials} max</span><span>{job.device || result?.device || 'preparing'}</span></div>{job.status === 'running' && <button className="cancel" onClick={() => cancelJob(job.id)}><CircleStop size={14} /> Cancel</button>}</div>}
+            {error && <div className="error-box">{error}</div>}
+            {(result || hasVisibleSinkResults) ? <div className="results" ref={resultsRef}>{result && <div className="metric-row results-runtime"><div className="metric"><span>Elapsed</span><strong>{result.elapsed_seconds.toFixed(2)} s</strong></div><div className="metric"><span>Throughput</span><strong>{formatNumber(result.throughput_bps / 1000)} kb/s</strong></div></div>}<SinkResults nodes={sinkNodes} metrics={activeSinkMetrics} berPoints={livePoints} berLive={job?.status === 'running'} />{result?.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}</div> : <div className="experiment-config-empty"><Activity size={28} /><strong>No runtime results</strong><span>Run once or Run Benchmark from the floating toolbar.</span></div>}
           </div>
         </section>
       </div>}
@@ -539,26 +519,20 @@ function App() {
         onOpenDocs={openDocuments}
       /></Suspense>}
 
-      <aside className={`library ${leftOpen ? '' : 'collapsed'}`}>
-        <div className="panel-title"><Layers3 size={16} /><span>Block library</span><small>{specs.length} blocks</small></div>
-        <div className="search"><Search size={15} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search blocks…" /></div>
-        <div className="library-list">
-          {Object.entries(grouped).map(([category, blocks]) => <section key={category}><h4>{category}</h4>{blocks.map(spec => { const Icon = iconFor(spec.type); return <button className="block-item" key={spec.type} draggable onDragStart={event => onLibraryDragStart(event, spec)} onClick={() => addBlock(spec)}><span className="block-icon"><Icon size={16} /></span><span><b>{spec.label}</b><small>{spec.description}</small></span><Plus size={14} /></button> })}</section>)}
-        </div>
-        {leftOpen && <div className="sidebar-resizer left-resizer" onPointerDown={event => startResize('left', event)} title="Resize block library" />}
-      </aside>
-
       <main className="canvas-wrap">
         <div className="canvas-label"><span>FLOWGRAPH</span><span>{nodes.length} blocks · {edges.length} links</span></div>
         <div className="simulation-toolbar" role="toolbar" aria-label="Simulation controls">
+          <button className="simulation-icon-button add-icon" onClick={() => setBlockPickerOpen(true)} aria-label="Add block" data-tooltip="Add block"><Plus size={17} /></button>
+          <span className="simulation-toolbar-divider" />
           <button className="simulation-icon-button run-once-icon" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} aria-label={runOnceActive ? 'Running one frame' : 'Run once'} data-tooltip={runOnceActive ? 'Running…' : 'Run once'}><Play size={17} fill="currentColor" /></button>
-          <button className="simulation-icon-button benchmark-icon" onClick={runBenchmark} disabled={executionActive || Boolean(configIssue)} aria-label={jobActive ? 'Benchmark running' : 'Run Benchmark'} data-tooltip={configIssue || (jobActive ? 'Benchmark running…' : 'Run Benchmark')}><Activity size={18} /></button>
+          <button className="simulation-icon-button benchmark-icon" onClick={runBenchmark} disabled={executionActive || Boolean(configIssue)} aria-label={jobActive ? 'Benchmark running' : 'Run Benchmark'} data-tooltip={configIssue || (jobActive ? 'Benchmark running…' : 'Run Benchmark')}><Play size={17} fill="currentColor" /></button>
           <button className="simulation-icon-button config-icon" onClick={() => setExperimentConfigOpen(true)} aria-label="Experiment config" data-tooltip="Experiment config"><Settings2 size={18} /></button>
           <span className="simulation-toolbar-divider" />
+          <button className="simulation-icon-button results-icon" onClick={() => setResultsOpen(true)} aria-label="Results" data-tooltip="Results"><BarChart3 size={17} /></button>
           <button className="simulation-icon-button reset-icon" onClick={resetPortData} disabled={executionActive || (!snapshotId && !hasVisibleSinkResults && !error)} aria-label="Reset port data" data-tooltip="Reset port data"><RotateCcw size={18} /></button>
           {jobActive && <span className="simulation-progress" aria-live="polite">{Math.round((job?.progress || 0) * 100)}%</span>}
         </div>
-        <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, selected: e.id === selectedEdgeId, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running', style: e.id === selectedEdgeId ? { strokeWidth: 3, stroke: '#2563eb' } : undefined }))} nodeTypes={{ signal: SignalNode }} onInit={instance => { flowInstanceRef.current = instance; window.setTimeout(() => instance.fitView({ padding: 0.18, duration: 320 }), 100) }} onDrop={onCanvasDrop} onDragOver={onCanvasDragOver} onNodesChange={onNodesChange} onEdgesChange={onEdgesChangeWithPreview} onConnect={onConnect} onConnectStart={() => setIsConnecting(true)} onConnectEnd={() => setIsConnecting(false)} onNodeClick={onNodeClick} onNodeDragStart={onNodeDragStart} onEdgeClick={onEdgeClick} onPaneClick={() => { setSelectedId(null); setSelectedEdgeId(null) }} deleteKeyCode={null} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
+        <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, selected: e.id === selectedEdgeId, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running', style: e.id === selectedEdgeId ? { strokeWidth: 3, stroke: '#2563eb' } : undefined }))} nodeTypes={{ signal: SignalNode }} onInit={instance => { flowInstanceRef.current = instance; window.setTimeout(() => instance.fitView({ padding: 0.18, duration: 320 }), 100) }} onNodesChange={onNodesChange} onEdgesChange={onEdgesChangeWithPreview} onConnect={onConnect} onConnectStart={() => setIsConnecting(true)} onConnectEnd={() => setIsConnecting(false)} onNodeClick={onNodeClick} onNodeDragStart={onNodeDragStart} onEdgeClick={onEdgeClick} onPaneClick={() => { setSelectedId(null); setSelectedEdgeId(null) }} deleteKeyCode={null} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
           <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#ccd3dc" />
           <Controls position="bottom-left" />
           <MiniMap position="bottom-right" pannable zoomable offsetScale={4} nodeColor={node => miniMapColor(String((node.data as Record<string, unknown>)?.blockType || ''))} nodeStrokeColor="#ffffff" nodeStrokeWidth={1} nodeBorderRadius={3} nodeComponent={FlowMiniMapNode} bgColor="#f9fbfd" maskColor="rgba(226,233,242,.62)" maskStrokeColor="#8ea8ca" maskStrokeWidth={1} style={{ width: 150, height: 92, border: '1px solid #cbd6e3', borderRadius: 8, boxShadow: '0 3px 12px rgba(36,55,78,.14)' }} />
@@ -596,7 +570,7 @@ function App() {
           <dl><div><dt>Source block</dt><dd>{selectedEdgeSource?.data.label || selectedEdge.source}</dd></div><div><dt>Output port</dt><dd>{selectedEdge.sourceHandle || 'out'}</dd></div><div><dt>Target block</dt><dd>{selectedEdgeTarget?.data.label || selectedEdge.target}</dd></div><div><dt>Input port</dt><dd>{selectedEdge.targetHandle || 'in'}</dd></div></dl>
           <p className="muted">Select either endpoint block to edit its parameters and inspect current port data.</p>
         </div> : <div className="empty-state"><Settings2 size={32} /><h3>No object selected</h3><p>Select a block or connection on the canvas to view its properties.</p></div>}
-        {rightOpen && <div className="sidebar-resizer right-resizer" onPointerDown={event => startResize('right', event)} title="Resize inspector" />}
+        {rightOpen && <div className="sidebar-resizer right-resizer" onPointerDown={startResize} title="Resize inspector" />}
       </aside>
 
       {consoleOpen && <section className="console-dock">

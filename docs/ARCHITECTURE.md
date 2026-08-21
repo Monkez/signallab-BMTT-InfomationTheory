@@ -65,7 +65,7 @@ Canvas quản lý selection của node và edge tách biệt: click edge đặt 
 
 `SignalNode` suy ra trạng thái marker trực tiếp từ `portPreviews[direction][port].size`: chưa có preview hoặc size bằng 0 dùng marker vàng; preview có dữ liệu dùng marker xanh lá. Vì topology/parameter edit và Reset đều đi qua `clearDiagnostics()`, trạng thái màu không cần một state song song và không thể lệch khỏi snapshot đang hiển thị.
 
-`SinkChart.tsx` hiện là component điều phối trạng thái BER và dùng các module feature trên. Mọi plot đều đi qua `BerPlot`, nên preview, report, đường reference, marker và quy tắc điểm BER bằng 0 có một nguồn logic duy nhất.
+`SinkChart.tsx` hiện là component điều phối trạng thái BER và dùng các module feature trên. Mọi plot đều đi qua `BerPlot`, nên preview, dashboard, report, đường reference, marker và quy tắc điểm BER bằng 0 có một nguồn logic duy nhất. `chartMath.ts` tạo miền SNR theo nice-step và chia major/minor tự động; trục BER log dùng major tick từng decade, minor tick 2–9 và grid phụ tại 2/5. Dashboard dùng viewBox 960px và giới hạn chiều rộng để typography không bị phóng đại theo modal.
 
 ## Bản desktop Windows
 

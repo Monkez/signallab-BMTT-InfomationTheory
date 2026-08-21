@@ -409,6 +409,7 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .chart-actions button:hover { border-color: #9bb9e6; color: #1f57ba; background: #f4f8ff; }
 .chart-notice { color: #1f57ba; font-size: 9px; margin: 3px 2px; }
 .sink-chart svg { display: block; width: 100%; height: auto; }
+.sink-chart .ber-dashboard-plot { width: min(100%, 1200px); margin: 12px auto 0; }
 .sink-chart-label { color: #7e8998; font-size: 10px; text-align: center; margin-top: 4px; }
 .ber-curve-controls { display: grid; gap: 4px; margin: 3px 0 5px; }
 .ber-curve-controls input, .ber-curve-controls select { height: 24px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: #526174; font-size: 9px; }

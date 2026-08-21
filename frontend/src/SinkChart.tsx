@@ -10,7 +10,7 @@ import type { BerCurve, BerLineStyle, BerReference, SinkPoint } from './features
 
 export type { BerLineStyle, BerReference, SinkPoint } from './features/ber/types'
 
-export function BerChart({ points, live = false }: { points: SinkPoint[]; live?: boolean }) {
+export function BerChart({ points, live = false, wide = false }: { points: SinkPoint[]; live?: boolean; wide?: boolean }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const reportSvgRef = useRef<SVGSVGElement>(null)
   const referenceFileRef = useRef<HTMLInputElement>(null)
@@ -169,7 +169,7 @@ export function BerChart({ points, live = false }: { points: SinkPoint[]; live?:
       </div>
       {selectedReference && <div className="ber-reference-actions"><button onClick={() => removeReference(selectedReference.id)}>Hide selected reference</button><button className="danger" onClick={() => deleteReference(selectedReference.id)}>Delete reference</button></div>}
     </div>
-    <BerPlot ref={svgRef} curves={curves} />
+    <BerPlot ref={svgRef} curves={curves} variant={wide ? 'dashboard' : 'preview'} />
     {notice && <div className="chart-notice">{notice}</div>}
     <div className="sink-chart-label">{current.plotted.length} SNR points plotted · {current.plotted[current.plotted.length - 1]?.frames ?? 0} frames at last point</div>
     {detailsOpen && createPortal(<div className="ber-report-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDetailsOpen(false) }}>

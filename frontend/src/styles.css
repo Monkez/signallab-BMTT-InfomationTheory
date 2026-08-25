@@ -559,7 +559,7 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .spectrum-line { fill: none; stroke: #58b8ff; stroke-width: 1.7; vector-effect: non-scaling-stroke; }
 .waterfall-preview rect { shape-rendering: crispEdges; }
 .sink-visual-empty { display: grid; place-items: center; height: 96px; margin-top: 8px; color: #8995a4; font-size: 9px; background: #f8fafc; border: 1px dashed #d7e0eb; border-radius: 5px; }
-.sink-detail-backdrop { position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: 24px; background: rgba(20, 31, 46, .38); }
+.sink-detail-backdrop { position: fixed; inset: 0; z-index: 5400; display: grid; place-items: center; padding: 24px; background: rgba(20, 31, 46, .38); }
 .sink-detail { width: min(920px, 100%); height: min(700px, 100%); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; box-shadow: 0 16px 50px rgba(15, 27, 44, .25); }
 .sink-detail-header { display: flex; align-items: center; justify-content: space-between; padding: 15px 18px; border-bottom: 1px solid var(--line); }
 .sink-detail-header small { color: #718096; font-size: 8px; letter-spacing: .12em; }

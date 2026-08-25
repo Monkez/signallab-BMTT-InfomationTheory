@@ -6,7 +6,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import {
   Activity, ArrowLeftRight, BarChart3, BookOpen, Box, Braces, CircleStop, FilePlus2, FolderOpen, Settings2,
-  Copy, LibraryBig, Maximize2, PanelBottom, PanelRight, Play, Plus, RotateCcw, Save, SaveAll, Terminal, Trash2, X,
+  Copy, LibraryBig, Maximize2, PanelBottomClose, PanelBottomOpen, PanelRightClose, PanelRightOpen, Play, Plus, RotateCcw, Save, SaveAll, Terminal, Trash2, X,
 } from 'lucide-react'
 import { SignalNode } from './SignalNode'
 import { cancelJob, createJob, getJob, graphPayload, GraphApiError, runGraphOnce } from './api'
@@ -491,8 +491,6 @@ function App() {
         <div className="brand"><div className="brand-mark"><img src="/app-icon.svg" alt="SignalLab logo" /></div><div><strong>SignalLab</strong><span>Communications Studio</span></div></div>
         <div className={`project-name ${projectDirty ? 'dirty' : ''}`} title={projectDirty ? 'Unsaved changes' : 'All changes saved'}><span className="status-dot" /><span>{projectName}</span>{projectDirty && <small>Unsaved</small>}</div>
         <div className="top-actions">
-          <button className="ghost" onClick={() => setRightOpen(value => !value)} title={rightOpen ? 'Hide inspector' : 'Show inspector'}><PanelRight size={16} /></button>
-          <button className={`ghost ${consoleOpen ? 'active' : ''}`} onClick={() => setConsoleOpen(value => !value)} title={consoleOpen ? 'Hide console' : 'Show console'}><PanelBottom size={16} /></button>
           <button className="ghost labeled compact-label" onClick={newSimulation} disabled={executionActive} title="Create a blank simulation"><FilePlus2 size={15} /><span>New</span></button>
           <button className="ghost labeled compact-label" onClick={() => void openProject()} title="Open a SignalLab simulation"><FolderOpen size={15} /><span>Open</span></button>
           <button className="ghost labeled samples-action" onClick={() => setSamplesOpen(true)} title="Open a complete learning sample"><LibraryBig size={15} /><span>Open Samples</span></button>
@@ -546,6 +544,8 @@ function App() {
 
       <main className="canvas-wrap">
         <div className="canvas-label"><span>FLOWGRAPH</span><span>{nodes.length} blocks · {edges.length} links</span></div>
+        {!rightOpen && <button className="layout-reveal layout-reveal-right" onClick={() => setRightOpen(true)} aria-label="Show inspector" title="Show inspector"><PanelRightOpen size={16} /></button>}
+        {!consoleOpen && <button className="layout-reveal layout-reveal-console" onClick={() => setConsoleOpen(true)} aria-label="Show console" title="Show console"><PanelBottomOpen size={16} /></button>}
         <div className="simulation-toolbar" role="toolbar" aria-label="Simulation controls">
           <button className="simulation-icon-button add-icon" onClick={() => setBlockPickerOpen(true)} aria-label="Add block" data-tooltip="Add block"><Plus size={17} /></button>
           <span className="simulation-toolbar-divider" />
@@ -567,7 +567,7 @@ function App() {
       </main>
 
       <aside className={`inspector ${rightOpen ? '' : 'collapsed'}`}>
-        <div className="panel-title"><Settings2 size={16} /><span>Properties</span><small>{selected ? 'Block' : selectedEdge ? 'Connection' : 'No selection'}</small></div>
+        <div className="panel-title"><Settings2 size={16} /><span>Properties</span><small>{selected ? 'Block' : selectedEdge ? 'Connection' : 'No selection'}</small><button className="panel-collapse" onClick={() => setRightOpen(false)} aria-label="Hide inspector" title="Hide inspector"><PanelRightClose size={15} /></button></div>
         {selected ? <div className="inspector-content">
           <div className="selection-heading"><span className="large-icon">{selected.data.blockType === 'python' ? <Braces /> : <Box />}</span><div><small>SELECTED BLOCK</small><h3>{selected.data.label}</h3></div><button className="icon-danger" onClick={() => { setNodes(ns => ns.filter(n => n.id !== selected.id).map(n => ({ ...n, data: { ...n.data, portPreviews: undefined, runtimeError: undefined } }))); setEdges(es => es.filter(e => e.source !== selected.id && e.target !== selected.id)); setSelectedId(null) }}><X size={16} /></button></div>
           {selected.data.runtimeError && <div className="error-box"><strong>Signal size contract failed</strong><br />{selected.data.runtimeError}</div>}
@@ -605,7 +605,7 @@ function App() {
 
       {consoleOpen && <section className="console-dock">
         <div className="console-resizer" onPointerDown={startConsoleResize} title="Resize console" />
-        <div className="console-header"><div><Terminal size={15} /><strong>Console</strong><span>{consoleEntries.length} events</span></div><div className="console-actions"><button className="console-copy" onClick={() => void copyConsole()} disabled={!consoleEntries.length} title="Copy all console text"><Copy size={13} />{consoleCopied ? 'Copied' : 'Copy'}</button><button className="console-clear" onClick={() => setConsoleEntries([])} title="Clear console"><Trash2 size={14} /></button></div></div>
+        <div className="console-header"><div><Terminal size={15} /><strong>Console</strong><span>{consoleEntries.length} events</span></div><div className="console-actions"><button className="console-copy" onClick={() => void copyConsole()} disabled={!consoleEntries.length} title="Copy all console text"><Copy size={13} />{consoleCopied ? 'Copied' : 'Copy'}</button><button className="console-clear" onClick={() => setConsoleEntries([])} title="Clear console"><Trash2 size={14} /></button><button className="panel-collapse" onClick={() => setConsoleOpen(false)} aria-label="Hide console" title="Hide console"><PanelBottomClose size={15} /></button></div></div>
         <div className="console-body">
           {consoleEntries.length ? consoleEntries.map(entry => <div className={`console-line ${entry.level}`} key={entry.id}><time>{entry.time}</time><b>{entry.level}</b><span>{entry.message}</span></div>) : <div className="console-empty">No messages yet.</div>}
         </div>

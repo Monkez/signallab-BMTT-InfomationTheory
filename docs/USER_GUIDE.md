@@ -49,6 +49,8 @@ Catalog hiện có 14 bài, được chia nhóm có thể thu gọn/mở rộng:
 
 Trong cửa sổ thư viện, nhóm Digital communications và Analog communications mở sẵn; nhóm còn lại có thể mở khi cần. Search sẽ tự mở các nhóm có kết quả. Khi xem chi tiết sample, nút **Open this sample** nằm trong thanh chân dính ở cuối panel để luôn dễ chọn dù phần hướng dẫn dài. Block **Oscilloscope Sink** vẽ dạng sóng miền thời gian từ các mẫu đã capture; tín hiệu phức được vẽ hai nét I/Q, phù hợp để xem AM sau AWGN và FM complex-baseband.
 
+Các nút ẩn/hiện Inspector và Console không còn nằm trên topbar. Inspector có nút thu gọn ngay trong tiêu đề **Properties**, Console có nút tương ứng ở góc phải tiêu đề **Console**. Khi panel đã ẩn, một nút mở lại nhỏ xuất hiện sát mép canvas tương ứng.
+
 Hai bài Python minh họa đúng mô hình lập trình của SignalLab: người học chỉ viết `process(signal, params)` cho một frame; runtime tự xử lý worker và song song hóa Monte-Carlo. Mã nguồn nằm ngay trong Python Block để đọc, chạy và sửa.
 
 1. Chọn khối trong thanh bên hoặc dùng sơ đồ mẫu. Khi bắt đầu kéo block, block được chọn ngay.

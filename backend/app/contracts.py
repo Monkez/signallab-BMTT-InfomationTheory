@@ -97,6 +97,15 @@ def validate_parameters(block_type: str, params: dict[str, Any]) -> list[str]:
             expected = str(params.get("output_size", "same")).strip().lower()
             if expected not in {"same", "any"}:
                 _positive_integer(expected, "output_size")
+            executor = str(params.get("runtime_executor", "auto")).strip().lower()
+            if executor not in {"auto", "inline", "process"}:
+                raise SignalContractError("Parameter 'runtime_executor' must be 'auto', 'inline', or 'process'")
+            raw_batch_size = params.get("runtime_batch_size", 0)
+            if isinstance(raw_batch_size, bool):
+                raise SignalContractError("Parameter 'runtime_batch_size' must be an integer from 0 to 4096")
+            batch_size = float(raw_batch_size)
+            if not math.isfinite(batch_size) or not batch_size.is_integer() or batch_size < 0 or batch_size > 4096:
+                raise SignalContractError("Parameter 'runtime_batch_size' must be an integer from 0 to 4096")
     except (SignalContractError, VariableDefinitionError, PythonPortDefinitionError, TypeError, ValueError) as exc:
         errors.append(str(exc))
     return errors

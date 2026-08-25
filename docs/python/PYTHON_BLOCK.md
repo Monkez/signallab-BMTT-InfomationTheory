@@ -29,7 +29,7 @@ def process(signal, params):
     return np.asarray(signal) * adaptive_gain
 ```
 
-Không truyền SNR bằng biến global Python và không tự viết vòng lặp sweep trong block. **Specific steps** gọi block theo số bước cố định và `params["snr_db"]` là `None`; channel vì vậy dùng tham số mặc định của block. **BER benchmark** gọi block nhiều lần và cập nhật `params["snr_db"]` theo Start/Stop/Step. **Run once** giữ cùng quy tắc của mode hiện tại.
+Không truyền SNR bằng biến global Python và không tự viết vòng lặp sweep trong block. **Specific steps** gọi block theo số bước cố định và đặt `params["snr_db"]` bằng SNR đã chọn. **BER benchmark** gọi block nhiều lần và cập nhật `params["snr_db"]` theo Start/Stop/Step. **Run once** giữ cùng quy tắc của mode hiện tại.
 
 ## Khối Variables
 
@@ -160,6 +160,31 @@ def process(inputs, params, context):
 Không tạo process, thread hay CUDA stream trong `process`. SignalLab biên dịch DAG một lần và phân phối các frame Monte-Carlo độc lập. Một block chỉ cần là hàm thuần theo input, params và seed của block.
 
 Tránh biến global thay đổi được, ghi cùng một file từ nhiều frame, hoặc giữ reference đến buffer của frame trước. Những thao tác đó làm kết quả phụ thuộc thứ tự worker.
+
+### API batch tùy chọn
+
+Block NumPy/SciPy có thể xử lý nhiều frame trong một lời gọi bằng cách khai báo thêm `process_batch`. Vẫn phải giữ `process` để Run once, port preview và debug một frame hoạt động:
+
+```python
+def process(signal, params):
+    return (np.asarray(signal) < 0).astype(np.int8)
+
+def process_batch(signals, params_batch):
+    # signals có shape (batch, samples) khi mọi frame cùng shape/dtype.
+    # params_batch[index] là params runtime riêng của frame đó.
+    return (np.asarray(signals) < 0).astype(np.int8)
+```
+
+Runtime chạy DAG theo từng node trong một chunk. Built-in vẫn giữ ngữ nghĩa từng frame; riêng block có `process_batch` nhận trục frame đầu tiên và phải trả output có cùng trục này. Nếu input các frame khác shape/dtype, runtime truyền list thay vì stack. Với PORTS nhiều cổng, đối số đầu là dictionary `port → batched array/list`, và kết quả là dictionary output tương ứng. Batch path hiện dành cho CPU compatibility backend.
+
+Python Block có hai tham số runtime trong Properties:
+
+- `runtime_executor = auto`: inline cho job nhỏ, persistent process pool cho workload đủ lớn.
+- `runtime_executor = process`: cưỡng bức process pool khi code Python thuần nặng nhưng mảng nhỏ khiến Auto không suy ra được chi phí.
+- `runtime_executor = inline`: tránh startup process cho job ngắn hoặc thư viện đã tự dùng nhiều thread.
+- `runtime_batch_size = 0`: tự chọn khoảng một triệu phần tử input mỗi batch, giới hạn tối đa 64 frame. Đặt `1..4096` để benchmark/tinh chỉnh thủ công.
+
+Process worker nhận compiled graph/code đúng một lần khi khởi tạo; mỗi task sau chỉ truyền trial index, seed và SNR chunk. PORTS, bytecode và call profile cũng được cache trong từng process. `Results → Python runtime` cho biết inline/process và số block batch thực tế.
 
 ## Debug
 

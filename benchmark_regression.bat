@@ -15,6 +15,12 @@ call benchmark.bat --bits 4096 --frames 1000 --repeats 3 --modulation qam16 --co
 if errorlevel 1 goto :error
 
 echo [SignalLab] All native performance gates passed.
+
+echo [SignalLab] Python Custom Block performance gate...
+call benchmark_python.bat --bits 65536 --frames 1024 --repeats 2 --workload fft --min-speedup 1.2
+if errorlevel 1 goto :error
+
+echo [SignalLab] All native and Python performance gates passed.
 exit /b 0
 
 :error

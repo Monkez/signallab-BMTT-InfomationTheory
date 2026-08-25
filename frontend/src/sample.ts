@@ -42,4 +42,8 @@ def process(signal, params):
     # all_globals = params["variables"]
     gain = float(params.get("gain", 1.0))
     return sl.signals.normalize_power(signal * gain)
+
+# Optional for large Monte-Carlo jobs: define process_batch(signals,
+# params_batch) with equivalent logic and a leading frame dimension.
+# Keep it synchronized with process(); see Documents > Python Block.
 `

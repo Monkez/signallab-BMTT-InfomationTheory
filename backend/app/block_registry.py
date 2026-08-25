@@ -115,7 +115,7 @@ SPECS = [
     BlockSpec("power_meter", "Power Meter", "Sinks", "Measure mean signal power.", {}, ["in"], []),
     BlockSpec("ber", "BER Meter", "Sinks", "Compare received bits with a reference stream.", {}, ["reference", "estimate"], []),
     BlockSpec("ser", "Symbol Error Rate", "Source theory", "Compare original and decoded text symbols.", {}, ["reference", "estimate"], [], False),
-    BlockSpec("python", "Python Block", "Custom", "Write process(signal, params), or declare PORTS for named multi-input/output processing.", {"gain": 1.0, "output_size": "same"}, ["in"], ["out"], False),
+    BlockSpec("python", "Python Block", "Custom", "Write process(signal, params), or declare PORTS/process_batch for optimized multi-frame processing.", {"gain": 1.0, "output_size": "same", "runtime_executor": "auto", "runtime_batch_size": 0}, ["in"], ["out"], False),
 ]
 
 SPEC_BY_TYPE = {spec.type: spec for spec in SPECS}

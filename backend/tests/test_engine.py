@@ -4,7 +4,7 @@ import math
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.app.blocks import PROCESSORS, _stable_huffman_codes, make_context, python_block
+from backend.app.blocks import PROCESSORS, _stable_huffman_codes, make_context, python_block, python_block_batch, python_has_batch
 from backend.app.block_registry import SPEC_BY_TYPE
 from backend.app.contracts import BlockExecutionError
 from backend.app.contracts import validate_inputs, validate_outputs, validate_parameters
@@ -365,6 +365,101 @@ def test_python_block_supports_natural_and_legacy_apis():
     assert (python_block({"in": signal}, {}, context, legacy)["out"] == [2.0, 3.0]).all()
 
 
+def test_python_block_batch_vectorizes_frames_and_runtime_params():
+    code = """def process(signal, params):
+    return np.asarray(signal) * params["gain"]
+
+def process_batch(signals, params_batch):
+    gains = np.asarray([params["gain"] + params["trial_index"] for params in params_batch])[:, None]
+    return np.asarray(signals) * gains
+"""
+    contexts = [make_context(np, np.random.default_rng(index), index, 100 + index, "cpu") for index in range(3)]
+    results = python_block_batch(
+        [{"in": np.asarray([1.0, 2.0])} for _ in contexts],
+        {"gain": 2.0},
+        contexts,
+        code,
+    )
+    assert python_has_batch(code)
+    assert [result["out"].tolist() for result in results] == [[2.0, 4.0], [3.0, 6.0], [4.0, 8.0]]
+
+
+def test_python_block_batch_supports_named_multiple_outputs():
+    code = """PORTS = {"inputs": ["left", "right"], "outputs": ["sum", "difference"]}
+def process_batch(inputs, params_batch):
+    return {"sum": inputs["left"] + inputs["right"], "difference": inputs["left"] - inputs["right"]}
+"""
+    contexts = [make_context(np, np.random.default_rng(index), index, index, "cpu") for index in range(2)]
+    results = python_block_batch(
+        [
+            {"left": np.asarray([1, 2]), "right": np.asarray([3, 4])},
+            {"left": np.asarray([5, 6]), "right": np.asarray([1, 2])},
+        ],
+        {},
+        contexts,
+        code,
+    )
+    assert results[0]["sum"].tolist() == [4, 6]
+    assert results[1]["difference"].tolist() == [4, 4]
+
+
+def test_simulation_scheduler_uses_python_batch_path_without_changing_preview_api():
+    code = """def process(signal, params):
+    if params["trial_index"] != 0:
+        raise AssertionError("frame API should only be used for the representative preview")
+    return (np.asarray(signal) < 0).astype(np.int8)
+
+def process_batch(signals, params_batch):
+    return (np.asarray(signals) < 0).astype(np.int8)
+"""
+    graph = Graph(nodes=[
+        {"id": "source", "type": "bit_source", "label": "Bits", "params": {"length": 128, "seed": 7}},
+        {"id": "mod", "type": "bpsk_mod", "label": "BPSK", "params": {}},
+        {"id": "custom", "type": "python", "label": "Batch detector", "params": {"output_size": "same"}, "code": code},
+        {"id": "meter", "type": "ber", "label": "BER", "params": {}},
+    ], edges=[
+        {"id": "e1", "source": "source", "target": "mod"},
+        {"id": "e2", "source": "mod", "target": "custom"},
+        {"id": "e3", "source": "source", "target": "meter", "target_handle": "reference"},
+        {"id": "e4", "source": "custom", "target": "meter", "target_handle": "estimate"},
+    ])
+    result = run_simulation(graph, SimulationConfig(
+        mode="specific_steps",
+        max_frames=8,
+        min_frames=8,
+        workers=1,
+        chunk_size=8,
+        device="cpu",
+        engine="python",
+    ))
+    assert result["bit_errors"] == 0
+    assert result["execution"]["python_batch_blocks"] == 1
+    assert result["port_previews"]["custom"]["outputs"]["out"]["size"] == 128
+
+
+def test_python_block_can_force_persistent_process_executor_for_small_frames():
+    graph = Graph(nodes=[
+        {"id": "source", "type": "bit_source", "label": "Bits", "params": {"length": 64, "seed": 7}},
+        {"id": "custom", "type": "python", "label": "CPU-heavy custom", "params": {"output_size": "same", "runtime_executor": "process", "runtime_batch_size": 0}, "code": "def process(signal, params):\n    return np.asarray(signal)\n"},
+        {"id": "sink", "type": "power_meter", "label": "Power", "params": {}},
+    ], edges=[
+        {"id": "e1", "source": "source", "target": "custom"},
+        {"id": "e2", "source": "custom", "target": "sink"},
+    ])
+    result = run_simulation(graph, SimulationConfig(
+        mode="specific_steps",
+        max_frames=16,
+        min_frames=16,
+        workers=0,
+        chunk_size=4,
+        device="cpu",
+        engine="python",
+    ))
+    assert result["execution"]["scheduler"] == "persistent_process_pool"
+    assert result["execution"]["executor_hint"] == "process"
+    assert result["workers"] > 1
+
+
 def test_python_source_can_use_process_params_and_reports_missing_keys_clearly():
     context = make_context(np, np.random.default_rng(1), 0, 1, "cpu")
     source = 'PORTS = {"inputs": [], "outputs": ["out"]}\ndef process(params):\n    return np.zeros(params["length"], dtype=np.int8)'
@@ -449,6 +544,18 @@ def test_python_ports_reject_invalid_declarations():
         parse_python_ports('PORTS = {"inputs": ["in", "in"]}')
     with pytest.raises(PythonPortDefinitionError, match="literal dictionary"):
         parse_python_ports("PORTS = make_ports()")
+
+
+def test_python_port_cache_returns_fresh_mutable_lists():
+    code = 'PORTS = {"inputs": ["left"], "outputs": ["right"]}'
+    first = parse_python_ports(code)
+    first.inputs.append("mutated")
+    assert parse_python_ports(code).inputs == ["left"]
+
+
+def test_python_runtime_parameters_are_validated():
+    assert validate_parameters("python", {"output_size": "same", "runtime_executor": "threads", "runtime_batch_size": 0})
+    assert validate_parameters("python", {"output_size": "same", "runtime_executor": "auto", "runtime_batch_size": 4097})
 
 
 def test_validation_highlights_duplicate_variables_blocks():

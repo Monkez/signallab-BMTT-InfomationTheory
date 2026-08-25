@@ -1,5 +1,10 @@
 # Trạng thái dự án
 
+- Mốc Python Custom Block 2026-08-25 đã hoàn tất: process worker giữ compiled graph một lần qua initializer; cache PORTS/bytecode/call profile; Auto bảo thủ tránh spawn cho workload nhỏ. Có runtime hint `auto/inline/process` và batch-size tự động/thủ công.
+- Thêm API `process_batch(signals, params_batch)` CPU: scheduler chạy chunk node-by-node, stack input cùng shape/dtype, hỗ trợ PORTS nhiều cổng và giữ `process` cho Run once/preview. Results hiển thị inline/process và số batch block.
+- Xác minh cuối: backend 92/92 pass, frontend production build pass và `build_app.bat` đóng gói thành công. Full performance gate đạt native BPSK 20,82×, QPSK 20,71×, QAM16 15,62×; Python FFT 1.024 × 65.536 mẫu đạt 30,22 Msamples/s batch-auto so với 17,42 Msamples/s frame-inline (1,74×). Threshold vốn nhẹ/vectorized tăng khoảng 10%.
+- Frozen release smoke test chạy graph thật `Bit Source → BPSK → Python process/process_batch → BER`: `python_multiprocessing`, 4 worker, persistent process pool, batch 8 frame, 131.072 bit và 0 bit lỗi. Bản phát hành ở `dist\SignalLab\SignalLab.exe`.
+
 - Mốc đang hoàn thiện 2026-08-25: native v0.2 mở rộng typed modulation plan sang QPSK (không mã hóa/Hamming/Repetition) và 16-QAM không mã hóa. Kernel 16-QAM lấy mẫu trực tiếp vùng quyết định Gaussian; không materialize waveform.
 - Scientific/performance gates: thêm kiểm tra BER 6σ cho BPSK/QPSK/16-QAM, determinism 16-QAM giữa số worker, exact-topology rejection, benchmark warm-up + median + `--min-speedup`, và `benchmark_regression.bat` ba workload.
 - Diagnostics: native result ghi modulation/coding/kernel/version; Auto compatibility result ghi lý do fallback và Results hiển thị cho người dùng. Backend 86/86 pass, frontend build pass.

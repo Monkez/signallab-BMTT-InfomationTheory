@@ -166,7 +166,7 @@
       {"id":"src","type":"bit_source","label":"Random bits","position":{"x":30,"y":150},"params":{"length":4096,"seed":-1}},
       {"id":"mod","type":"bpsk_mod","label":"BPSK","position":{"x":240,"y":150}},
       {"id":"ch","type":"awgn","label":"AWGN","position":{"x":450,"y":150},"params":{"ebn0_db":4,"snr_mode":"experiment","seed":-1}},
-      {"id":"py","type":"python","label":"Custom hard decision","position":{"x":670,"y":150},"params":{"threshold":0,"output_size":"same"},"code":"import numpy as np\n\n# Process one frame. SignalLab parallelizes frames automatically.\ndef process(signal, params):\n    threshold = float(params.get(\"threshold\", 0.0))\n    samples = np.real(np.asarray(signal))\n    return (samples < threshold).astype(np.int8)\n"},
+      {"id":"py","type":"python","label":"Custom hard decision","position":{"x":670,"y":150},"params":{"threshold":0,"output_size":"same"},"code":"import numpy as np\n\n# Run once/preview uses one frame.\ndef process(signal, params):\n    threshold = float(params.get(\"threshold\", 0.0))\n    samples = np.real(np.asarray(signal))\n    return (samples < threshold).astype(np.int8)\n\n# Benchmark can vectorize a chunk with a leading frame dimension.\ndef process_batch(signals, params_batch):\n    thresholds = np.asarray([float(params.get(\"threshold\", 0.0)) for params in params_batch])[:, None]\n    return (np.real(np.asarray(signals)) < thresholds).astype(np.int8)\n"},
       {"id":"ber","type":"ber","label":"BER meter","position":{"x":670,"y":350},"port_orientation":"reversed"}
     ], "edges": [
       {"id":"e1","source":"src","target":"mod"},{"id":"e2","source":"mod","target":"ch"},{"id":"e3","source":"ch","target":"py"},

@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 
 
 DEFAULT_INPUTS = ["in"]
@@ -33,8 +34,8 @@ def _names(value: object, direction: str) -> list[str]:
     return names
 
 
-def parse_python_ports(code: str | None) -> PythonPorts:
-    source = str(code or "")
+@lru_cache(maxsize=256)
+def _parse_python_ports(source: str) -> tuple[tuple[str, ...], tuple[str, ...], bool]:
     try:
         tree = ast.parse(source, filename="<python-block>", mode="exec")
     except SyntaxError as exc:
@@ -52,7 +53,7 @@ def parse_python_ports(code: str | None) -> PythonPorts:
                 raise PythonPortDefinitionError("PORTS may only be declared once")
             declaration = value
     if declaration is None:
-        return PythonPorts(DEFAULT_INPUTS.copy(), DEFAULT_OUTPUTS.copy(), False)
+        return tuple(DEFAULT_INPUTS), tuple(DEFAULT_OUTPUTS), False
     try:
         raw = ast.literal_eval(declaration)
     except (TypeError, ValueError) as exc:
@@ -62,4 +63,10 @@ def parse_python_ports(code: str | None) -> PythonPorts:
     unknown = set(raw) - {"inputs", "outputs"}
     if unknown:
         raise PythonPortDefinitionError(f"PORTS has unknown key(s): {', '.join(sorted(map(str, unknown)))}")
-    return PythonPorts(_names(raw.get("inputs", DEFAULT_INPUTS), "inputs"), _names(raw.get("outputs", DEFAULT_OUTPUTS), "outputs"), True)
+    return tuple(_names(raw.get("inputs", DEFAULT_INPUTS), "inputs")), tuple(_names(raw.get("outputs", DEFAULT_OUTPUTS), "outputs")), True
+
+
+def parse_python_ports(code: str | None) -> PythonPorts:
+    inputs, outputs, explicit = _parse_python_ports(str(code or ""))
+    # Return fresh lists so callers cannot mutate the cached canonical value.
+    return PythonPorts(list(inputs), list(outputs), explicit)

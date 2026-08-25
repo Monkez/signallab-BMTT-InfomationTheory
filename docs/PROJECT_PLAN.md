@@ -21,6 +21,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 - Engine tối ưu graph lookup, seed theo batch và tái sử dụng process pool; auto mode tránh multiprocessing cho workload nhỏ để giảm độ trễ.
 - Native Batch Executor C++20/oneTBB fuse các chuỗi BER BPSK/AWGN phổ biến, dùng Philox tái lập độc lập số thread; Auto planner fallback về engine Python cho graph chưa hỗ trợ.
 - Python Block dùng API đơn giản `process(signal, params) -> array`; scheduler đảm nhiệm song song hóa các frame, không bắt người dùng viết mã multiprocessing/GPU.
+- Python Block có fast path `process_batch(signals, params_batch)` tùy chọn, persistent process workers, metadata cache và runtime hint inline/process/batch-size; API frame cũ giữ tương thích.
 - Python Block đọc trực tiếp SNR/trial/seed/device của frame hiện tại qua `params`; khối Variables không cổng khai báo literal toàn cục một lần cho mọi Python Block.
 - Package `signallab` trên NumPy/SciPy cung cấp API nhất quán cho nguồn, tín hiệu, lọc, điều chế, kênh, mã và metric; NumPy/SciPy trực tiếp vẫn được hỗ trợ.
 - Menu Documents mở cửa sổ offline độc lập, có tìm kiếm full-text và tài liệu hàm/quickstart chi tiết cho người học.

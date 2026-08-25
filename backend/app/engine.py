@@ -9,12 +9,15 @@ from typing import Any, Callable
 import numpy as np
 
 from .block_registry import SPEC_BY_TYPE
-from .blocks import PROCESSORS, make_context, python_block, to_numpy
+from .blocks import PROCESSORS, make_context, python_block, python_block_batch, python_has_batch, to_numpy
 from .contracts import BlockExecutionError, validate_inputs, validate_outputs, validate_parameters
 from .models import Graph, SimulationConfig, ValidationResult
 from .native_engine import run_native_simulation
 from .python_ports import PythonPortDefinitionError, parse_python_ports
 from .variables import VariableDefinitionError, collect_global_variables
+
+
+_WORKER_GRAPH_DICT: dict[str, Any] | None = None
 
 
 def gpu_status() -> dict[str, Any]:
@@ -346,6 +349,8 @@ def _run_chunk(
     device: str,
     snr_db: float | None,
 ) -> dict[str, float]:
+    if device == "cpu" and any(node["type"] == "python" and python_has_batch(node.get("code")) for node in graph_dict["nodes"]):
+        return _run_chunk_batched(graph_dict, items, snr_db)
     total: dict[str, float] = {"completed_trials": 0}
     for trial_index, seed in items:
         result = execute_trial(graph_dict, trial_index, seed, device, snr_db)
@@ -353,6 +358,103 @@ def _run_chunk(
             total[key] = total.get(key, 0) + value
         total["completed_trials"] += 1
     return total
+
+
+def _run_chunk_batched(
+    graph_dict: dict[str, Any],
+    items: list[tuple[int, int]],
+    snr_db: float | None,
+) -> dict[str, float]:
+    """Execute a chunk node-by-node so opted-in Python blocks can vectorize frames."""
+    global_variables = graph_dict.get("_global_variables") or collect_global_variables(graph_dict["nodes"])
+    contexts = [
+        make_context(
+            np,
+            np.random.default_rng(seed),
+            trial_index,
+            seed,
+            "cpu",
+            snr_db,
+            graph_dict.get("_random_seed_root"),
+            global_variables,
+        )
+        for trial_index, seed in items
+    ]
+    nodes = graph_dict.get("_node_map") or {node["id"]: node for node in graph_dict["nodes"]}
+    incoming = graph_dict.get("_incoming_edges")
+    if incoming is None:
+        incoming = {node_id: [] for node_id in nodes}
+        for edge in graph_dict["edges"]:
+            incoming[edge["target"]].append(edge)
+    order = graph_dict.get("_execution_order") or topological_order(graph_dict)
+    frame_outputs: list[dict[str, dict[str, Any]]] = [{} for _ in items]
+    frame_metrics: list[dict[str, float]] = [{"bit_errors": 0, "total_bits": 0} for _ in items]
+    for node_id in order:
+        node = nodes[node_id]
+        for context in contexts:
+            context.node_id = node_id
+        spec = SPEC_BY_TYPE[node["type"]]
+        declared_outputs = spec.outputs
+        if node["type"] == "python":
+            try:
+                declared_outputs = parse_python_ports(node.get("code")).outputs
+            except PythonPortDefinitionError as exc:
+                raise BlockExecutionError(node_id, node.get("label", "Python Block"), str(exc)) from exc
+        inputs_batch = [
+            {
+                edge.get("target_handle", "in"): frame_outputs[index][edge["source"]][edge.get("source_handle", "out")]
+                for edge in incoming[node_id]
+            }
+            for index in range(len(items))
+        ]
+        try:
+            for node_inputs in inputs_batch:
+                validate_inputs(node["type"], node_inputs, node.get("params", {}))
+            if node["type"] == "python" and python_has_batch(node.get("code")):
+                results = python_block_batch(inputs_batch, node.get("params", {}), contexts, node.get("code") or "")
+            else:
+                results = []
+                for index, node_inputs in enumerate(inputs_batch):
+                    contexts[index].node_id = node_id
+                    if node["type"] == "python":
+                        result = python_block(node_inputs, node.get("params", {}), contexts[index], node.get("code"))
+                    else:
+                        result = PROCESSORS[node["type"]](node_inputs, node.get("params", {}), contexts[index])
+                    results.append(result)
+            for index, (node_inputs, result) in enumerate(zip(inputs_batch, results, strict=True)):
+                if not isinstance(result, dict):
+                    raise ValueError("processor must return a dictionary of output ports")
+                validate_outputs(node["type"], node_inputs, result, declared_outputs, node.get("params", {}))
+                node_metrics = result.pop("__metrics__", None)
+                if node_metrics:
+                    for key, value in node_metrics.items():
+                        frame_metrics[index][key] = frame_metrics[index].get(key, 0) + float(value)
+                frame_outputs[index][node_id] = result
+        except BlockExecutionError:
+            raise
+        except Exception as exc:
+            raise BlockExecutionError(node_id, node.get("label", node["type"]), str(exc)) from exc
+    total: dict[str, float] = {"completed_trials": len(items)}
+    for metrics in frame_metrics:
+        for key, value in metrics.items():
+            total[key] = total.get(key, 0) + value
+    return total
+
+
+def _initialize_worker(graph_dict: dict[str, Any]) -> None:
+    """Install the compiled graph once in each persistent process worker."""
+    global _WORKER_GRAPH_DICT
+    _WORKER_GRAPH_DICT = graph_dict
+
+
+def _run_worker_chunk(
+    items: list[tuple[int, int]],
+    device: str,
+    snr_db: float | None,
+) -> dict[str, float]:
+    if _WORKER_GRAPH_DICT is None:
+        raise RuntimeError("Compatibility worker was not initialized with a graph")
+    return _run_chunk(_WORKER_GRAPH_DICT, items, device, snr_db)
 
 
 def _merge_metrics(target: dict[str, float], source: dict[str, float]) -> None:
@@ -446,14 +548,35 @@ def run_simulation(
             snr_values = [round(float(config.snr_db_start), 6)]
     device, device_warnings = _execution_device(graph, config.device)
     cpu_count = os.cpu_count() or 1
+    frame_hint = _frame_item_hint(graph)
+    python_blocks = sum(node.type == "python" for node in graph.nodes)
+    python_batch_blocks = sum(node.type == "python" and python_has_batch(node.code) for node in graph.nodes)
+    python_executor_hints = [str(node.params.get("runtime_executor", "auto")).lower() for node in graph.nodes if node.type == "python"]
+    forced_process = "process" in python_executor_hints
+    forced_inline = bool(python_executor_hints) and all(hint == "inline" for hint in python_executor_hints)
+    configured_batch_size = max(
+        (int(node.params.get("runtime_batch_size", 0)) for node in graph.nodes if node.type == "python" and python_has_batch(node.code)),
+        default=0,
+    )
+    effective_chunk_size = config.chunk_size
+    if python_batch_blocks:
+        # Aim for roughly one million input items per vectorized call while
+        # bounding retained per-frame DAG buffers and cancellation latency.
+        effective_chunk_size = max(config.chunk_size, min(64, max(1, 1_048_576 // frame_hint)))
+        if configured_batch_size:
+            effective_chunk_size = configured_batch_size
     # Auto mode is deliberately conservative on Windows: local measurements
     # show that vectorized frames below this threshold are faster inline.
     if config.workers:
         workers = config.workers
     else:
-        frame_hint = _frame_item_hint(graph)
-        worth_processes = frame_hint >= 262_144 and frame_hint * max_frames >= 50_000_000
-        workers = min(32, max(1, cpu_count - 1), max_frames // max(1, config.chunk_size)) if worth_processes else 1
+        custom_python_workload = python_blocks > 0 and max_frames >= max(64, config.chunk_size * 4) and frame_hint * max_frames >= 50_000_000
+        worth_processes = not forced_inline and (
+            forced_process
+            or (frame_hint >= 262_144 and frame_hint * max_frames >= 50_000_000)
+            or custom_python_workload
+        )
+        workers = min(32, max(1, cpu_count - 1), max(1, max_frames // max(1, effective_chunk_size))) if worth_processes else 1
     workers = min(workers, max_frames, cpu_count)
     if device == "gpu":
         workers = 1
@@ -462,8 +585,8 @@ def run_simulation(
     total_budget = len(snr_values) * max_frames
     was_cancelled = False
     pool = (
-        ProcessPoolExecutor(max_workers=workers)
-        if device == "cpu" and workers > 1 and max_frames >= max(4, config.chunk_size)
+        ProcessPoolExecutor(max_workers=workers, initializer=_initialize_worker, initargs=(graph_dict,))
+        if device == "cpu" and workers > 1 and max_frames >= max(4, effective_chunk_size)
         else None
     )
 
@@ -476,15 +599,15 @@ def run_simulation(
                 if cancelled and cancelled():
                     was_cancelled = True
                     break
-                batch_size = min(config.chunk_size * workers, max_frames - offset)
+                batch_size = min(effective_chunk_size * workers, max_frames - offset)
                 batch_seeds = seed_rng.integers(0, np.iinfo(np.uint32).max, size=batch_size, dtype=np.uint32)
                 batch = [(offset + index, int(seed)) for index, seed in enumerate(batch_seeds)]
-                chunks = [batch[i : i + config.chunk_size] for i in range(0, len(batch), config.chunk_size)]
+                chunks = [batch[i : i + effective_chunk_size] for i in range(0, len(batch), effective_chunk_size)]
                 results: list[dict[str, float]] = []
-                if workers == 1 or len(batch) < max(4, config.chunk_size):
+                if workers == 1 or len(batch) < max(4, effective_chunk_size):
                     results = [_run_chunk(graph_dict, chunk, device, snr_db) for chunk in chunks]
                 elif pool is not None:
-                    futures = [pool.submit(_run_chunk, graph_dict, chunk, device, snr_db) for chunk in chunks]
+                    futures = [pool.submit(_run_worker_chunk, chunk, device, snr_db) for chunk in chunks]
                     for future in as_completed(futures):
                         if cancelled and cancelled():
                             was_cancelled = True
@@ -571,6 +694,11 @@ def run_simulation(
         "execution": {
             "backend": "python_compatibility",
             "fallback_reason": native_reason if config.engine == "auto" else None,
+            "scheduler": "persistent_process_pool" if pool is not None else "inline",
+            "python_blocks": python_blocks,
+            "python_batch_blocks": python_batch_blocks,
+            "chunk_size": effective_chunk_size,
+            "executor_hint": "process" if forced_process else "inline" if forced_inline else "auto",
         },
         "workers": workers,
         "cancelled": was_cancelled,

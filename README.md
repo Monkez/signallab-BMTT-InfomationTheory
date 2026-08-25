@@ -4,6 +4,8 @@ SignalLab is a local, visual digital-communications simulator inspired by Simuli
 
 For supported BPSK, QPSK, and 16-QAM BER pipelines, the Auto executor uses a fused C++20/oneTBB engine with counter-based Philox random streams, while arbitrary graphs continue to run through the Python/NumPy compatibility engine with an explicit fallback reason. See [Native CPU Engine](docs/NATIVE_ENGINE.md), run `benchmark.bat` for a local comparison, or use `benchmark_regression.bat` for the three-case performance gate.
 
+Custom Python Blocks support persistent process workers and an optional vectorized `process_batch(signals, params_batch)` API. Run `benchmark_python.bat` to compare frame-inline, frame-auto, and batch-auto execution on the local CPU.
+
 Python Blocks include a CodeMirror-based IDE editor with Python syntax highlighting, line numbers, bracket matching and a large draft-based editing window.
 At runtime they receive the current Experiment point through `params["snr_db"]` and related keys. A port-free Variables block declares safe typed globals shared by every Python Block without coupling user code to the parallel scheduler.
 

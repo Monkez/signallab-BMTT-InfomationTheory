@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import base64
 import copy
 import heapq
@@ -555,6 +556,55 @@ def _compile_python_block(code: str):
     return compile(code, "<python-block>", "exec")
 
 
+@lru_cache(maxsize=256)
+def _python_function_profile(code_object) -> tuple[int, bool, str]:
+    positional_count = int(code_object.co_argcount)
+    has_varargs = bool(code_object.co_flags & inspect.CO_VARARGS)
+    first_name = str(code_object.co_varnames[0]).lower() if positional_count else ""
+    return positional_count, has_varargs, first_name
+
+
+@lru_cache(maxsize=256)
+def python_has_batch(code: str | None) -> bool:
+    try:
+        tree = ast.parse(str(code or ""), filename="<python-block>", mode="exec")
+    except SyntaxError:
+        return False
+    return any(isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "process_batch" for node in tree.body)
+
+
+def _runtime_params(params, context) -> dict[str, Any]:
+    global_values = copy.deepcopy(getattr(context, "global_variables", {}))
+    experiment = {
+        "snr_db": context.snr_db,
+        "trial_index": context.trial_index,
+        "seed": context.seed,
+        "device": context.device,
+    }
+    return {
+        **global_values,
+        **copy.deepcopy(params),
+        "snr_db": context.snr_db,
+        "trial_index": context.trial_index,
+        "frame_seed": context.seed,
+        "device": context.device,
+        "experiment": experiment,
+        "variables": copy.deepcopy(global_values),
+    }
+
+
+def _callable_profile(process) -> tuple[int, bool, str]:
+    if inspect.isfunction(process):
+        return _python_function_profile(process.__code__)
+    signature = inspect.signature(process)
+    positional = [parameter for parameter in signature.parameters.values() if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)]
+    return (
+        len(positional),
+        any(parameter.kind == parameter.VAR_POSITIONAL for parameter in signature.parameters.values()),
+        positional[0].name.lower() if positional else "",
+    )
+
+
 def python_block(inputs, params, context, code):
     if not code:
         return {"out": inputs.get("in")}
@@ -578,44 +628,26 @@ def python_block(inputs, params, context, code):
     if not callable(process):
         raise ValueError("Python block must define process(signal, params)")
     signal = inputs.get("in")
-    global_values = copy.deepcopy(getattr(context, "global_variables", {}))
-    experiment = {
-        "snr_db": context.snr_db,
-        "trial_index": context.trial_index,
-        "seed": context.seed,
-        "device": context.device,
-    }
-    runtime_params = {
-        **global_values,
-        **copy.deepcopy(params),
-        "snr_db": context.snr_db,
-        "trial_index": context.trial_index,
-        "frame_seed": context.seed,
-        "device": context.device,
-        "experiment": experiment,
-        "variables": copy.deepcopy(global_values),
-    }
-    positional = [parameter for parameter in inspect.signature(process).parameters.values() if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)]
-    has_varargs = any(parameter.kind == parameter.VAR_POSITIONAL for parameter in inspect.signature(process).parameters.values())
+    runtime_params = _runtime_params(params, context)
+    positional_count, has_varargs, first_parameter_name = _callable_profile(process)
     try:
-        if has_varargs or len(positional) >= 3:
+        if has_varargs or positional_count >= 3:
             # Backward-compatible form: process(inputs, params, context) -> {"out": ...}
             result = process(inputs, runtime_params, context)
         elif ports.explicit:
             # Explicit PORTS use a named input mapping. A source with no inputs
             # may use the natural process(params) form, which is especially
             # useful for generators driven entirely by Variables/Experiment.
-            if len(positional) >= 2:
+            if positional_count >= 2:
                 result = process(inputs, runtime_params)
-            elif len(positional) == 1:
-                parameter_name = positional[0].name.lower()
-                result = process(runtime_params if not ports.inputs and parameter_name in {"params", "config", "runtime_params"} else inputs)
+            elif positional_count == 1:
+                result = process(runtime_params if not ports.inputs and first_parameter_name in {"params", "config", "runtime_params"} else inputs)
             else:
                 result = process()
-        elif len(positional) == 2:
+        elif positional_count == 2:
             # Recommended form: process(signal, params) -> array
             result = process(signal, runtime_params)
-        elif len(positional) == 1:
+        elif positional_count == 1:
             result = process(signal)
         else:
             result = process()
@@ -630,6 +662,77 @@ def python_block(inputs, params, context, code):
     if len(ports.outputs) != 1:
         raise ValueError("A Python Block with multiple output ports must return a dictionary keyed by port name")
     return {ports.outputs[0]: result}
+
+
+def _stack_python_batch(values: list[Any]) -> Any:
+    arrays = [np.asarray(value) for value in values]
+    if arrays and all(array.shape == arrays[0].shape and array.dtype == arrays[0].dtype for array in arrays[1:]):
+        return np.stack(arrays, axis=0)
+    return values
+
+
+def _split_python_batch(value: Any, count: int, port: str) -> list[Any]:
+    if isinstance(value, (list, tuple)):
+        if len(value) != count:
+            raise ValueError(f"Python process_batch() output '{port}' returned {len(value)} frames; expected {count}")
+        return list(value)
+    array = np.asarray(value)
+    if array.ndim < 2 or array.shape[0] != count:
+        raise ValueError(
+            f"Python process_batch() output '{port}' must have a leading frame dimension of {count}; received shape {array.shape}"
+        )
+    return [array[index] for index in range(count)]
+
+
+def python_block_batch(inputs_batch: list[dict[str, Any]], params, contexts: list[Any], code: str) -> list[dict[str, Any]]:
+    """Run an opt-in vectorized Python block once for a scheduler chunk."""
+    if not inputs_batch or len(inputs_batch) != len(contexts):
+        raise ValueError("Python process_batch() requires one input mapping per frame")
+    ports = parse_python_ports(code)
+    namespace = {
+        "PORTS": {"inputs": ports.inputs.copy(), "outputs": ports.outputs.copy()},
+        "np": np,
+        "numpy": np,
+        "sp": sp,
+        "scipy": sp,
+        "sl": sl,
+        "signallab": sl,
+        "__builtins__": __builtins__,
+    }
+    try:
+        exec(_compile_python_block(code), namespace, namespace)
+    except Exception as exc:
+        raise ValueError(_python_process_error(exc, code, {}, ports.inputs)) from exc
+    process_batch = namespace.get("process_batch")
+    if not callable(process_batch):
+        raise ValueError("Python block batch path requires process_batch(signals, params_batch)")
+    batched_inputs = {name: _stack_python_batch([frame[name] for frame in inputs_batch]) for name in ports.inputs}
+    signals = batched_inputs if ports.explicit else batched_inputs.get("in")
+    params_batch = [_runtime_params(params, context) for context in contexts]
+    positional_count, has_varargs, _ = _callable_profile(process_batch)
+    try:
+        if has_varargs or positional_count >= 3:
+            raw = process_batch(signals, params_batch, contexts)
+        elif positional_count == 2:
+            raw = process_batch(signals, params_batch)
+        elif positional_count == 1:
+            raw = process_batch(signals)
+        else:
+            raw = process_batch()
+    except Exception as exc:
+        raise ValueError(_python_process_error(exc, code, params_batch[0], ports.inputs).replace("process()", "process_batch()")) from exc
+    if isinstance(raw, dict):
+        batched_outputs = raw
+    elif len(ports.outputs) == 1:
+        batched_outputs = {ports.outputs[0]: raw}
+    elif raw is None and not ports.outputs:
+        batched_outputs = {}
+    else:
+        raise ValueError("Python process_batch() with multiple outputs must return a dictionary")
+    if set(batched_outputs) != set(ports.outputs):
+        raise ValueError("Python process_batch() outputs must match the declared PORTS exactly")
+    split = {port: _split_python_batch(value, len(contexts), port) for port, value in batched_outputs.items()}
+    return [{port: values[index] for port, values in split.items()} for index in range(len(contexts))]
 
 
 def _python_process_error(exc: Exception, code: str, runtime_params: dict[str, Any], input_ports: list[str]) -> str:

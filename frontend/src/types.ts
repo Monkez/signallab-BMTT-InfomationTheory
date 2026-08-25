@@ -127,6 +127,11 @@ export type Job = {
       coding?: string
       kernel?: string
       fallback_reason?: string | null
+      scheduler?: string
+      python_blocks?: number
+      python_batch_blocks?: number
+      chunk_size?: number
+      executor_hint?: string
     }
     workers: number
     warnings: string[]

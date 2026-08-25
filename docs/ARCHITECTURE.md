@@ -86,14 +86,14 @@ Python Block mặc định giữ contract `in/out`. Nếu code có `PORTS` liter
 
 Random Bits, AWGN và Rayleigh có seed riêng. `seed = -1` lấy một entropy gốc mới đúng một lần khi bắt đầu Run once/Benchmark; runtime tiếp tục trộn entropy đó với seed frame và CRC32 của node để các node/frame có stream độc lập, ổn định trước thay đổi lịch multiprocessing. Với `seed >= 0`, entropy gốc của run bị bỏ qua nên cùng graph, Experiment seed và block seed sẽ tái lập; frame vẫn khác nhau vì seed frame vẫn tham gia phép trộn.
 
-`POST /api/run-once` dùng cùng DAG runtime nhưng chỉ chạy một frame đồng bộ. Với Specific steps, channel nhận `context.snr_db=None` để dùng tham số riêng; với BER benchmark, frame dùng `snr_db_start`. Khi bật `capture_ports`, engine tóm tắt input/output của từng node thành dtype, shape, size, min/mean/max và tối đa 8 mẫu dạng JSON-safe. Frontend gắn summary vào node để tooltip đọc trực tiếp; dữ liệu đầy đủ được giữ sau `snapshot_id` và chỉ truyền từng trang khi tab Block yêu cầu.
+`POST /api/run-once` dùng cùng DAG runtime nhưng chỉ chạy một frame đồng bộ. Với Specific steps, channel/Python Block nhận `context.snr_db=snr_db_start`; với BER benchmark, frame đại diện cũng dùng `snr_db_start`. Khi bật `capture_ports`, engine tóm tắt input/output của từng node thành dtype, shape, size, min/mean/max và tối đa 8 mẫu dạng JSON-safe. Frontend gắn summary vào node để tooltip đọc trực tiếp; dữ liệu đầy đủ được giữ sau `snapshot_id` và chỉ truyền từng trang khi tab Block yêu cầu.
 
 Job **Run Benchmark** vẫn chạy Monte-Carlo bất đồng bộ qua polling. Khi hoàn tất, engine chạy thêm một frame đại diện xác định bằng seed cấu hình tại SNR đầu tiên để trả `port_previews` và đăng ký snapshot đầy đủ. Frame này phục vụ quan sát luồng dữ liệu, không tham gia phép cộng metric và không làm thay đổi BER benchmark. Mọi chỉnh sửa topology hoặc tham số đều xóa preview/snapshot phía frontend để tránh hiển thị dữ liệu hết hạn.
 
 ## Song song CPU/GPU
 
 - Native CPU: C++20/oneTBB chia dải counter RNG giữa thread, giữ kết quả bit-exact khi đổi số worker. Philox sinh số ngẫu nhiên theo counter nên không cần khóa hoặc state chung. Scheduler chỉ cho một benchmark nặng chiếm máy tại một thời điểm để tránh các job tự oversubscribe lẫn nhau.
-- Compatibility CPU: trial tổng quát được chia chunk qua `ProcessPoolExecutor`. `workers=0` chỉ bật đa tiến trình tự động khi frame và tổng workload đủ lớn; workload nhỏ chạy inline để tránh overhead IPC.
+- Compatibility CPU: trial tổng quát được chia chunk qua `ProcessPoolExecutor`. Initializer cài compiled graph một lần trong mỗi worker, nên task sau không pickle lại topology/code. `workers=0` chỉ bật đa tiến trình tự động khi frame và tổng workload đủ lớn; workload nhỏ chạy inline để tránh overhead IPC. Python Block có `process_batch` khiến chunk chạy node-by-node và vector hóa trục frame; block cũ vẫn chạy từng frame.
 - Compatibility GPU: runtime thử nạp CuPy/CUDA và kiểm tra device; các built-in dùng namespace mảng `context.xp`. Đây không phải lựa chọn mặc định trên máy Intel Arc.
 - Auto: planner thử native CPU trước cho topology được hỗ trợ, sau đó mới dùng backend tương thích theo lựa chọn device.
 
@@ -128,7 +128,7 @@ Mỗi node có `port_orientation` (`standard` hoặc `reversed`). Đây là thu�
 
 ## Experiment sweep và Sink
 
-Experiment có hai mode: `specific_steps` chạy đúng số frame cố định và truyền `context.snr_db=None` để channel dùng tham số riêng; `ber_benchmark` tạo dải từ `snr_db_start/stop/step` và dừng từng điểm khi đạt `min_frames` cùng (`min_errors` hoặc `max_frames`). Kết quả giữ `snr_points` cho BER benchmark; Specific steps không tạo đường BER theo SNR. Block được thêm từ Block Picker; Properties inspector có thể ẩn/hiện và kéo đổi chiều rộng.
+Experiment có hai mode: `specific_steps` chạy đúng số frame cố định tại `snr_db_start`; `ber_benchmark` tạo dải từ `snr_db_start/stop/step` và dừng từng điểm khi đạt `min_frames` cùng (`min_errors` hoặc `max_frames`). Kết quả giữ `snr_points` cho BER benchmark; Specific steps không tạo đường BER theo SNR. Block được thêm từ Block Picker; Properties inspector có thể ẩn/hiện và kéo đổi chiều rộng.
 
 Console dock là lớp hiển thị phía frontend, nhận sự kiện khi nạp block, xếp hàng/chạy/kết thúc/hủy job và lỗi API. Trong lúc chạy, callback tiến độ mang theo `snr_points` gồm các điểm đã hoàn tất và điểm SNR hiện tại, vì vậy dashboard có thể vẽ BER theo thời gian thực mà không đợi job kết thúc. Engine trả thêm `sink_metrics` cho Scope, Constellation và Power Meter để inspector hiển thị tóm tắt trực quan mà không truyền mảng mẫu lớn qua API.
 
@@ -136,7 +136,7 @@ Console dock là lớp hiển thị phía frontend, nhận sự kiện khi nạp
 
 - Biểu đồ BER có thể copy trực tiếp ảnh PNG vào clipboard hoặc tải xuống; bảng kết quả theo SNR có thể copy dạng TSV, tải CSV hoặc PNG.
 - Graph được biên dịch thành `node_map`, danh sách cạnh vào và thứ tự thực thi một lần trước sweep. Seed được sinh theo từng batch thay vì cấp phát toàn bộ số frame từ đầu.
-- Mã của Python Block được compile và giữ trong LRU cache theo nội dung; mỗi frame vẫn tạo namespace riêng để không rò state giữa các trial.
+- Mã, PORTS và call profile của Python Block được giữ trong LRU cache theo nội dung/code object; API frame vẫn tạo namespace riêng để không rò state giữa trial. API `process_batch` tạo một namespace cho mỗi chunk và nhận params riêng từng frame.
 - Fast path native fuse BPSK/AWGN/hard decision/BER và Hamming hoặc Repetition tùy graph; compatibility CPU dùng một `ProcessPoolExecutor` dùng lại cho toàn bộ sweep. Người dùng vẫn có thể đặt `Workers` thủ công khi benchmark hệ thống cụ thể.
 
 ## Quy trình mở rộng

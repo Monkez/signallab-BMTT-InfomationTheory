@@ -20,12 +20,12 @@ export function NumericInput({ value, onValueChange, integer = false, className 
   const commitIfValid = (text: string) => {
     if (!COMPLETE_NUMBER.test(text.trim())) return false
     const numeric = Number(text)
-    if (!Number.isFinite(numeric) || (integer && !Number.isInteger(numeric))) return false
+    if (!Number.isFinite(numeric) || (integer && !Number.isSafeInteger(numeric))) return false
     onValueChange(numeric)
     return true
   }
 
-  const invalid = draft !== '' && (!COMPLETE_NUMBER.test(draft.trim()) || !Number.isFinite(Number(draft)) || (integer && !Number.isInteger(Number(draft))))
+  const invalid = draft !== '' && (!COMPLETE_NUMBER.test(draft.trim()) || !Number.isFinite(Number(draft)) || (integer && !Number.isSafeInteger(Number(draft))))
 
   return <input
     {...inputProps}

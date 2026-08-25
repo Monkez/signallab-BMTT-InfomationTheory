@@ -132,7 +132,7 @@ Mỗi node có `port_orientation` (`standard` hoặc `reversed`). Đây là thu�
 
 ## Experiment sweep và Sink
 
-Experiment có hai mode: `specific_steps` chạy đúng số frame cố định tại `snr_db_start`; `ber_benchmark` tạo dải từ `snr_db_start/stop/step` và dừng từng điểm khi đạt `min_frames` cùng (`min_errors` hoặc `max_frames`). Kết quả giữ `snr_points` cho BER benchmark; Specific steps không tạo đường BER theo SNR. Block được thêm từ Block Picker; Properties inspector có thể ẩn/hiện và kéo đổi chiều rộng.
+Experiment có hai mode: `specific_steps` chạy đúng số frame cố định tại `snr_db_start`; `ber_benchmark` tạo dải từ `snr_db_start/stop/step` và dừng từng điểm khi đạt `min_frames` cùng (`min_errors` hoặc `max_frames`). Frame là biên logic của một lần chạy DAG, độc lập với số phần tử mà Source phát ra: Hamming có thể dùng 4 bit/frame để debug hoặc nhiều codeword/frame để tăng mật độ vector. Các budget frame/error không có trần nghiệp vụ ở Pydantic; frontend giữ số nguyên trong miền exact integer của JavaScript. Kết quả giữ `snr_points` cho BER benchmark; Specific steps không tạo đường BER theo SNR. Block được thêm từ Block Picker; Properties inspector có thể ẩn/hiện và kéo đổi chiều rộng.
 
 Console dock là lớp hiển thị phía frontend, nhận sự kiện khi nạp block, xếp hàng/chạy/kết thúc/hủy job và lỗi API. Trong lúc chạy, callback tiến độ mang theo `snr_points` gồm các điểm đã hoàn tất và điểm SNR hiện tại, vì vậy dashboard có thể vẽ BER theo thời gian thực mà không đợi job kết thúc. Engine trả thêm `sink_metrics` cho Scope, Constellation và Power Meter để inspector hiển thị tóm tắt trực quan mà không truyền mảng mẫu lớn qua API.
 
@@ -141,7 +141,7 @@ Console dock là lớp hiển thị phía frontend, nhận sự kiện khi nạp
 - Biểu đồ BER có thể copy trực tiếp ảnh PNG vào clipboard hoặc tải xuống; bảng kết quả theo SNR có thể copy dạng TSV, tải CSV hoặc PNG.
 - Graph được biên dịch thành `node_map`, danh sách cạnh vào và thứ tự thực thi một lần trước sweep. Seed được sinh theo từng batch thay vì cấp phát toàn bộ số frame từ đầu.
 - Mã, PORTS và call profile của Python Block được giữ trong LRU cache theo nội dung/code object; API frame vẫn tạo namespace riêng để không rò state giữa trial. API `process_batch` tạo một namespace cho mỗi chunk và nhận params riêng từng frame.
-- Fast path native fuse BPSK/AWGN/hard decision/BER và Hamming hoặc Repetition tùy graph; compatibility CPU dùng một `ProcessPoolExecutor` dùng lại cho toàn bộ sweep. Người dùng vẫn có thể đặt `Workers` thủ công khi benchmark hệ thống cụ thể.
+- Fast path native fuse BPSK/AWGN/hard decision/BER và Hamming hoặc Repetition tùy graph; compatibility CPU dùng một `ProcessPoolExecutor` dùng lại cho toàn bộ sweep. Native scheduler giữ frame logic nhưng gom tối đa 262.144 frame nhỏ trong một lần pybind/TBB để không làm Hamming 4 bit/frame chậm vì overhead. Người dùng vẫn có thể đặt `Workers` thủ công khi benchmark hệ thống cụ thể.
 
 ## Quy trình mở rộng
 

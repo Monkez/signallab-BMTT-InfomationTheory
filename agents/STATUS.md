@@ -1,5 +1,9 @@
 # Trạng thái dự án
 
+- Mốc logical-frame 2026-08-25 đã hoàn tất: bỏ trần 1.000.000 khỏi `trials/max_frames/min_frames/min_errors`; Hamming sample dùng đúng 4 bit → 7 bit mỗi frame để Run once/debug, còn native scheduler batch tối đa 262.144 frame nhỏ mỗi tile để giữ tốc độ.
+- Xác minh: backend 102/102 pass, frontend build pass; browser Save `1.52e6`, Run once hiển thị 4→7→4 và benchmark 7/7 point không lỗi. Sample Hamming mặc định 512.000 max frame/SNR hoàn tất native trong 0,041 s trên máy phát triển; frozen `dist-update` chạy thực 1.000.001 frame × 4 bit bằng `native_cpp/cpp_onetbb`.
+- Performance gate đạt native 14,86–23,16× Python một worker và Python Custom Block batch-auto 2,10× frame-serial. `build_app.bat` dùng side-by-side release vì bản chuẩn đang mở/khóa; `run.bat` sẽ chọn bản mới tại `dist-update\SignalLab\SignalLab.exe`.
+
 - Mốc UX/advanced simulation 2026-08-25 đã hoàn tất: Config có draft + Save/Cancel; mọi numeric parameter cho phép xóa trắng và dạng `1e6`/`1.52e3`; API validation object được format thành field path + message thay `[object Object]`.
 - Benchmark có progress bubble dưới Results (percent, step, SNR/frame), hiệu ứng sáng khi chạy và xanh khi hoàn tất. Browser QA đã xác nhận Hamming hoàn tất 7/7 point, compatibility sample hiển thị tiến độ đang chạy và nút/bubble chuyển completed.
 - Thư viện tăng 46 → 55 block: convolutional (7,5)/hard Viterbi, DC Blocker, FIR, Normalize Power, 2-FSK mapper/detector, Rician và EVM Meter. Catalog tăng 9 → 12 sample với ba hệ thống nâng cao; mọi sample có Run once + benchmark-short gate.

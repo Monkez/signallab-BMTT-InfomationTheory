@@ -9,7 +9,7 @@ Custom Python Blocks support persistent process workers and an optional vectoriz
 Python Blocks include a CodeMirror-based IDE editor with Python syntax highlighting, line numbers, bracket matching and a large draft-based editing window.
 At runtime they receive the current Experiment point through `params["snr_db"]` and related keys. A port-free Variables block declares safe typed globals shared by every Python Block without coupling user code to the parallel scheduler.
 
-The interface uses a high-contrast light layout with a bundled SignalLab logo and app icon. Numeric fields can be cleared naturally and accept scientific notation such as `1e6` or `1.52e3`. The 55-block library includes PSK/QAM/OOK/2-FSK, convolutional/Viterbi coding, AWGN/Rayleigh/Rician channels, FIR/DC/power processing, BER/SER/EVM and custom Python processing.
+The interface uses a high-contrast light layout with a bundled SignalLab logo and app icon. Numeric fields can be cleared naturally and accept scientific notation such as `1e6` or `1.52e3`. Monte-Carlo frame budgets no longer have a one-million-frame cap; a frame remains a user-visible graph boundary while the runtime batches tiny frames internally. The 55-block library includes PSK/QAM/OOK/2-FSK, convolutional/Viterbi coding, AWGN/Rayleigh/Rician channels, FIR/DC/power processing, BER/SER/EVM and custom Python processing.
 
 Use **Open Samples** on the top bar to browse 12 complete learning labs, including convolutional/Viterbi BPSK, QPSK/Rician/EVM and orthogonal 2-FSK systems. Every sample includes learning objectives, guided steps and expected observations before it is opened as an editable simulation.
 

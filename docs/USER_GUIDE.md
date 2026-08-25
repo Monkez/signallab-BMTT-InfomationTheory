@@ -72,8 +72,10 @@ Hai bài Python minh họa đúng mô hình lập trình của SignalLab: ngư�
 ## Cấu hình Experiment
 
 - Cửa sổ **Experiment config** giữ một bản nháp riêng. **Save** mới áp dụng cấu hình; **Cancel**, nút đóng hoặc click ra ngoài bỏ bản nháp. Các ô số có thể xóa trắng để gõ lại và chấp nhận dạng khoa học như `1e6`, `1.52e3` hoặc `-2.5e-1`.
-- **Specific steps**: nhập `SNR (dB)` cho một điểm làm việc và `Steps` là số frame cố định cần chạy. Mode này không quét SNR; giá trị SNR được truyền vào `params["snr_db"]` của channel/Python Block. Nếu channel đặt `Fixed block value` thì `ebn0_db` của block vẫn được ưu tiên.
+- **Specific steps**: nhập `SNR (dB)` cho một điểm làm việc và `Frames` là số frame logic cố định cần chạy. Mode này không quét SNR; giá trị SNR được truyền vào `params["snr_db"]` của channel/Python Block. Nếu channel đặt `Fixed block value` thì `ebn0_db` của block vẫn được ưu tiên.
 - **BER benchmark**: dùng `SNR Start/Stop/Step`; mỗi điểm chạy ít nhất `Min frames / SNR`, dừng sớm khi đạt `Min errors / SNR`, hoặc dừng ở `Frames / SNR`.
+- Một **frame logic** là một lần graph xử lý dữ liệu do Source phát ra. Vì vậy Hamming (7,4) có thể dùng `Bit Source.length = 4`: mỗi frame chứa đúng một message 4 bit và một codeword 7 bit, rất tiện Run once/debug. Đặt `length = 4096` vẫn hợp lệ và tương đương 1.024 codeword trong mỗi frame.
+- `Max frames` không còn trần nghiệp vụ 1.000.000. UI nhận mọi số nguyên dương biểu diễn chính xác bởi JavaScript (tối đa `9,007,199,254,740,991`) và backend stream chúng theo batch/tile hữu hạn, không cấp phát toàn bộ frame cùng lúc. Tổng thời gian vẫn tỷ lệ với `frames × dữ liệu mỗi frame`; nên dùng stopping criteria và Cancel cho job dài.
 - Với block **AWGN**, chọn `Experiment sweep` để lấy `context.snr_db`; chọn `Fixed block value` để dùng `ebn0_db` riêng.
 - `Workers = 0`: hệ thống tự chọn; đặt `1` để debug dễ hơn.
 - `Execution engine = Auto` (khuyến nghị): dùng C++/oneTBB cho chuỗi BER được hỗ trợ và tự quay về Python cho graph tổng quát. Chọn `Native C++` để kiểm tra/cưỡng bức fast path; graph chưa hỗ trợ sẽ báo lý do. Chọn `Python` khi cần so sánh tương thích hoặc debug block.
@@ -111,7 +113,7 @@ Luồng mẫu phân tích: `Text Symbol Source → Source Information Analyzer`.
 
 Mọi port phải mang mảng một chiều, không rỗng. Runtime không còn tự cắt phần dư hoặc để BER so sánh theo nhánh ngắn hơn:
 
-- Hamming (7,4): encoder dùng dạng hệ thống quen thuộc trong giáo trình `c = [d1 d2 d3 d4 p1 p2 p3]`, yêu cầu input chia hết cho 4 và tạo `7/4` số phần tử. Decoder yêu cầu input chia hết cho 7, sửa tối đa một bit lỗi trong mỗi codeword rồi trả về bốn bit dữ liệu đầu tiên.
+- Hamming (7,4): encoder dùng dạng hệ thống quen thuộc trong giáo trình `c = [d1 d2 d3 d4 p1 p2 p3]`, yêu cầu input chia hết cho 4 và tạo `7/4` số phần tử. `length=4` tạo đúng một codeword/frame để debug; `length=4096` được vector hóa thành 1.024 codeword/frame. Decoder yêu cầu input chia hết cho 7, sửa tối đa một bit lỗi trong mỗi codeword rồi trả về bốn bit dữ liệu đầu tiên.
 - Repetition-3: encoder tạo kích thước gấp 3; decoder yêu cầu input chia hết cho 3.
 - Mã chập (7,5): encoder rate 1/2 tạo hai coded bit trên mỗi information bit và phát `reference`; hard Viterbi yêu cầu input chẵn rồi trả đúng một nửa số bit.
 - QPSK: modulator yêu cầu số bit chẵn và tạo một symbol trên hai bit; demodulator khôi phục hai bit trên một symbol.

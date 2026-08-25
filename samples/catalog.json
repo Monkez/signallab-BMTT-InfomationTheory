@@ -28,11 +28,11 @@
       "summary": "Mô hình hoàn chỉnh sử dụng mã Hamming hệ thống c=[d1 d2 d3 d4 p1 p2 p3], BPSK và AWGN. Nhánh reference đi thẳng từ encoder giúp BER so sánh đúng dữ liệu nguồn sau giải mã.",
       "concepts": ["Hamming (7,4)", "Mã hệ thống", "Syndrome", "Coding gain", "BER"], "uses_python": false,
       "learning_objectives": ["Kiểm tra quan hệ kích thước 4 bit vào và 7 bit ra", "Quan sát sửa lỗi đơn bằng syndrome", "So sánh với tuyến BPSK không mã hóa"],
-      "instructions": ["Run once, chọn Hamming encoder và kiểm tra reference 4 bit, codeword 7 bit theo từng nhóm.", "Theo dõi output decoder; xác nhận kích thước quay về đúng số bit nguồn.", "Run Benchmark với cấu hình có sẵn và lưu đường BER thành reference.", "Mở sample BPSK không mã hóa, load reference vừa lưu để thảo luận coding gain và overhead."],
-      "expected_observations": ["Với 4096 bit, encoder sinh 7168 bit vì 4096 chia hết cho 4.", "Decoder sửa được tối đa một lỗi trong mỗi codeword; nhiều lỗi cùng codeword có thể làm sai dữ liệu."]
+      "instructions": ["Run once, chọn Hamming encoder và kiểm tra đúng một message 4 bit cùng codeword 7 bit.", "Theo dõi output decoder; xác nhận kích thước quay về đúng 4 bit nguồn.", "Run Benchmark với cấu hình có sẵn: scheduler giữ frame logic 4 bit nhưng tự batch nhiều frame trong native engine.", "Mở sample BPSK không mã hóa, load reference vừa lưu để thảo luận coding gain và overhead."],
+      "expected_observations": ["Mỗi frame có 4 bit và encoder sinh đúng một codeword 7 bit, thuận tiện xem từng giá trị khi debug.", "Decoder sửa được tối đa một lỗi trong mỗi codeword; nhiều lỗi cùng codeword có thể làm sai dữ liệu."]
     },
     "graph": { "version": "1.0", "nodes": [
-      {"id":"src","type":"bit_source","label":"Random bits","position":{"x":20,"y":48},"params":{"length":4096,"seed":-1}},
+      {"id":"src","type":"bit_source","label":"One 4-bit message","position":{"x":20,"y":48},"params":{"length":4,"seed":-1}},
       {"id":"enc","type":"hamming74_encode","label":"Systematic Hamming (7,4)","position":{"x":252,"y":48}},
       {"id":"mod","type":"bpsk_mod","label":"BPSK","position":{"x":484,"y":48}},
       {"id":"ch","type":"awgn","label":"AWGN","position":{"x":716,"y":48},"params":{"ebn0_db":4,"snr_mode":"experiment","seed":-1}},
@@ -43,7 +43,7 @@
       {"id":"e1","source":"src","target":"enc"},{"id":"e2","source":"enc","target":"mod"},{"id":"e3","source":"mod","target":"ch"},{"id":"e4","source":"ch","target":"demod"},
       {"id":"e5","source":"demod","target":"dec"},{"id":"e6","source":"enc","source_handle":"reference","target":"ber","target_handle":"reference"},{"id":"e7","source":"dec","target":"ber","target_handle":"estimate"}
     ]},
-    "config": {"mode":"ber_benchmark","trials":500,"max_frames":500,"min_frames":50,"min_errors":250,"snr_db_start":-2,"snr_db_stop":10,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","chunk_size":20}
+    "config": {"mode":"ber_benchmark","trials":512000,"max_frames":512000,"min_frames":51200,"min_errors":250,"snr_db_start":-2,"snr_db_stop":10,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","chunk_size":8192}
   },
   {
     "format": "signallab-simulation", "version": "1.0",

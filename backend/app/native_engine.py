@@ -235,7 +235,10 @@ def run_native_simulation(
                 requested_tile = frames_to_minimum if frames_to_minimum else tile_floor
             else:
                 requested_tile = max(tile_floor, target_bits_per_tile // max(1, plan.bit_length))
-            tile_frames = min(remaining, max(1, min(1024, requested_tile)))
+            # Logical frames can deliberately be tiny for teaching/debugging
+            # (e.g. one four-bit Hamming message). Keep that public boundary,
+            # but amortize Python/pybind/TBB overhead with a bounded native tile.
+            tile_frames = min(remaining, max(1, min(262_144, requested_tile)))
             result = native.run_modulated_awgn_batch(
                 plan.bit_length,
                 int(point["frames"]),

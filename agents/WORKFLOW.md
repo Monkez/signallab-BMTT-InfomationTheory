@@ -15,3 +15,4 @@
 13. Khi sửa Python Custom Block runtime, khóa cả API frame/PORTS cũ, `process_batch`, params riêng từng frame, persistent worker trên Windows và benchmark `benchmark_python.bat`; không suy luận rằng process pool luôn nhanh hơn inline.
 14. Numeric UI phải cho phép draft rỗng và scientific notation; không dùng `Number(input.value)` trực tiếp trong controlled input vì `Number("")` biến thao tác xóa thành 0.
 15. Sample mới/sửa phải pass cả Run once lẫn benchmark ngắn trong `test_samples.py`; sink metric mới phải đi qua helper tổng hợp dùng chung cho hai đường chạy.
+16. Phân biệt frame logic với vector trong frame: không ép sample giáo dục tăng `Source.length` chỉ để benchmark nhanh. Scheduler phải batch nội bộ frame nhỏ; budget frame/error không đặt trần nghiệp vụ tùy ý và phải có test vượt mốc một triệu.

@@ -5,7 +5,7 @@ const block = (id: string, blockType: string, label: string, x: number, y: numbe
 })
 
 export const initialNodes: FlowNode[] = [
-  block('source', 'bit_source', 'Random bits', 20, 48, [], ['out'], { length: 4096, seed: -1 }),
+  block('source', 'bit_source', 'One Hamming message', 20, 48, [], ['out'], { length: 4, seed: -1 }),
   block('encoder', 'hamming74_encode', 'Hamming 7,4', 252, 48, ['in'], ['out', 'reference']),
   block('mod', 'bpsk_mod', 'BPSK', 484, 48, ['in'], ['out']),
   block('channel', 'awgn', 'AWGN', 716, 48, ['in'], ['out'], { ebn0_db: 4, snr_mode: 'experiment', seed: -1 }),

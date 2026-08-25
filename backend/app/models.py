@@ -44,10 +44,14 @@ class Graph(BaseModel):
 
 class SimulationConfig(BaseModel):
     mode: Literal["specific_steps", "ber_benchmark"] = "specific_steps"
-    trials: int = Field(default=100, ge=1, le=1_000_000)
-    max_frames: int | None = Field(default=1, ge=1, le=1_000_000)
-    min_frames: int = Field(default=1, ge=1, le=1_000_000)
-    min_errors: int = Field(default=0, ge=0, le=1_000_000)
+    # Frame/error budgets are intentionally unbounded at the API layer. A
+    # logical frame may contain only one codeword (for example four source
+    # bits for Hamming (7,4)); the schedulers stream large budgets in bounded
+    # tiles instead of allocating every frame at once.
+    trials: int = Field(default=100, ge=1)
+    max_frames: int | None = Field(default=1, ge=1)
+    min_frames: int = Field(default=1, ge=1)
+    min_errors: int = Field(default=0, ge=0)
     snr_db_start: float = -2.0
     snr_db_stop: float = 10.0
     snr_db_step: float = Field(default=2.0, gt=0)

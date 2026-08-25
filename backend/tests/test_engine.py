@@ -109,6 +109,18 @@ def test_specific_steps_mode_runs_exact_points_with_fixed_frames():
     assert all(point["frames"] == 2 for point in result["snr_points"])
 
 
+def test_frame_and_error_budgets_have_no_one_million_cap():
+    config = SimulationConfig(
+        trials=1_500_000,
+        max_frames=1_500_000,
+        min_frames=1_250_000,
+        min_errors=2_000_000,
+    )
+    assert config.max_frames == 1_500_000
+    assert config.min_frames == 1_250_000
+    assert config.min_errors == 2_000_000
+
+
 def test_run_once_captures_input_and_output_port_samples():
     result = run_once(sample_graph(), SimulationConfig(seed=42, device="cpu"))
     source = result["port_previews"]["0"]["outputs"]["out"]
@@ -759,6 +771,29 @@ def test_native_hamming_bpsk_is_deterministic_across_worker_counts():
     assert serial["bit_errors"] == parallel["bit_errors"]
     assert serial["total_bits"] == parallel["total_bits"] == 64 * 4096
     assert serial["port_previews"]["0"]["outputs"]["out"]["size"] == 4096
+
+
+@pytest.mark.skipif(not NATIVE_AVAILABLE, reason="native extension is not built")
+def test_native_batches_more_than_one_million_four_bit_hamming_frames():
+    graph = sample_graph()
+    graph.nodes[0].params["length"] = 4
+    graph.nodes[3].params["snr_mode"] = "experiment"
+    frame_count = 1_000_001
+    result = run_simulation(graph, SimulationConfig(
+        mode="specific_steps",
+        max_frames=frame_count,
+        min_frames=frame_count,
+        snr_db_start=4,
+        workers=4,
+        chunk_size=8192,
+        device="cpu",
+        engine="native",
+        seed=2026,
+    ))
+    assert result["engine"] == "native_cpp"
+    assert result["completed_trials"] == frame_count
+    assert result["total_bits"] == frame_count * 4
+    assert result["port_previews"]["0"]["outputs"]["out"]["size"] == 4
 
 
 @pytest.mark.skipif(not NATIVE_AVAILABLE, reason="native extension is not built")

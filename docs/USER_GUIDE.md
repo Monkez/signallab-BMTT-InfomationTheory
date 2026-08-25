@@ -188,3 +188,7 @@ Cửa sổ **Experiment config** có mode selector để cùng một canvas dùn
 - **BER benchmark** is the adaptive Monte-Carlo mode. Each SNR point runs until `Min frames / SNR` and `Min errors / SNR` are reached, or until the frame limit is reached. Use this for BER curves.
 
 The selected SNR is exposed to channels and Python Blocks as `params["snr_db"]`. Results are rendered from the sinks present in the graph, so non-BER experiments do not show BER-specific controls or charts.
+
+### BER Results layout
+
+The BER chart keeps the curve selector and editing controls in one compact toolbar. On wide windows the selector has a bounded width, while the name, color, line style, Save and Browse actions share the remaining space. On narrow windows the toolbar stacks automatically so controls remain usable without horizontal scrolling.

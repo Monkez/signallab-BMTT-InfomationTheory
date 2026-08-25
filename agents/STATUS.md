@@ -11,6 +11,7 @@
 - Sample Library Modal đã nhóm Digital communications, Analog communications, Information theory và Python labs bằng vùng thu gọn/mở rộng; tìm kiếm tự mở nhóm có kết quả. Nút Open this sample dùng footer sticky để luôn dễ thấy.
 - BER Results ở cửa sổ rộng dùng bố cục điều khiển gọn theo lưới, có fallback xếp dọc ở màn hình hẹp. QPSK/Rician sample dùng flat fading theo frame để đường BER giảm đúng ở SNR cao.
 - Regression mới kiểm tra BER QPSK/Rician tại 30 dB; cần chạy lại full backend, frontend build và build_app trước khi phát hành.
+- BER Results refinement 2026-08-26: giới hạn chiều rộng selector, gom hàng chỉnh đường cong vào một control bar nền nhẹ, chuẩn hóa kích thước nút Copy/PNG/Details và Save/Browse, giảm khoảng đệm tiêu đề Sink Results; vẫn có breakpoint cho màn hình hẹp.
 - Scope sink được hoàn thiện thành **Oscilloscope Sink**: engine giữ tối đa 2.048 mẫu cho sink, Results có waveform preview và Details có biểu đồ miền thời gian; AM/FM sample đều nối thêm sink này.
 - Layout controls được dời khỏi topbar: nút thu Inspector nằm trong Properties header, nút thu Console nằm trong Console header; khi ẩn, canvas hiển thị nút mở lại nhỏ sát cạnh panel.
 - Oscilloscope Inspector có waveform trực tiếp và bộ điều khiển channel Auto/Real/I/Imaginary/Q/Magnitude/IQ, sample window, Y scale và grid; Details button trong Results chặn bubbling để mở report portal ổn định.

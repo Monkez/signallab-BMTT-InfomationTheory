@@ -1,5 +1,10 @@
 # Trạng thái dự án
 
+## Cập nhật 2026-08-26 — sink report hợp nhất
+
+- Inspector có nút mở report cho BER, Scope, Constellation, Spectrum và Waterfall; dùng chung cửa sổ Details với Results. Oscilloscope report hỗ trợ chọn Real/I, Imaginary/Q, Magnitude, I+Q, số mẫu, Y scale và grid.
+- References toolbar đã căn đồng nhất chiều cao các nút Save current và Browse/Load.
+
 ## Cập nhật 2026-08-25 — sample modulation và thư viện nhóm
 
 - Catalog tăng lên 14 sample: thêm AM envelope modulation/demodulation và FM modulation/discriminator bằng Python Block; QPSK tiếp tục có các bài AWGN/Rician.

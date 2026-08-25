@@ -354,6 +354,9 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .section-rule { display: flex; align-items: center; gap: 8px; color: #788493; font-size: 7px; letter-spacing: .1em; margin: 20px 0 12px; }
 .section-rule:after { content: ''; height: 1px; background: var(--line); flex: 1; }
 .section-rule em { font-style: normal; color: #8792a0; letter-spacing: 0; order: 2; }
+.inspector-detail-button { min-height: 26px; margin-left: auto; padding: 0 9px; border: 1px solid #b8cce9; border-radius: 5px; background: #f3f7ff; color: #285da9; font-size: 10px; letter-spacing: 0; cursor: pointer; }
+.inspector-detail-button:hover { border-color: #7fa7df; background: #eaf2ff; }
+.inspector-detail-top { display: block; margin: 7px 0 10px auto; }
 .muted, .code-hint { font-size: 9px; color: #788493; line-height: 1.6; }
 .python-editor-inline-toolbar { min-height: 39px; padding: 0 8px 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid #29384b; border-bottom: 0; border-radius: 7px 7px 0 0; background: #172231; color: #aebed2; }
 .python-editor-inline-toolbar > div { min-width: 0; display: flex; align-items: center; gap: 7px; }
@@ -590,9 +593,14 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .sink-metric-editor label, .sink-edit-grid label { color: #64748b; font-size: 10px; text-transform: capitalize; }
 .sink-metric-editor input, .sink-edit-grid input, .sink-edit-grid select { margin-top: 5px; height: 32px; font-size: 10px; }
 .sink-sample-editor { width: 100%; min-height: 120px; resize: vertical; font: 10px/1.5 Consolas, monospace; }
-.sink-detail-actions, .sink-reference-toolbar, .sink-reference-footer { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.sink-detail-actions, .sink-reference-toolbar, .sink-reference-footer { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin-top: 14px; }
 .sink-detail-actions button, .sink-reference-toolbar button, .sink-reference-footer button, .sink-load-button { min-height: 30px; padding: 0 10px; border: 1px solid #b8cce9; border-radius: 5px; background: #f3f7ff; color: #285da9; font-size: 10px; cursor: pointer; }
 .sink-load-button { display: inline-flex; align-items: center; }
+.sink-reference-toolbar > button, .sink-reference-toolbar > .sink-load-button { min-height: 38px; height: 38px; justify-content: center; }
+.scope-detail-controls { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(80px, .7fr) minmax(80px, .7fr) auto; gap: 8px; align-items: end; margin-bottom: 8px; }
+.scope-detail-controls label { color: #718096; font-size: 10px; }
+.scope-detail-controls input, .scope-detail-controls select { width: 100%; height: 31px; margin-top: 4px; padding: 0 8px; border: 1px solid #cbd6e3; border-radius: 5px; background: #fff; color: #334155; font-size: 10px; }
+.scope-detail-view .waveform-preview.large { margin-top: 8px; }
 .sink-reference-list { display: grid; gap: 6px; margin-top: 16px; }
 .sink-reference-list button { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; padding: 9px; text-align: left; border: 1px solid #dbe3ed; border-radius: 6px; background: #fff; color: #526174; font-size: 10px; }
 .sink-reference-list button.active, .sink-reference-list button:hover { border-color: #9db9e8; background: #f3f7ff; color: #1f57ba; }

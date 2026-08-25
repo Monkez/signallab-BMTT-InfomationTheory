@@ -13,7 +13,7 @@ import { cancelJob, createJob, getJob, graphPayload, GraphApiError, runGraphOnce
 import { pythonTemplate } from './sample'
 import type { BlockSpec, FlowEdge, FlowNode, Job, PortPreviewMap, SimulationConfig } from './types'
 import { BerChart } from './SinkChart'
-import { ConstellationPreview, SinkResults } from './SinkResults'
+import { ConstellationPreview, SinkResults, SpectrumPreview, WaterfallPreview } from './SinkResults'
 import { FlowMiniMapNode } from './components/FlowMiniMapNode'
 import { BenchmarkStatusBubble } from './components/BenchmarkStatusBubble'
 import { NumericInput } from './components/NumericInput'
@@ -33,7 +33,15 @@ import {
 
 const formatNumber = (n: number) => new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(n)
 const parameterLabel = (key: string) => key === 'include_header' ? 'Include 32-bit symbol-count header' : key.replaceAll('_', ' ')
-const INTEGER_PARAMETER_KEYS = new Set(['length', 'repeat', 'seed', 'runtime_batch_size'])
+const INTEGER_PARAMETER_KEYS = new Set(['length', 'repeat', 'seed', 'runtime_batch_size', 'fft_size'])
+const PARAMETER_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  window: [
+    { value: 'hann', label: 'Hann' },
+    { value: 'hamming', label: 'Hamming' },
+    { value: 'blackman', label: 'Blackman' },
+    { value: 'rectangular', label: 'Rectangular' },
+  ],
+}
 type ConsoleLevel = 'info' | 'success' | 'warning' | 'error'
 type ConsoleEntry = { id: number; time: string; level: ConsoleLevel; message: string }
 
@@ -450,7 +458,7 @@ function App() {
   const livePoints = livePointsRaw.filter(point => Number.isFinite(point.snr_db)).map(point => ({ ...point, snr_db: point.snr_db as number }))
   const activeSinkMetrics = result?.sink_metrics || runOnceSinkMetrics
   const hasBerSink = nodes.some(node => node.data.blockType === 'ber')
-  const sinkNodes = nodes.filter(node => ['ber', 'power_meter', 'constellation', 'scope', 'source_analyzer', 'ser', 'evm_meter'].includes(node.data.blockType))
+  const sinkNodes = nodes.filter(node => ['ber', 'power_meter', 'constellation', 'scope', 'source_analyzer', 'ser', 'evm_meter', 'spectrum_analyzer', 'waterfall_sink'].includes(node.data.blockType))
   const hasVisibleSinkResults = Object.keys(activeSinkMetrics).length > 0 || (hasBerSink && livePoints.length > 0)
   const sourceFrames = runOnceMetrics.source_frame_count || 0
   const sourceSymbols = runOnceMetrics.source_symbol_count || 0
@@ -547,7 +555,7 @@ function App() {
           <span className="simulation-toolbar-divider" />
           <span className="results-control">
             <button className={`simulation-icon-button results-icon ${jobActive ? 'running' : job?.status === 'completed' ? 'completed' : job?.status === 'failed' ? 'failed' : ''}`} onClick={() => setResultsOpen(true)} aria-label="Results" data-tooltip="Results"><BarChart3 size={17} /></button>
-            {job && <BenchmarkStatusBubble job={job} onOpenResults={() => setResultsOpen(true)} />}
+            {jobActive && job && <BenchmarkStatusBubble job={job} onOpenResults={() => setResultsOpen(true)} />}
           </span>
           <button className="simulation-icon-button reset-icon" onClick={resetPortData} disabled={executionActive || (!snapshotId && !hasVisibleSinkResults && !error)} aria-label="Reset port data" data-tooltip="Reset port data"><RotateCcw size={18} /></button>
         </div>
@@ -571,7 +579,7 @@ function App() {
            {selectedIsStochasticChannel && <label>SNR source<select value={String(selected.data.params.snr_mode || 'experiment')} onChange={e => updateSelected({ params: { ...selected.data.params, snr_mode: e.target.value } })}><option value="experiment">Experiment sweep</option><option value="fixed">Fixed block value</option></select></label>}
            {selectedIsStochasticChannel && String(selected.data.params.snr_mode || 'experiment') === 'fixed' && <label>Fixed SNR dB<NumericInput value={Number(selected.data.params.ebn0_db ?? 4)} onValueChange={value => updateSelected({ params: { ...selected.data.params, ebn0_db: value } })} /></label>}
            {selected.data.blockType === 'image_file_source' && <label>Pixel mode<select value={String(selected.data.params.mode || 'grayscale')} onChange={e => updateSelected({ params: { ...selected.data.params, mode: e.target.value } })}><option value="grayscale">Grayscale</option><option value="rgb">RGB</option></select></label>}
-           {visibleParams.length ? visibleParams.map(([key, value]) => typeof value === 'boolean' ? <label className="boolean-param" key={key}><span>{parameterLabel(key)}</span><input type="checkbox" checked={value} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: e.target.checked } })} />{key === 'include_header' && <small>Enable the same option on the matching decoder.</small>}</label> : <label key={key}>{parameterLabel(key)}{typeof value === 'number' ? <NumericInput value={value} integer={INTEGER_PARAMETER_KEYS.has(key)} onValueChange={numeric => updateSelected({ params: { ...selected.data.params, [key]: numeric } })} /> : <input type="text" value={String(value)} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: e.target.value } })} />}{key === 'seed' && <small>-1 = random each run · 0+ = reproducible</small>}</label>) : !['variables', 'awgn', 'rayleigh', 'rician', 'text_file_source', 'image_file_source'].includes(selected.data.blockType) && <p className="muted">This block has no parameters.</p>}
+           {visibleParams.length ? visibleParams.map(([key, value]) => typeof value === 'boolean' ? <label className="boolean-param" key={key}><span>{parameterLabel(key)}</span><input type="checkbox" checked={value} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: e.target.checked } })} />{key === 'include_header' && <small>Enable the same option on the matching decoder.</small>}</label> : <label key={key}>{parameterLabel(key)}{PARAMETER_OPTIONS[key] ? <select value={String(value)} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: e.target.value } })}>{PARAMETER_OPTIONS[key].map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : typeof value === 'number' ? <NumericInput value={value} integer={INTEGER_PARAMETER_KEYS.has(key)} onValueChange={numeric => updateSelected({ params: { ...selected.data.params, [key]: numeric } })} /> : <input type="text" value={String(value)} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: e.target.value } })} />}{key === 'seed' && <small>-1 = random each run · 0+ = reproducible</small>}</label>) : !['variables', 'awgn', 'rayleigh', 'rician', 'text_file_source', 'image_file_source'].includes(selected.data.blockType) && <p className="muted">This block has no parameters.</p>}
           {selected.data.blockType === 'variables' && <VariablesEditor definitions={String(selected.data.params.definitions || '')} onChange={definitions => updateSelected({ params: { ...selected.data.params, definitions } })} />}
           {selected.data.blockType === 'symbol_huffman_encode' && <><div className="section-rule"><span>CURRENT HUFFMAN CODEBOOK</span><em>updates with P(x)</em></div><HuffmanCodebookTable params={selected.data.params} inputPreview={selected.data.portPreviews?.inputs.in} /></>}
            {!isConnecting && <><div className="section-rule"><span>CURRENT PORT DATA</span><em>representative frame</em></div>
@@ -583,6 +591,8 @@ function App() {
           {sourceTheoryMetrics && selected.data.blockType === 'source_analyzer' && <><div className="section-rule"><span>SOURCE THEORY RESULTS</span></div><div className="source-theory-result"><div><span>Entropy H(X)</span><strong>{sourceTheoryMetrics.source_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Average information</span><strong>{sourceTheoryMetrics.source_average_information?.toFixed(4)} bit/symbol</strong></div><div><span>Maximum entropy</span><strong>{sourceTheoryMetrics.source_max_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Source efficiency</span><strong>{sourceTheoryMetrics.source_efficiency_percent?.toFixed(2)}%</strong></div><div><span>Alphabet size</span><strong>{sourceTheoryMetrics.source_alphabet_size}</strong></div></div></>}
           {symbolMetrics && selected.data.blockType === 'ser' && <><div className="section-rule"><span>SYMBOL RESULT</span></div><div className="source-theory-result"><div><span>Symbol error rate</span><strong>{symbolMetrics.ser?.toExponential(3)}</strong></div><div><span>Symbol errors</span><strong>{symbolMetrics.symbol_errors} / {symbolMetrics.total_symbols}</strong></div></div></>}
           {selected.data.blockType === 'evm_meter' && activeSinkMetrics.evm_rms_percent !== undefined && <><div className="section-rule"><span>MODULATION QUALITY</span></div><div className="source-theory-result"><div><span>RMS EVM</span><strong>{activeSinkMetrics.evm_rms_percent.toFixed(3)}%</strong></div><div><span>EVM level</span><strong>{activeSinkMetrics.evm_rms_db.toFixed(2)} dB</strong></div><div><span>Measured symbols</span><strong>{activeSinkMetrics.evm_symbol_count}</strong></div></div></>}
+          {selected.data.blockType === 'spectrum_analyzer' && <><div className="section-rule"><span>SPECTRUM RESULT</span><em>centered FFT · normalized frequency</em></div><SpectrumPreview values={selected.data.portPreviews?.inputs?.in?.sample || []} fftSize={Number(selected.data.params.fft_size) || 256} window={String(selected.data.params.window || 'hann')} />{activeSinkMetrics.spectrum_peak_db !== undefined && <div className="sink-result"><Activity size={18} /><div><span>Peak / floor</span><strong>{activeSinkMetrics.spectrum_peak_db.toFixed(1)} / {activeSinkMetrics.spectrum_floor_db.toFixed(1)} dB</strong></div><div><span>Peak frequency</span><strong>{activeSinkMetrics.spectrum_peak_normalized.toFixed(3)} fₛ</strong></div></div>}</>}
+          {selected.data.blockType === 'waterfall_sink' && <><div className="section-rule"><span>WATERFALL RESULT</span><em>successive short-time spectra</em></div><WaterfallPreview values={selected.data.portPreviews?.inputs?.in?.sample || []} fftSize={Number(selected.data.params.fft_size) || 64} window={String(selected.data.params.window || 'hann')} />{activeSinkMetrics.waterfall_peak_db !== undefined && <div className="sink-result"><Activity size={18} /><div><span>Peak / floor</span><strong>{activeSinkMetrics.waterfall_peak_db.toFixed(1)} / {activeSinkMetrics.waterfall_floor_db.toFixed(1)} dB</strong></div><div><span>Time slices</span><strong>{Math.round(activeSinkMetrics.waterfall_rows)}</strong></div></div>}</>}
           {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><div className="python-editor-inline-toolbar"><div><Braces size={14} /><span><b>process.py</b><small>Python 3 · UTF-8</small></span></div><button type="button" onClick={() => setPythonEditorOpen(true)}><Maximize2 size={14} /> Open editor</button></div><Suspense fallback={<div className="python-editor-loading">Loading Python editor…</div>}><PythonCodeEditor value={selected.data.code || pythonTemplate} onChange={updatePythonCode} /></Suspense><p className="code-hint">Read the current sweep point with <code>params["snr_db"]</code>. For flexible ports, declare <code>PORTS = {'{'}"inputs": ["signal", "noise"], "outputs": ["out", "residual"]{'}'}</code> and write <code>process(inputs, params)</code> returning a dictionary. <button type="button" onClick={openDocuments}>Read Python API</button></p></>}
         </div> : selectedEdge ? <div className="inspector-content connection-properties">
           <div className="selection-heading"><span className="large-icon"><ArrowLeftRight /></span><div><small>SELECTED CONNECTION</small><h3>{selectedEdgeSource?.data.label || selectedEdge.source} → {selectedEdgeTarget?.data.label || selectedEdge.target}</h3></div><button className="icon-danger" onClick={() => { setEdges(items => items.filter(edge => edge.id !== selectedEdge.id)); setSelectedEdgeId(null); clearDiagnostics() }} title="Delete connection"><X size={16} /></button></div>

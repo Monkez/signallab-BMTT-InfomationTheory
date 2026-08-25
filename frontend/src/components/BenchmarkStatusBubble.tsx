@@ -1,4 +1,4 @@
-import { Check, CircleAlert, LoaderCircle } from 'lucide-react'
+import { LoaderCircle } from 'lucide-react'
 import type { Job } from '../types'
 
 type Props = {
@@ -10,18 +10,12 @@ export function BenchmarkStatusBubble({ job, onOpenResults }: Props) {
   const percent = Math.max(0, Math.min(100, Math.round((job.progress || 0) * 100)))
   const point = typeof job.snr_index === 'number' ? job.snr_index + 1 : 0
   const pointCount = job.snr_count || job.result?.snr_points.length || 1
-  const state = job.status === 'completed' ? 'completed' : job.status === 'failed' ? 'failed' : job.status === 'cancelled' ? 'cancelled' : 'active'
-  const label = state === 'completed' ? 'Completed' : state === 'failed' ? 'Failed' : state === 'cancelled' ? 'Cancelled' : job.status === 'queued' ? 'Queued' : 'Running'
+  const detail = typeof job.snr_db === 'number'
+    ? `${point || '—'}/${pointCount} · ${job.snr_db.toFixed(1)} dB`
+    : `${job.completed_trials || 0}/${job.trials}`
 
-  return <button type="button" className={`benchmark-status-bubble ${state}`} onClick={onOpenResults} aria-label={`Benchmark ${label.toLowerCase()}, ${percent} percent. Open results.`}>
-    <span className="benchmark-bubble-head">
-      {state === 'active' ? <LoaderCircle size={13} /> : state === 'completed' ? <Check size={13} /> : <CircleAlert size={13} />}
-      <strong>{percent}%</strong><em>{label}</em>
-    </span>
+  return <button type="button" className="benchmark-status-bubble" onClick={onOpenResults} aria-label={`Benchmark running, ${percent} percent, step ${detail}. Open results.`}>
+    <span className="benchmark-bubble-row"><LoaderCircle size={12} /><strong>{percent}%</strong><span>{detail}</span></span>
     <span className="benchmark-bubble-track"><i style={{ width: `${percent}%` }} /></span>
-    <span className="benchmark-bubble-meta">
-      <b>Step {point || '—'}/{pointCount}</b>
-      <span>{typeof job.snr_db === 'number' ? `${job.snr_db.toFixed(2)} dB` : `${job.completed_trials || 0}/${job.trials} frames`}</span>
-    </span>
   </button>
 }

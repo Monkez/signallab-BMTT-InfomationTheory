@@ -36,6 +36,10 @@ export const fallbackSpecs: BlockSpec[] = [
   { type: 'dc_blocker', label: 'DC Blocker', category: 'Signal processing', description: 'First-order DC rejection filter', defaults: { alpha: 0.995 }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
   { type: 'fir_filter', label: 'FIR Filter', category: 'Signal processing', description: 'Configurable causal FIR taps', defaults: { taps: '0.25,0.5,0.25' }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
   { type: 'normalize_power', label: 'Normalize Power', category: 'Signal processing', description: 'Scale to target mean power', defaults: { target_power: 1 }, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
+  { type: 'window_function', label: 'Window Function', category: 'Signal processing', description: 'Hann/Hamming/Blackman analysis window', defaults: { window: 'hann' }, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
+  { type: 'fft', label: 'FFT', category: 'Signal processing', description: 'Complex discrete Fourier transform', defaults: { normalize: false }, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
+  { type: 'ifft', label: 'Inverse FFT', category: 'Signal processing', description: 'Inverse complex Fourier transform', defaults: { normalize: false }, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
+  { type: 'fft_shift', label: 'FFT Shift', category: 'Signal processing', description: 'Center zero frequency', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'bpsk_mod', label: 'BPSK Modulator', category: 'Modulation', description: 'Binary phase shift keying', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'qpsk_mod', label: 'QPSK Modulator', category: 'Modulation', description: 'Map bit pairs to I/Q', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'ook_mod', label: 'OOK Modulator', category: 'Modulation', description: 'On-off keying · 0 or 1 amplitude', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
@@ -55,15 +59,17 @@ export const fallbackSpecs: BlockSpec[] = [
   { type: 'scope', label: 'Signal Scope', category: 'Sinks', description: 'Amplitude and peak summary', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
   { type: 'constellation', label: 'Constellation Sink', category: 'Sinks', description: 'I/Q sample summary', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
   { type: 'power_meter', label: 'Power Meter', category: 'Sinks', description: 'Mean signal power', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
+  { type: 'spectrum_analyzer', label: 'Spectrum Analyzer', category: 'Sinks', description: 'Centered FFT magnitude in dB', defaults: { fft_size: 256, window: 'hann' }, inputs: ['in'], outputs: [], gpu_compatible: true },
+  { type: 'waterfall_sink', label: 'Waterfall Sink', category: 'Sinks', description: 'Short-time spectrum heatmap', defaults: { fft_size: 64, window: 'hann' }, inputs: ['in'], outputs: [], gpu_compatible: true },
   { type: 'evm_meter', label: 'EVM Meter', category: 'Sinks', description: 'RMS error vector magnitude', defaults: {}, inputs: ['reference', 'estimate'], outputs: [], gpu_compatible: true },
   { type: 'ber', label: 'BER Meter', category: 'Sinks', description: 'Measure bit error rate', defaults: {}, inputs: ['reference', 'estimate'], outputs: [], gpu_compatible: true },
   { type: 'python', label: 'Python Block', category: 'Custom', description: 'Custom processing · optional vectorized process_batch', defaults: { gain: 1, output_size: 'same', runtime_executor: 'auto', runtime_batch_size: 0 }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
 ]
 
 export function iconFor(type: string): LucideIcon {
-  return type === 'variables' ? Settings2 : type.includes('source') ? Binary : type.includes('awgn') || type.includes('rayleigh') || type.includes('rician') ? Waves : type.includes('bpsk') || type.includes('qpsk') || type.includes('fsk') ? Radio : type === 'ber' ? Gauge : type === 'scope' || type === 'constellation' || type.includes('meter') ? Activity : type === 'python' ? Braces : Box
+  return type === 'variables' ? Settings2 : type.includes('source') ? Binary : type.includes('awgn') || type.includes('rayleigh') || type.includes('rician') ? Waves : type.includes('bpsk') || type.includes('qpsk') || type.includes('fsk') ? Radio : type === 'ber' ? Gauge : type === 'scope' || type === 'constellation' || type.includes('meter') || type.includes('spectrum') || type.includes('waterfall') ? Activity : type === 'python' ? Braces : Box
 }
 
 export function miniMapColor(type: string) {
-  return type === 'variables' ? '#3d6f9e' : type.includes('source') ? '#5b8def' : type.includes('encode') || type.includes('decode') ? '#8b72d9' : type.includes('mod') || type.includes('demod') ? '#e49a45' : type.includes('awgn') || type.includes('rayleigh') || type.includes('rician') ? '#41a987' : type === 'ber' || type.includes('meter') || type === 'scope' || type === 'constellation' ? '#d26782' : type === 'python' ? '#65748b' : '#8493a8'
+  return type === 'variables' ? '#3d6f9e' : type.includes('source') ? '#5b8def' : type.includes('encode') || type.includes('decode') ? '#8b72d9' : type.includes('mod') || type.includes('demod') ? '#e49a45' : type.includes('awgn') || type.includes('rayleigh') || type.includes('rician') ? '#41a987' : type === 'ber' || type.includes('meter') || type === 'scope' || type === 'constellation' || type.includes('spectrum') || type.includes('waterfall') ? '#d26782' : type === 'python' ? '#65748b' : '#8493a8'
 }

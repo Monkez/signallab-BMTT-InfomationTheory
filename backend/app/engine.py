@@ -168,14 +168,14 @@ def _preview_value(value: Any, sample_limit: int = 8) -> dict[str, Any]:
 
 
 def _preview_limit(node_type: str) -> int:
-    """Keep ordinary port previews small, but give constellation plots enough points.
+    """Keep ordinary port previews small, but give visual sinks enough points.
 
     A benchmark may run hundreds of frames, while the UI preview is captured from
     one representative frame. Eight values (the generic limit) makes a noisy I/Q
     cloud look like only a few dots, so the constellation sink gets a bounded,
     plot-friendly sample without sending the full signal buffer to the browser.
     """
-    return 2048 if node_type == "constellation" else 8
+    return 2048 if node_type in {"constellation", "spectrum_analyzer", "waterfall_sink"} else 8
 
 
 def _capture_value(value: Any) -> np.ndarray:
@@ -498,6 +498,16 @@ def _sink_metrics(aggregate: dict[str, float]) -> dict[str, float]:
         sink_metrics["evm_rms_percent"] = math.sqrt(max(0.0, ratio)) * 100.0
         sink_metrics["evm_rms_db"] = 10.0 * math.log10(max(ratio, np.finfo(float).tiny))
         sink_metrics["evm_symbol_count"] = aggregate.get("evm_symbol_count", 0)
+    if aggregate.get("spectrum_frame_count", 0):
+        frames = aggregate["spectrum_frame_count"]
+        sink_metrics["spectrum_peak_db"] = aggregate.get("spectrum_peak_db_sum", 0) / frames
+        sink_metrics["spectrum_floor_db"] = aggregate.get("spectrum_floor_db_sum", 0) / frames
+        sink_metrics["spectrum_peak_normalized"] = aggregate.get("spectrum_peak_normalized_sum", 0) / frames
+    if aggregate.get("waterfall_frame_count", 0):
+        frames = aggregate["waterfall_frame_count"]
+        sink_metrics["waterfall_peak_db"] = aggregate.get("waterfall_peak_db_sum", 0) / frames
+        sink_metrics["waterfall_floor_db"] = aggregate.get("waterfall_floor_db_sum", 0) / frames
+        sink_metrics["waterfall_rows"] = aggregate.get("waterfall_rows_sum", 0) / frames
     return sink_metrics
 
 

@@ -112,6 +112,14 @@ def validate_parameters(block_type: str, params: dict[str, Any]) -> list[str]:
             target_power = float(params.get("target_power", 1.0))
             if not math.isfinite(target_power) or target_power <= 0:
                 raise SignalContractError("Parameter 'target_power' must be a positive finite number")
+        if block_type in {"window_function", "spectrum_analyzer", "waterfall_sink"}:
+            window = str(params.get("window", "hann")).strip().lower()
+            if window not in {"hann", "hamming", "blackman", "rectangular"}:
+                raise SignalContractError("Parameter 'window' must be hann, hamming, blackman, or rectangular")
+        if block_type in {"spectrum_analyzer", "waterfall_sink"}:
+            fft_size = _positive_integer(params.get("fft_size", 256 if block_type == "spectrum_analyzer" else 64), "fft_size")
+            if fft_size < 8 or fft_size > 4096:
+                raise SignalContractError("Parameter 'fft_size' must be an integer from 8 to 4096")
         if block_type == "python":
             expected = str(params.get("output_size", "same")).strip().lower()
             if expected not in {"same", "any"}:
@@ -220,7 +228,7 @@ def validate_outputs(
     out_size = output_sizes.get("out")
 
     same_size = {
-        "differential_encode", "differential_decode", "dc_blocker", "fir_filter", "normalize_power", "bpsk_mod", "bpsk_demod", "ook_mod", "ook_demod", "fsk2_mod", "fsk2_demod", "awgn", "rayleigh", "rician",
+        "differential_encode", "differential_decode", "dc_blocker", "fir_filter", "normalize_power", "window_function", "fft", "ifft", "fft_shift", "bpsk_mod", "bpsk_demod", "ook_mod", "ook_demod", "fsk2_mod", "fsk2_demod", "awgn", "rayleigh", "rician",
     }
     if block_type in same_size and out_size != in_size:
         raise SignalContractError(f"Output 'out' must match input 'in': expected {in_size}, received {out_size}")

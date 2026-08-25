@@ -5,6 +5,7 @@ import base64
 import copy
 import heapq
 import inspect
+import math
 import secrets
 import traceback
 import zlib
@@ -461,6 +462,43 @@ def normalize_power(inputs, params, context):
     return {"out": samples * scale}
 
 
+def _analysis_window(xp, size: int, kind: str):
+    if kind == "rectangular" or size <= 1:
+        return xp.ones(size, dtype=xp.float64)
+    phase = 2.0 * xp.pi * xp.arange(size, dtype=xp.float64) / (size - 1)
+    if kind == "hamming":
+        return 0.54 - 0.46 * xp.cos(phase)
+    if kind == "blackman":
+        return 0.42 - 0.5 * xp.cos(phase) + 0.08 * xp.cos(2.0 * phase)
+    return 0.5 - 0.5 * xp.cos(phase)
+
+
+def window_function(inputs, params, context):
+    samples = context.xp.asarray(inputs["in"]).reshape(-1)
+    window = _analysis_window(context.xp, int(samples.size), str(params.get("window", "hann")).lower())
+    return {"out": samples * window}
+
+
+def fft_block(inputs, params, context):
+    samples = context.xp.asarray(inputs["in"]).reshape(-1)
+    output = context.xp.fft.fft(samples)
+    if bool(params.get("normalize", False)):
+        output = output / context.xp.sqrt(samples.size)
+    return {"out": output}
+
+
+def ifft_block(inputs, params, context):
+    samples = context.xp.asarray(inputs["in"]).reshape(-1)
+    output = context.xp.fft.ifft(samples)
+    if bool(params.get("normalize", False)):
+        output = output * context.xp.sqrt(samples.size)
+    return {"out": output}
+
+
+def fft_shift(inputs, params, context):
+    return {"out": context.xp.fft.fftshift(context.xp.asarray(inputs["in"]).reshape(-1))}
+
+
 def bpsk_mod(inputs, params, context):
     bits = context.xp.asarray(inputs["in"])
     return {"out": 1.0 - 2.0 * bits.astype(context.xp.float32)}
@@ -647,6 +685,45 @@ def constellation(inputs, params, context):
 def power_meter(inputs, params, context):
     samples = to_numpy(inputs["in"]).reshape(-1)
     return {"__metrics__": {"power_count": int(len(samples)), "power_sum": float(np.abs(samples).astype(float).dot(np.abs(samples).astype(float))) if len(samples) else 0.0}}
+
+
+def _spectrum_db(samples, fft_size: int, window: str):
+    values = np.asarray(samples).reshape(-1)
+    segment = np.zeros(fft_size, dtype=np.complex128)
+    count = min(values.size, fft_size)
+    segment[:count] = values[:count]
+    weights = np.asarray(_analysis_window(np, fft_size, window))
+    weighted = segment * weights
+    magnitude = np.abs(np.fft.fftshift(np.fft.fft(weighted))) / max(1.0, float(weights.sum()))
+    return 20.0 * np.log10(np.maximum(magnitude, np.finfo(float).tiny))
+
+
+def spectrum_analyzer(inputs, params, context):
+    samples = to_numpy(inputs["in"]).reshape(-1)
+    fft_size = int(params.get("fft_size", 256))
+    spectrum = _spectrum_db(samples, fft_size, str(params.get("window", "hann")).lower())
+    peak_index = int(np.argmax(spectrum))
+    return {"__metrics__": {
+        "spectrum_frame_count": 1,
+        "spectrum_peak_db_sum": float(spectrum[peak_index]),
+        "spectrum_floor_db_sum": float(np.median(spectrum)),
+        "spectrum_peak_normalized_sum": float((peak_index - fft_size / 2) / fft_size),
+    }}
+
+
+def waterfall_sink(inputs, params, context):
+    samples = to_numpy(inputs["in"]).reshape(-1)
+    fft_size = int(params.get("fft_size", 64))
+    window = str(params.get("window", "hann")).lower()
+    row_count = max(1, min(32, math.ceil(samples.size / fft_size)))
+    rows = [_spectrum_db(samples[start:start + fft_size], fft_size, window) for start in range(0, row_count * fft_size, fft_size)]
+    values = np.concatenate(rows)
+    return {"__metrics__": {
+        "waterfall_frame_count": 1,
+        "waterfall_peak_db_sum": float(np.max(values)),
+        "waterfall_floor_db_sum": float(np.median(values)),
+        "waterfall_rows_sum": row_count,
+    }}
 
 
 def evm_meter(inputs, params, context):
@@ -900,6 +977,10 @@ PROCESSORS: dict[str, Callable] = {
     "dc_blocker": dc_blocker,
     "fir_filter": fir_filter,
     "normalize_power": normalize_power,
+    "window_function": window_function,
+    "fft": fft_block,
+    "ifft": ifft_block,
+    "fft_shift": fft_shift,
     "bpsk_mod": bpsk_mod,
     "qpsk_mod": qpsk_mod,
     "ook_mod": ook_mod,
@@ -919,6 +1000,8 @@ PROCESSORS: dict[str, Callable] = {
     "scope": scope,
     "constellation": constellation,
     "power_meter": power_meter,
+    "spectrum_analyzer": spectrum_analyzer,
+    "waterfall_sink": waterfall_sink,
     "evm_meter": evm_meter,
     "ber": ber,
     "ser": ser,

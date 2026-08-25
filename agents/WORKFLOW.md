@@ -16,3 +16,4 @@
 14. Numeric UI phải cho phép draft rỗng và scientific notation; không dùng `Number(input.value)` trực tiếp trong controlled input vì `Number("")` biến thao tác xóa thành 0.
 15. Sample mới/sửa phải pass cả Run once lẫn benchmark ngắn trong `test_samples.py`; sink metric mới phải đi qua helper tổng hợp dùng chung cho hai đường chạy.
 16. Phân biệt frame logic với vector trong frame: không ép sample giáo dục tăng `Source.length` chỉ để benchmark nhanh. Scheduler phải batch nội bộ frame nhỏ; budget frame/error không đặt trần nghiệp vụ tùy ý và phải có test vượt mốc một triệu.
+17. Sink trực quan miền tần số phải giới hạn port preview, khóa quy ước FFT centered `−0.5…+0.5 fₛ`, kiểm thử metric backend và kiểm tra SVG/heatmap trên browser; không gửi toàn bộ waveform của benchmark lên UI.

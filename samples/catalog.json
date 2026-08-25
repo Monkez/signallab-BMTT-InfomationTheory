@@ -224,10 +224,10 @@
     "format": "signallab-simulation", "version": "1.0",
     "sample": {
       "id": "qpsk-rician-evm", "title": "QPSK qua Rician: BER, EVM và constellation", "subtitle": "Đánh giá tuyến có thành phần LOS bằng nhiều sink", "category": "Digital communications", "level": "Nâng cao", "duration_minutes": 45,
-      "summary": "QPSK được chuẩn hóa công suất trước khi đi qua kênh Rician có K-factor. Constellation, EVM và BER tạo bộ chỉ tiêu gần với quy trình đánh giá modem thực tế.",
-      "concepts": ["Rician fading", "K-factor", "QPSK", "Power normalization", "EVM", "Constellation"], "uses_python": false,
-      "learning_objectives": ["Phân biệt Rician với Rayleigh bằng thành phần LOS", "Đo EVM RMS theo symbol lý tưởng", "Quan sát quan hệ K-factor, constellation và BER"],
-      "instructions": ["Run once và xác nhận Normalize Power đưa công suất QPSK về 1.", "Chọn Rician Fading, đổi K-factor từ 12 dB xuống 0 dB.", "Quan sát Constellation và EVM thay đổi sau mỗi Run once.", "Run Benchmark rồi so sánh BER khi bật/tắt Flat fading."],
+      "summary": "QPSK được chuẩn hóa công suất trước khi đi qua kênh Rician có K-factor. Constellation, EVM, phổ và waterfall tạo bộ chỉ tiêu gần với quy trình đánh giá modem thực tế.",
+      "concepts": ["Rician fading", "K-factor", "QPSK", "Power normalization", "EVM", "Constellation", "Spectrum", "Waterfall"], "uses_python": false,
+      "learning_objectives": ["Phân biệt Rician với Rayleigh bằng thành phần LOS", "Đo EVM RMS theo symbol lý tưởng", "Quan sát đồng thời constellation, phổ, waterfall và BER"],
+      "instructions": ["Run once và xác nhận Normalize Power đưa công suất QPSK về 1.", "Chọn Rician Fading, đổi K-factor từ 12 dB xuống 0 dB.", "Quan sát Constellation, Spectrum Analyzer và Waterfall sau mỗi Run once.", "Run Benchmark rồi so sánh BER/EVM khi bật/tắt Flat fading."],
       "expected_observations": ["K-factor lớn tạo tuyến gần LOS và constellation tập trung hơn.", "EVM tăng khi fading/nhiễu mạnh hơn; BER hard-decision thường tăng theo."]
     },
     "graph": { "version": "1.0", "nodes": [
@@ -238,11 +238,14 @@
       {"id":"demod","type":"qpsk_demod","label":"QPSK detector","position":{"x":820,"y":90}},
       {"id":"ber","type":"ber","label":"BER meter","position":{"x":820,"y":300},"port_orientation":"reversed"},
       {"id":"evm","type":"evm_meter","label":"RMS EVM","position":{"x":590,"y":330},"port_orientation":"reversed"},
-      {"id":"const","type":"constellation","label":"Rician constellation","position":{"x":350,"y":330}}
+      {"id":"const","type":"constellation","label":"Rician constellation","position":{"x":350,"y":330}},
+      {"id":"spectrum","type":"spectrum_analyzer","label":"Rician spectrum","position":{"x":350,"y":520},"params":{"fft_size":256,"window":"hann"}},
+      {"id":"waterfall","type":"waterfall_sink","label":"Rician waterfall","position":{"x":620,"y":520},"params":{"fft_size":64,"window":"hann"}}
     ], "edges": [
       {"id":"e1","source":"src","target":"mod"},{"id":"e2","source":"mod","target":"norm"},{"id":"e3","source":"norm","target":"ch"},{"id":"e4","source":"ch","target":"demod"},
       {"id":"e5","source":"src","target":"ber","target_handle":"reference"},{"id":"e6","source":"demod","target":"ber","target_handle":"estimate"},
-      {"id":"e7","source":"norm","target":"evm","target_handle":"reference"},{"id":"e8","source":"ch","target":"evm","target_handle":"estimate"},{"id":"e9","source":"ch","target":"const"}
+      {"id":"e7","source":"norm","target":"evm","target_handle":"reference"},{"id":"e8","source":"ch","target":"evm","target_handle":"estimate"},{"id":"e9","source":"ch","target":"const"},
+      {"id":"e10","source":"ch","target":"spectrum"},{"id":"e11","source":"ch","target":"waterfall"}
     ]},
     "config": {"mode":"ber_benchmark","trials":200,"max_frames":200,"min_frames":30,"min_errors":200,"snr_db_start":0,"snr_db_stop":14,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","engine":"auto","chunk_size":10}
   },

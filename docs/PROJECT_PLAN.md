@@ -7,7 +7,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 ## 2. Phạm vi MVP
 
 - Canvas kéo-thả, nối cổng, phóng to/thu nhỏ, lưu/mở file mô phỏng `.slab.json`; Save ghi lại file hiện tại và hỗ trợ `Ctrl+S`.
-- Thư viện 55 khối gồm nguồn, source/channel coding, DSP, PSK/QAM/OOK/2-FSK, AWGN/Rayleigh/Rician, receiver, BER/SER/EVM và Python tùy biến.
+- Thư viện 61 khối gồm nguồn, source/channel coding, DSP/FFT, PSK/QAM/OOK/2-FSK, AWGN/Rayleigh/Rician, receiver, phổ/waterfall, BER/SER/EVM và Python tùy biến.
 - Panel thuộc tính có Python IDE editor với syntax highlighting, line number và cửa sổ chỉnh sửa lớn chuyên biệt; code mẫu dùng NumPy/SciPy/SignalLab.
 - Kiểm tra DAG, cổng kết nối và tham số trước khi chạy.
 - Job Monte-Carlo bất đồng bộ, seed tái lập, chạy tuần tự hoặc đa tiến trình.
@@ -37,7 +37,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 ### V1 — Công cụ giảng dạy
 
 - QAM bậc cao hơn, pulse shaping, carrier/timing synchronization và equalization (2-FSK/QPSK/8-PSK/16-QAM/Rayleigh/Rician đã có).
-- Scope miền thời gian, phổ, constellation, eye diagram.
+- Scope miền thời gian, phổ và waterfall, constellation đã có; tiếp tục eye diagram, spectrogram export và marker đo phổ.
 - Subsystem, nhóm khối, annotation, undo/redo đầy đủ.
 - Notebook/report thí nghiệm và sweep Eb/N0.
 

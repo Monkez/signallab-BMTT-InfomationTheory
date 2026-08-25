@@ -172,6 +172,47 @@ def test_constellation_preview_keeps_a_plot_sized_sample():
     assert len(preview["sample"]) == 2048
 
 
+def test_fft_ifft_window_and_shift_blocks_preserve_signal_contracts():
+    context = make_context(np, np.random.default_rng(7), 0, 7, "cpu")
+    signal = np.asarray([1.0, 2.0, -1.0, 0.5, 0.0, 1.0, -2.0, 0.25])
+    windowed = PROCESSORS["window_function"]({"in": signal}, {"window": "hann"}, context)["out"]
+    transformed = PROCESSORS["fft"]({"in": signal}, {"normalize": False}, context)["out"]
+    restored = PROCESSORS["ifft"]({"in": transformed}, {"normalize": False}, context)["out"]
+    shifted = PROCESSORS["fft_shift"]({"in": transformed}, {}, context)["out"]
+    assert windowed.shape == transformed.shape == restored.shape == shifted.shape == signal.shape
+    assert np.allclose(restored, signal)
+    assert windowed[0] == pytest.approx(0.0)
+    assert np.array_equal(shifted, np.fft.fftshift(transformed))
+
+
+def test_spectrum_and_waterfall_sinks_return_metrics_and_plot_samples():
+    graph = Graph(nodes=[
+        {"id": "src", "type": "bit_source", "label": "Bits", "params": {"length": 512, "seed": 1}},
+        {"id": "mod", "type": "bpsk_mod", "label": "BPSK", "params": {}},
+        {"id": "spectrum", "type": "spectrum_analyzer", "label": "Spectrum", "params": {"fft_size": 128, "window": "hann"}},
+        {"id": "waterfall", "type": "waterfall_sink", "label": "Waterfall", "params": {"fft_size": 32, "window": "hamming"}},
+    ], edges=[
+        {"id": "e1", "source": "src", "target": "mod"},
+        {"id": "e2", "source": "mod", "target": "spectrum"},
+        {"id": "e3", "source": "mod", "target": "waterfall"},
+    ])
+    result = run_once(graph, SimulationConfig(seed=42, device="cpu"))
+    assert math.isfinite(result["sink_metrics"]["spectrum_peak_db"])
+    assert -0.5 <= result["sink_metrics"]["spectrum_peak_normalized"] < 0.5
+    assert result["sink_metrics"]["waterfall_rows"] == 16
+    assert len(result["port_previews"]["spectrum"]["inputs"]["in"]["sample"]) == 512
+    assert len(result["port_previews"]["waterfall"]["inputs"]["in"]["sample"]) == 512
+
+
+@pytest.mark.parametrize("block_type,params", [
+    ("window_function", {"window": "invalid"}),
+    ("spectrum_analyzer", {"fft_size": 4, "window": "hann"}),
+    ("waterfall_sink", {"fft_size": 8192, "window": "hann"}),
+])
+def test_frequency_analysis_contract_rejects_invalid_parameters(block_type, params):
+    assert validate_parameters(block_type, params)
+
+
 def test_run_once_snapshot_exposes_every_port_value_by_page():
     client = TestClient(app)
     response = client.post("/api/run-once", json={

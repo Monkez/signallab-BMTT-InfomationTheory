@@ -16,7 +16,27 @@ async function graphError(response: Response, fallback: string) {
   if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
     return new GraphApiError(detail.message || fallback, detail.node_errors || {})
   }
-  return new GraphApiError(Array.isArray(detail) ? detail.join(' · ') : detail || fallback)
+  return new GraphApiError(formatApiDetail(detail, fallback))
+}
+
+export function formatApiDetail(detail: unknown, fallback = 'Request failed'): string {
+  if (typeof detail === 'string' && detail.trim()) return detail
+  if (Array.isArray(detail)) {
+    const messages = detail.map(item => {
+      if (typeof item === 'string') return item
+      if (!item || typeof item !== 'object') return String(item)
+      const issue = item as { msg?: unknown; message?: unknown; loc?: unknown[] }
+      const message = String(issue.msg || issue.message || 'Invalid value')
+      const location = Array.isArray(issue.loc) ? issue.loc.filter(part => part !== 'body').join(' → ') : ''
+      return location ? `${location}: ${message}` : message
+    }).filter(Boolean)
+    return messages.join(' · ') || fallback
+  }
+  if (detail && typeof detail === 'object') {
+    const issue = detail as { message?: unknown; msg?: unknown }
+    return String(issue.message || issue.msg || fallback)
+  }
+  return fallback
 }
 
 const graphPayload = (nodes: FlowNode[], edges: FlowEdge[]) => ({
@@ -65,7 +85,7 @@ export async function getPortValues(snapshotId: string, nodeId: string, directio
   const response = await fetch(`/api/snapshots/${snapshot}/nodes/${node}/ports/${direction}/${portName}?offset=${offset}&limit=${limit}`)
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
-    throw new Error(body.detail || 'Port data is no longer available; run the graph again')
+    throw new Error(formatApiDetail(body.detail, 'Port data is no longer available; run the graph again'))
   }
   return response.json()
 }

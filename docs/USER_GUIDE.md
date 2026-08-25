@@ -30,7 +30,7 @@ Nút **Open Samples** trên topbar mở thư viện bài học được đóng g
 
 Nhấn **Open this sample** để nạp graph cùng cấu hình Experiment đã hiệu chỉnh cho bài đó. Sample luôn được mở dưới dạng simulation **Unsaved**, không liên kết với file gốc; do đó có thể thay đổi tùy ý rồi dùng Save/`Ctrl+S` để chọn tên và vị trí lưu thành bài riêng. Nếu simulation hiện tại chưa lưu, app hỏi xác nhận trước khi thay thế.
 
-Catalog hiện có chín bài:
+Catalog hiện có 12 bài:
 
 1. BPSK không mã hóa qua AWGN — đường BER chuẩn.
 2. Hamming (7,4) hệ thống qua AWGN — syndrome, sửa lỗi đơn và coding gain.
@@ -41,6 +41,9 @@ Catalog hiện có chín bài:
 7. Shannon–Fano cho nguồn văn bản — so sánh với Huffman.
 8. Bộ thu BPSK bằng Python Block — quyết định ngưỡng với NumPy.
 9. Kênh nhị phân đối xứng BSC(p) bằng Python Block — kiểm chứng BER xấp xỉ p.
+10. Mã chập (7,5), hard Viterbi và BPSK — trellis, coding rate, BER và EVM.
+11. QPSK qua Rician — K-factor, chuẩn hóa công suất, constellation, EVM và BER.
+12. 2-FSK trực giao qua AWGN — symbol trực giao và detector khoảng cách Euclid.
 
 Hai bài Python minh họa đúng mô hình lập trình của SignalLab: người học chỉ viết `process(signal, params)` cho một frame; runtime tự xử lý worker và song song hóa Monte-Carlo. Mã nguồn nằm ngay trong Python Block để đọc, chạy và sửa.
 
@@ -68,6 +71,7 @@ Hai bài Python minh họa đúng mô hình lập trình của SignalLab: ngư�
 
 ## Cấu hình Experiment
 
+- Cửa sổ **Experiment config** giữ một bản nháp riêng. **Save** mới áp dụng cấu hình; **Cancel**, nút đóng hoặc click ra ngoài bỏ bản nháp. Các ô số có thể xóa trắng để gõ lại và chấp nhận dạng khoa học như `1e6`, `1.52e3` hoặc `-2.5e-1`.
 - **Specific steps**: nhập `SNR (dB)` cho một điểm làm việc và `Steps` là số frame cố định cần chạy. Mode này không quét SNR; giá trị SNR được truyền vào `params["snr_db"]` của channel/Python Block. Nếu channel đặt `Fixed block value` thì `ebn0_db` của block vẫn được ưu tiên.
 - **BER benchmark**: dùng `SNR Start/Stop/Step`; mỗi điểm chạy ít nhất `Min frames / SNR`, dừng sớm khi đạt `Min errors / SNR`, hoặc dừng ở `Frames / SNR`.
 - Với block **AWGN**, chọn `Experiment sweep` để lấy `context.snr_db`; chọn `Fixed block value` để dùng `ebn0_db` riêng.
@@ -77,17 +81,17 @@ Hai bài Python minh họa đúng mô hình lập trình của SignalLab: ngư�
 - `Chunk size` điều khiển batch của compatibility backend và kích thước tile native. Với Auto, nên giữ mặc định trước khi benchmark trên máy cụ thể.
 - Python Block có `runtime_executor` và `runtime_batch_size`. Giữ `auto/0` trước; chọn `process` cho code Python thuần CPU nặng nhưng frame nhỏ, hoặc `inline` cho job ngắn/thư viện đã tự đa luồng. Khi code định nghĩa `process_batch`, runtime tự stack nhiều frame và Results báo số batch block thực tế.
 - `Seed`: cho kết quả tái lập.
-- Random Bits, AWGN và Rayleigh có thêm `seed` riêng ở tab **Block**. Giá trị mặc định `-1` sinh dữ liệu/nhiễu mới ở mỗi lần Run once hoặc Run Benchmark. Đặt số nguyên từ `0` đến `4294967295` để tái lập kết quả; runtime vẫn tự tạo stream khác nhau cho từng block và từng frame.
+- Random Bits, AWGN, Rayleigh và Rician có thêm `seed` riêng ở tab **Block**. Giá trị mặc định `-1` sinh dữ liệu/nhiễu mới ở mỗi lần Run once hoặc Run Benchmark. Đặt số nguyên từ `0` đến `4294967295` để tái lập kết quả; runtime vẫn tự tạo stream khác nhau cho từng block và từng frame.
 - Muốn benchmark tái lập hoàn toàn, đặt seed cụ thể cho tất cả block ngẫu nhiên và giữ nguyên Seed trong Experiment. Chỉ cần một block còn `-1` thì lần chạy sau có thể cho chuỗi mẫu/BER khác.
 - `Auto`: chọn GPU nếu có và phù hợp, nếu không dùng CPU.
 - Bấm **Add** để mở thư viện block; nhập tên vào searchbar hoặc mở từng nhóm. Mọi nhóm đều thu gọn khi cửa sổ vừa mở; kết quả tìm kiếm tự mở nhóm phù hợp. **Variables** và **Python Block** vẫn được ưu tiên ở đầu nhóm tương ứng.
 - Sau khi chạy, chọn từng sink trên canvas để xem kết quả ngay trong tab **Block**. Constellation Sink hiển thị đồ thị I/Q với đầy đủ trục, vạch chia và nhãn I/Q. Trong **Details → Edit & Data**, có thể đặt giới hạn đối xứng `I limit (±)` và `Q limit (±)`; các giới hạn này được lưu cùng reference JSON. Tab **Experiment** chỉ tổng hợp lại các sink results này.
 - Với tín hiệu phức như QPSK, AWGN tạo nhiễu độc lập trên cả hai thành phần I và Q. Vì vậy constellation đúng sẽ tạo bốn cụm quanh bốn điểm lý tưởng (+I,+Q), (+I,-Q), (-I,+Q), (-I,-Q), sau đó lan rộng theo mức nhiễu.
-- **Run Benchmark** là nút chạy thí nghiệm theo mode hiện tại. Sau khi hoàn tất, port preview đại diện được lấy từ một frame xác định tại SNR đầu tiên; dữ liệu đầy đủ của mọi frame không được gửi lên UI nên app vẫn nhẹ với mô phỏng lớn.
+- **Run Benchmark** là nút chạy thí nghiệm theo mode hiện tại. Trong lúc chạy, nút **Results** có hiệu ứng ánh sáng và bong bóng nhỏ ngay bên dưới hiển thị phần trăm, step SNR, SNR hiện tại hoặc số frame. Khi hoàn tất nút chuyển xanh và bong bóng giữ trạng thái 100%; click bong bóng để mở Results. Port preview đại diện được lấy từ một frame xác định tại SNR đầu tiên; dữ liệu đầy đủ của mọi frame không được gửi lên UI nên app vẫn nhẹ với mô phỏng lớn.
 - Kết quả hiển thị tên executor thực tế như `native_cpp`, `python_numpy` hoặc `python_multiprocessing`. Native result ghi modulation/coding plan; compatibility result giải thích lý do Auto fallback và Python runtime ghi inline/process/batch. Có thể chạy `benchmark_python.bat` để đo custom block hoặc `benchmark_regression.bat` để chạy toàn bộ performance gate. Xem thêm [Python Block](python/PYTHON_BLOCK.md) và [Native CPU Engine](NATIVE_ENGINE.md).
 - Reference BER được lưu theo tên trong trình duyệt; khi Browse/load một đường có cùng tên, đường cũ được thay thế để legend không xuất hiện các curve trùng tên.
 - Trên biểu đồ BER, trục SNR tự chọn bước chia phù hợp với miền dữ liệu; trục BER log có mốc chính cho từng decade và tick phụ 2–9 để đọc giá trị chính xác hơn. Kích thước chữ/tỷ lệ nét được tối ưu riêng cho preview, Results và Details. Chọn **Copy** để copy ảnh PNG hoặc **PNG** để tải ảnh. Bảng **Results by SNR** hỗ trợ **Copy** (TSV), **CSV** và **PNG**, thuận tiện đưa vào báo cáo.
-- Thư viện có thêm Text Source, Text File Source, Image File Source, Differential Encoder/Decoder, Huffman, Shannon-Fano, Run-Length, ZIP/DEFLATE, Repetition-3, QPSK, **OOK, 8-PSK Gray, 16-QAM Gray**, Rayleigh Fading, Signal Scope, Constellation Sink và Power Meter. File Source cho phép chọn file trực tiếp trong panel Block; dữ liệu được lưu trong project dưới dạng base64 để chạy được cả desktop và dev server.
+- Thư viện có thêm Text/File/Image Source, Differential, Huffman, Shannon-Fano, RLE, ZIP/DEFLATE, Repetition-3, mã chập (7,5)/Viterbi, QPSK, **OOK, 2-FSK, 8-PSK Gray, 16-QAM Gray**, AWGN/Rayleigh/Rician, FIR Filter, DC Blocker, Normalize Power, Signal Scope, Constellation, Power và EVM Meter. File Source cho phép chọn file trực tiếp trong panel Block; dữ liệu được lưu trong project dưới dạng base64 để chạy được cả desktop và dev server.
 - Các codec nguồn kinh điển làm việc trên stream bit: Encoder có cổng `reference` để nối vào BER, Decoder dùng cùng tham số codebook/codec để khôi phục stream. Huffman và Shannon-Fano dùng nhóm symbol 2-bit với trọng số có thể chỉnh; RLE dùng cặp count/value; ZIP dùng DEFLATE chuẩn.
 
 ## Thực hành lý thuyết nguồn với text
@@ -109,13 +113,16 @@ Mọi port phải mang mảng một chiều, không rỗng. Runtime không còn 
 
 - Hamming (7,4): encoder dùng dạng hệ thống quen thuộc trong giáo trình `c = [d1 d2 d3 d4 p1 p2 p3]`, yêu cầu input chia hết cho 4 và tạo `7/4` số phần tử. Decoder yêu cầu input chia hết cho 7, sửa tối đa một bit lỗi trong mỗi codeword rồi trả về bốn bit dữ liệu đầu tiên.
 - Repetition-3: encoder tạo kích thước gấp 3; decoder yêu cầu input chia hết cho 3.
+- Mã chập (7,5): encoder rate 1/2 tạo hai coded bit trên mỗi information bit và phát `reference`; hard Viterbi yêu cầu input chẵn rồi trả đúng một nửa số bit.
 - QPSK: modulator yêu cầu số bit chẵn và tạo một symbol trên hai bit; demodulator khôi phục hai bit trên một symbol.
 - OOK: mỗi bit tạo một biên độ `0` hoặc `1`; demodulator quyết định cứng tại ngưỡng `0.5`, nên kích thước được bảo toàn.
 - 8-PSK Gray: input chia hết cho 3, mỗi ba bit tạo một symbol pha phức; demodulator trả ba bit trên mỗi symbol.
 - 16-QAM Gray: input chia hết cho 4, mỗi bốn bit tạo một symbol I/Q được chuẩn hóa theo `sqrt(10)`; demodulator trả bốn bit trên mỗi symbol.
-- Differential, BPSK, OOK, AWGN và Rayleigh phải bảo toàn chính xác kích thước input/output.
+- 2-FSK: mỗi bit tạo một trong hai symbol trực giao `1+0j`/`0+1j`; detector trả một bit trên mỗi symbol.
+- Differential, FIR, DC Blocker, Normalize Power, BPSK, OOK, 2-FSK, AWGN, Rayleigh và Rician phải bảo toàn chính xác kích thước input/output.
 - Huffman, Shannon-Fano, RLE và ZIP kiểm tra output decoder theo header/count trong stream; dữ liệu lỗi hoặc thiếu không được âm thầm chấp nhận.
 - BER Meter yêu cầu `reference` và `estimate` có kích thước hoàn toàn bằng nhau.
+- EVM Meter yêu cầu hai stream symbol cùng kích thước và báo RMS EVM theo phần trăm/dB.
 - Python Block mặc định `output_size = same`. Chỉ đặt một số nguyên dương hoặc `any` khi block được chủ ý thiết kế để thay đổi kích thước.
 
 Các tham số `length`, `repeat`, `weights`, SNR và `output_size` được kiểm tra trước khi chạy; input trùng kết nối, port không tồn tại và output khai báo thiếu/thừa cũng bị từ chối.

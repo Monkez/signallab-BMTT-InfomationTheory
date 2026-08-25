@@ -1,5 +1,11 @@
 # Trạng thái dự án
 
+- Mốc UX/advanced simulation 2026-08-25 đã hoàn tất: Config có draft + Save/Cancel; mọi numeric parameter cho phép xóa trắng và dạng `1e6`/`1.52e3`; API validation object được format thành field path + message thay `[object Object]`.
+- Benchmark có progress bubble dưới Results (percent, step, SNR/frame), hiệu ứng sáng khi chạy và xanh khi hoàn tất. Browser QA đã xác nhận Hamming hoàn tất 7/7 point, compatibility sample hiển thị tiến độ đang chạy và nút/bubble chuyển completed.
+- Thư viện tăng 46 → 55 block: convolutional (7,5)/hard Viterbi, DC Blocker, FIR, Normalize Power, 2-FSK mapper/detector, Rician và EVM Meter. Catalog tăng 9 → 12 sample với ba hệ thống nâng cao; mọi sample có Run once + benchmark-short gate.
+- Xác minh cuối: backend 100/100 pass, frontend production build và `build_app.bat` pass; browser xác nhận scientific notation ở Config/Block (`1e6`, `1.52e3`), Hamming benchmark hoàn tất 7/7 point, QPSK/Rician Run once trả EVM + constellation.
+- Performance gate đạt native 16,78–24,55× Python một worker và Python Custom Block FFT batch-auto đạt 2,01× frame-serial. Frozen release smoke test xác nhận 55 block, `cpp_onetbb`, graph convolutional/Viterbi chạy `python_multiprocessing` 2 worker/8 frame và trả cả BER + EVM tại `dist\SignalLab\SignalLab.exe`.
+
 - Mốc Python Custom Block 2026-08-25 đã hoàn tất: process worker giữ compiled graph một lần qua initializer; cache PORTS/bytecode/call profile; Auto bảo thủ tránh spawn cho workload nhỏ. Có runtime hint `auto/inline/process` và batch-size tự động/thủ công.
 - Thêm API `process_batch(signals, params_batch)` CPU: scheduler chạy chunk node-by-node, stack input cùng shape/dtype, hỗ trợ PORTS nhiều cổng và giữ `process` cho Run once/preview. Results hiển thị inline/process và số batch block.
 - Xác minh cuối: backend 92/92 pass, frontend production build pass và `build_app.bat` đóng gói thành công. Full performance gate đạt native BPSK 20,82×, QPSK 20,71×, QAM16 15,62×; Python FFT 1.024 × 65.536 mẫu đạt 30,22 Msamples/s batch-auto so với 17,42 Msamples/s frame-inline (1,74×). Threshold vốn nhẹ/vectorized tăng khoảng 10%.

@@ -362,6 +362,56 @@ def differential_decode(inputs, params, context):
     return {"out": decoded}
 
 
+def convolutional_encode(inputs, params, context):
+    """Rate-1/2, constraint-length-3 encoder with octal generators (7, 5)."""
+    bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1)
+    encoded = np.empty(bits.size * 2, dtype=np.int8)
+    previous_1 = 0
+    previous_2 = 0
+    for index, bit_value in enumerate(bits):
+        bit = int(bit_value) & 1
+        encoded[2 * index] = bit ^ previous_1 ^ previous_2
+        encoded[2 * index + 1] = bit ^ previous_2
+        previous_2 = previous_1
+        previous_1 = bit
+    return {"out": encoded, "reference": bits.copy()}
+
+
+def viterbi_decode(inputs, params, context):
+    """Hard-decision Viterbi decoder matched to the (7, 5) encoder."""
+    received = np.asarray(inputs["in"], dtype=np.int8).reshape(-1, 2)
+    state_count = 4
+    infinity = np.iinfo(np.int32).max // 4
+    metrics = np.full(state_count, infinity, dtype=np.int32)
+    metrics[0] = 0
+    predecessor = np.empty((len(received), state_count), dtype=np.int8)
+    decisions = np.empty((len(received), state_count), dtype=np.int8)
+    for time_index, pair in enumerate(received):
+        next_metrics = np.full(state_count, infinity, dtype=np.int32)
+        for state in range(state_count):
+            if metrics[state] >= infinity:
+                continue
+            previous_1 = (state >> 1) & 1
+            previous_2 = state & 1
+            for bit in (0, 1):
+                expected_0 = bit ^ previous_1 ^ previous_2
+                expected_1 = bit ^ previous_2
+                distance = int(pair[0] != expected_0) + int(pair[1] != expected_1)
+                next_state = (bit << 1) | previous_1
+                candidate = int(metrics[state]) + distance
+                if candidate < next_metrics[next_state]:
+                    next_metrics[next_state] = candidate
+                    predecessor[time_index, next_state] = state
+                    decisions[time_index, next_state] = bit
+        metrics = next_metrics
+    state = int(np.argmin(metrics))
+    decoded = np.empty(len(received), dtype=np.int8)
+    for time_index in range(len(received) - 1, -1, -1):
+        decoded[time_index] = decisions[time_index, state]
+        state = int(predecessor[time_index, state])
+    return {"out": decoded}
+
+
 def hamming74_encode(inputs, params, context):
     bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1)
     d = bits.reshape(-1, 4)
@@ -383,6 +433,32 @@ def repetition3_decode(inputs, params, context):
     bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1)
     usable = bits[: len(bits) - len(bits) % 3].reshape(-1, 3)
     return {"out": (usable.sum(axis=1) >= 2).astype(np.int8)}
+
+
+def dc_blocker(inputs, params, context):
+    samples = np.asarray(inputs["in"]).reshape(-1)
+    alpha = float(params.get("alpha", 0.995))
+    output = np.empty_like(samples, dtype=np.result_type(samples.dtype, np.float32))
+    output[0] = samples[0]
+    for index in range(1, samples.size):
+        output[index] = samples[index] - samples[index - 1] + alpha * output[index - 1]
+    return {"out": output}
+
+
+def fir_filter(inputs, params, context):
+    samples = np.asarray(inputs["in"]).reshape(-1)
+    taps = np.asarray([float(value.strip()) for value in str(params.get("taps", "0.25,0.5,0.25")).split(",")], dtype=float)
+    return {"out": sp.signal.lfilter(taps, [1.0], samples)}
+
+
+def normalize_power(inputs, params, context):
+    xp = context.xp
+    samples = xp.asarray(inputs["in"])
+    measured = xp.mean(xp.abs(samples) ** 2)
+    if float(to_numpy(measured)) <= 0:
+        raise ValueError("Cannot normalize a zero-power signal")
+    scale = xp.sqrt(float(params.get("target_power", 1.0)) / measured)
+    return {"out": samples * scale}
 
 
 def bpsk_mod(inputs, params, context):
@@ -421,6 +497,11 @@ def qam16_mod(inputs, params, context):
     return {"out": symbols.astype(xp.complex64) / xp.sqrt(10.0)}
 
 
+def fsk2_mod(inputs, params, context):
+    bits = context.xp.asarray(inputs["in"], dtype=context.xp.int8).reshape(-1)
+    return {"out": context.xp.where(bits == 0, 1.0 + 0.0j, 0.0 + 1.0j).astype(context.xp.complex64)}
+
+
 def awgn(inputs, params, context):
     samples = context.xp.asarray(inputs["in"])
     # Legacy projects without snr_mode keep their fixed Eb/N0 behavior.
@@ -445,6 +526,20 @@ def rayleigh(inputs, params, context):
     random = _block_rng(params, context, context.xp)
     fading = (random.normal(0.0, 1.0, samples.shape) + 1j * random.normal(0.0, 1.0, samples.shape)) / (2.0 ** 0.5)
     noise = random.normal(0.0, sigma, samples.shape) + 1j * random.normal(0.0, sigma, samples.shape)
+    return {"out": samples * fading + noise}
+
+
+def rician(inputs, params, context):
+    xp = context.xp
+    samples = xp.asarray(inputs["in"])
+    ebn0_db = float(params.get("ebn0_db", 4.0)) if params.get("snr_mode", "fixed") == "fixed" or context.snr_db is None else float(context.snr_db)
+    k_linear = 10.0 ** (float(params.get("k_factor_db", 6.0)) / 10.0)
+    random = _block_rng(params, context, xp)
+    shape = (1,) if bool(params.get("flat", False)) else samples.shape
+    scatter = (random.normal(0.0, 1.0, shape) + 1j * random.normal(0.0, 1.0, shape)) / (2.0 ** 0.5)
+    fading = (k_linear / (k_linear + 1.0)) ** 0.5 + scatter / ((k_linear + 1.0) ** 0.5)
+    sigma = (1.0 / (2.0 * 10.0 ** (ebn0_db / 10.0))) ** 0.5
+    noise = sigma * (random.normal(0.0, 1.0, samples.shape) + 1j * random.normal(0.0, 1.0, samples.shape))
     return {"out": samples * fading + noise}
 
 
@@ -489,6 +584,13 @@ def qam16_demod(inputs, params, context):
     bits[2::4] = (q_values > 0).astype(xp.int8)
     bits[3::4] = (xp.abs(q_values) < 2.0).astype(xp.int8)
     return {"out": bits}
+
+
+def fsk2_demod(inputs, params, context):
+    samples = context.xp.asarray(inputs["in"]).reshape(-1)
+    distance_zero = context.xp.abs(samples - (1.0 + 0.0j))
+    distance_one = context.xp.abs(samples - (0.0 + 1.0j))
+    return {"out": (distance_one < distance_zero).astype(context.xp.int8)}
 
 
 def hamming74_decode(inputs, params, context):
@@ -545,6 +647,17 @@ def constellation(inputs, params, context):
 def power_meter(inputs, params, context):
     samples = to_numpy(inputs["in"]).reshape(-1)
     return {"__metrics__": {"power_count": int(len(samples)), "power_sum": float(np.abs(samples).astype(float).dot(np.abs(samples).astype(float))) if len(samples) else 0.0}}
+
+
+def evm_meter(inputs, params, context):
+    reference = to_numpy(inputs["reference"]).reshape(-1)
+    estimate = to_numpy(inputs["estimate"]).reshape(-1)
+    error = estimate - reference
+    return {"__metrics__": {
+        "evm_error_energy": float(np.vdot(error, error).real),
+        "evm_reference_energy": float(np.vdot(reference, reference).real),
+        "evm_symbol_count": int(reference.size),
+    }}
 
 
 def variables_block(inputs, params, context):
@@ -767,6 +880,8 @@ PROCESSORS: dict[str, Callable] = {
     "image_file_source": image_file_source,
     "differential_encode": differential_encode,
     "differential_decode": differential_decode,
+    "convolutional_encode": convolutional_encode,
+    "viterbi_decode": viterbi_decode,
     "huffman_encode": huffman_encode,
     "huffman_decode": huffman_decode,
     "shannon_fano_encode": shannon_fano_encode,
@@ -782,22 +897,29 @@ PROCESSORS: dict[str, Callable] = {
     "hamming74_encode": hamming74_encode,
     "repetition3_encode": repetition3_encode,
     "repetition3_decode": repetition3_decode,
+    "dc_blocker": dc_blocker,
+    "fir_filter": fir_filter,
+    "normalize_power": normalize_power,
     "bpsk_mod": bpsk_mod,
     "qpsk_mod": qpsk_mod,
     "ook_mod": ook_mod,
     "psk8_mod": psk8_mod,
     "qam16_mod": qam16_mod,
+    "fsk2_mod": fsk2_mod,
     "awgn": awgn,
     "rayleigh": rayleigh,
+    "rician": rician,
     "bpsk_demod": bpsk_demod,
     "qpsk_demod": qpsk_demod,
     "ook_demod": ook_demod,
     "psk8_demod": psk8_demod,
     "qam16_demod": qam16_demod,
+    "fsk2_demod": fsk2_demod,
     "hamming74_decode": hamming74_decode,
     "scope": scope,
     "constellation": constellation,
     "power_meter": power_meter,
+    "evm_meter": evm_meter,
     "ber": ber,
     "ser": ser,
 }

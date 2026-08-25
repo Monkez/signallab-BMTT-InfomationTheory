@@ -7,7 +7,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 ## 2. Phạm vi MVP
 
 - Canvas kéo-thả, nối cổng, phóng to/thu nhỏ, lưu/mở file mô phỏng `.slab.json`; Save ghi lại file hiện tại và hỗ trợ `Ctrl+S`.
-- Thư viện khối: nguồn bit, Hamming(7,4), BPSK, AWGN, giải điều chế, giải mã, BER và Python tùy biến.
+- Thư viện 55 khối gồm nguồn, source/channel coding, DSP, PSK/QAM/OOK/2-FSK, AWGN/Rayleigh/Rician, receiver, BER/SER/EVM và Python tùy biến.
 - Panel thuộc tính có Python IDE editor với syntax highlighting, line number và cửa sổ chỉnh sửa lớn chuyên biệt; code mẫu dùng NumPy/SciPy/SignalLab.
 - Kiểm tra DAG, cổng kết nối và tham số trước khi chạy.
 - Job Monte-Carlo bất đồng bộ, seed tái lập, chạy tuần tự hoặc đa tiến trình.
@@ -26,6 +26,8 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 - Package `signallab` trên NumPy/SciPy cung cấp API nhất quán cho nguồn, tín hiệu, lọc, điều chế, kênh, mã và metric; NumPy/SciPy trực tiếp vẫn được hỗ trợ.
 - Menu Documents mở cửa sổ offline độc lập, có tìm kiếm full-text và tài liệu hàm/quickstart chi tiết cho người học.
 - Thư viện mở rộng với Text Source, differential source coding, repetition code, QPSK, OOK, 8-PSK Gray, 16-QAM Gray, Rayleigh fading, Scope, Constellation và Power Meter.
+- Mã chập rate-1/2 (7,5), hard Viterbi, FIR/DC Blocker/Normalize Power, 2-FSK, Rician K-factor và EVM Meter có contract/test/sample end-to-end.
+- Config dùng draft + Save; mọi ô số tham số hỗ trợ xóa trắng và scientific notation. Results có progress bubble theo step và trạng thái running/completed trực quan.
 - Bổ sung Text File Source và Image File Source (file picker, base64 project payload), cùng các codec nguồn kinh điển Huffman, Shannon-Fano, RLE và ZIP/DEFLATE theo cặp Encoder/Decoder.
 - Script Windows một lần bấm cho cài đặt, chạy và build.
 - Bản desktop Windows có `SignalLab.exe`, chứa frontend production và backend local, không cần Vite khi sử dụng.
@@ -34,7 +36,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 
 ### V1 — Công cụ giảng dạy
 
-- FSK, QAM bậc cao, pulse shaping, đồng bộ và fading Rician (QPSK/8-PSK/16-QAM/Rayleigh đã có).
+- QAM bậc cao hơn, pulse shaping, carrier/timing synchronization và equalization (2-FSK/QPSK/8-PSK/16-QAM/Rayleigh/Rician đã có).
 - Scope miền thời gian, phổ, constellation, eye diagram.
 - Subsystem, nhóm khối, annotation, undo/redo đầy đủ.
 - Notebook/report thí nghiệm và sweep Eb/N0.

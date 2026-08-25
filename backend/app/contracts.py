@@ -69,7 +69,7 @@ def validate_parameters(block_type: str, params: dict[str, Any]) -> list[str]:
             parse_variable_definitions(params.get("definitions", ""))
         if block_type == "bit_source":
             _positive_integer(params.get("length", 4096), "length")
-        if block_type in {"bit_source", "discrete_symbol_source", "awgn", "rayleigh"}:
+        if block_type in {"bit_source", "discrete_symbol_source", "awgn", "rayleigh", "rician"}:
             _random_seed(params.get("seed", -1))
         if block_type in {"text_source", "text_file_source", "text_symbol_source", "text_file_symbol_source"}:
             _positive_integer(params.get("repeat", 1), "repeat")
@@ -87,12 +87,31 @@ def validate_parameters(block_type: str, params: dict[str, Any]) -> list[str]:
                 raise SignalContractError("Parameter 'weights' must contain exactly four positive integers")
             for value in raw:
                 _positive_integer(value.strip(), "weights")
-        if block_type in {"awgn", "rayleigh"}:
+        if block_type in {"awgn", "rayleigh", "rician"}:
             if str(params.get("snr_mode", "fixed")) not in {"fixed", "experiment"}:
                 raise SignalContractError("Parameter 'snr_mode' must be 'fixed' or 'experiment'")
             snr = float(params.get("ebn0_db", 4.0))
             if not math.isfinite(snr):
                 raise SignalContractError("Parameter 'ebn0_db' must be a finite number")
+        if block_type == "rician":
+            k_factor = float(params.get("k_factor_db", 6.0))
+            if not math.isfinite(k_factor):
+                raise SignalContractError("Parameter 'k_factor_db' must be a finite number")
+        if block_type == "dc_blocker":
+            alpha = float(params.get("alpha", 0.995))
+            if not math.isfinite(alpha) or alpha < 0 or alpha >= 1:
+                raise SignalContractError("Parameter 'alpha' must be finite and in the range [0, 1)")
+        if block_type == "fir_filter":
+            raw_taps = [value.strip() for value in str(params.get("taps", "0.25,0.5,0.25")).split(",")]
+            if not raw_taps or any(not value for value in raw_taps):
+                raise SignalContractError("Parameter 'taps' must contain comma-separated coefficients")
+            taps = [float(value) for value in raw_taps]
+            if any(not math.isfinite(value) for value in taps):
+                raise SignalContractError("Every FIR coefficient must be finite")
+        if block_type == "normalize_power":
+            target_power = float(params.get("target_power", 1.0))
+            if not math.isfinite(target_power) or target_power <= 0:
+                raise SignalContractError("Parameter 'target_power' must be a positive finite number")
         if block_type == "python":
             expected = str(params.get("output_size", "same")).strip().lower()
             if expected not in {"same", "any"}:
@@ -139,6 +158,8 @@ def validate_inputs(block_type: str, inputs: dict[str, Any], params: dict[str, A
             _multiple(primary, 7, "in", "Hamming (7,4) decoding")
         elif block_type == "repetition3_decode":
             _multiple(primary, 3, "in", "Repetition-3 decoding")
+        elif block_type == "viterbi_decode":
+            _multiple(primary, 2, "in", "Viterbi decoding")
         elif block_type == "qpsk_mod":
             _multiple(primary, 2, "in", "QPSK modulation")
         elif block_type == "psk8_mod":
@@ -155,7 +176,7 @@ def validate_inputs(block_type: str, inputs: dict[str, Any], params: dict[str, A
             signal = _signal(inputs["in"], "in")
             if np.asarray(signal).dtype.kind not in {"U", "S", "O"}:
                 raise SignalContractError(f"Port 'in' must contain text symbols, received dtype {np.asarray(signal).dtype}")
-    if block_type in {"ber", "ser"} and sizes.get("reference") != sizes.get("estimate"):
+    if block_type in {"ber", "ser", "evm_meter"} and sizes.get("reference") != sizes.get("estimate"):
         raise SignalContractError(
             f"{block_type.upper()} inputs must match exactly: reference has {sizes.get('reference', 0)} values, "
             f"estimate has {sizes.get('estimate', 0)}"
@@ -199,13 +220,13 @@ def validate_outputs(
     out_size = output_sizes.get("out")
 
     same_size = {
-        "differential_encode", "differential_decode", "bpsk_mod", "bpsk_demod", "ook_mod", "ook_demod", "awgn", "rayleigh",
+        "differential_encode", "differential_decode", "dc_blocker", "fir_filter", "normalize_power", "bpsk_mod", "bpsk_demod", "ook_mod", "ook_demod", "fsk2_mod", "fsk2_demod", "awgn", "rayleigh", "rician",
     }
     if block_type in same_size and out_size != in_size:
         raise SignalContractError(f"Output 'out' must match input 'in': expected {in_size}, received {out_size}")
     if block_type in {"text_source", "text_file_source", "image_file_source", "symbols_to_bits"} and output_sizes.get("reference") != out_size:
         raise SignalContractError("Outputs 'out' and 'reference' must have identical sizes")
-    if block_type in {"huffman_encode", "shannon_fano_encode", "symbol_huffman_encode", "symbol_shannon_fano_encode", "rle_encode", "zip_encode", "hamming74_encode", "repetition3_encode"}:
+    if block_type in {"huffman_encode", "shannon_fano_encode", "symbol_huffman_encode", "symbol_shannon_fano_encode", "rle_encode", "zip_encode", "hamming74_encode", "repetition3_encode", "convolutional_encode"}:
         if output_sizes.get("reference") != in_size:
             raise SignalContractError(f"Output 'reference' must match input 'in': expected {in_size}, received {output_sizes.get('reference')}")
     if block_type == "bit_source":
@@ -239,6 +260,8 @@ def validate_outputs(
         "hamming74_decode": (4, 7),
         "repetition3_encode": (3, 1),
         "repetition3_decode": (1, 3),
+        "convolutional_encode": (2, 1),
+        "viterbi_decode": (1, 2),
         "qpsk_mod": (1, 2),
         "qpsk_demod": (2, 1),
         "psk8_mod": (1, 3),

@@ -29,32 +29,41 @@ export const fallbackSpecs: BlockSpec[] = [
   { type: 'zip_encode', label: 'ZIP (DEFLATE) Encoder', category: 'Source coding', description: 'Standard DEFLATE compression', defaults: {}, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: false },
   { type: 'zip_decode', label: 'ZIP (DEFLATE) Decoder', category: 'Source coding', description: 'Standard DEFLATE decompression', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
   { type: 'hamming74_encode', label: 'Hamming Encoder', category: 'Channel coding', description: 'Systematic [data | parity]', defaults: {}, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: true },
+  { type: 'convolutional_encode', label: 'Convolutional (7,5) Encoder', category: 'Channel coding', description: 'Rate-1/2 · K=3 trellis code', defaults: {}, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: false },
+  { type: 'viterbi_decode', label: 'Viterbi (7,5) Decoder', category: 'Channel coding', description: 'Hard maximum-likelihood sequence decoding', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
   { type: 'repetition3_encode', label: 'Repetition-3 Encoder', category: 'Channel coding', description: 'Repeat each bit three times', defaults: {}, inputs: ['in'], outputs: ['out', 'reference'], gpu_compatible: true },
   { type: 'repetition3_decode', label: 'Repetition-3 Decoder', category: 'Channel coding', description: 'Majority decode triples', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
+  { type: 'dc_blocker', label: 'DC Blocker', category: 'Signal processing', description: 'First-order DC rejection filter', defaults: { alpha: 0.995 }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
+  { type: 'fir_filter', label: 'FIR Filter', category: 'Signal processing', description: 'Configurable causal FIR taps', defaults: { taps: '0.25,0.5,0.25' }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
+  { type: 'normalize_power', label: 'Normalize Power', category: 'Signal processing', description: 'Scale to target mean power', defaults: { target_power: 1 }, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'bpsk_mod', label: 'BPSK Modulator', category: 'Modulation', description: 'Binary phase shift keying', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'qpsk_mod', label: 'QPSK Modulator', category: 'Modulation', description: 'Map bit pairs to I/Q', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'ook_mod', label: 'OOK Modulator', category: 'Modulation', description: 'On-off keying · 0 or 1 amplitude', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'psk8_mod', label: '8-PSK Modulator', category: 'Modulation', description: 'Gray-coded 3-bit phase symbols', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'qam16_mod', label: '16-QAM Modulator', category: 'Modulation', description: 'Gray-coded normalized I/Q symbols', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
+  { type: 'fsk2_mod', label: '2-FSK Symbol Mapper', category: 'Modulation', description: 'Two orthogonal complex symbols', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'awgn', label: 'AWGN Channel', category: 'Channels', description: 'Seeded AWGN · -1 is random', defaults: { ebn0_db: 4, snr_mode: 'experiment', seed: -1 }, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'rayleigh', label: 'Rayleigh Fading', category: 'Channels', description: 'Seeded fading · -1 is random', defaults: { ebn0_db: 4, snr_mode: 'experiment', seed: -1 }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
+  { type: 'rician', label: 'Rician Fading', category: 'Channels', description: 'LOS K-factor fading plus AWGN', defaults: { k_factor_db: 6, flat: false, ebn0_db: 4, snr_mode: 'experiment', seed: -1 }, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'bpsk_demod', label: 'BPSK Demodulator', category: 'Receivers', description: 'Hard decision', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'qpsk_demod', label: 'QPSK Demodulator', category: 'Receivers', description: 'Hard decision I/Q', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'ook_demod', label: 'OOK Demodulator', category: 'Receivers', description: 'Hard amplitude decision at 0.5', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'psk8_demod', label: '8-PSK Demodulator', category: 'Receivers', description: 'Nearest Gray-coded phase decision', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'qam16_demod', label: '16-QAM Demodulator', category: 'Receivers', description: 'Gray-coded I/Q threshold detector', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
+  { type: 'fsk2_demod', label: '2-FSK Detector', category: 'Receivers', description: 'Nearest orthogonal-symbol decision', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'hamming74_decode', label: 'Hamming Decoder', category: 'Channel coding', description: 'Systematic decode · correct 1 bit', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'scope', label: 'Signal Scope', category: 'Sinks', description: 'Amplitude and peak summary', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
   { type: 'constellation', label: 'Constellation Sink', category: 'Sinks', description: 'I/Q sample summary', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
   { type: 'power_meter', label: 'Power Meter', category: 'Sinks', description: 'Mean signal power', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
+  { type: 'evm_meter', label: 'EVM Meter', category: 'Sinks', description: 'RMS error vector magnitude', defaults: {}, inputs: ['reference', 'estimate'], outputs: [], gpu_compatible: true },
   { type: 'ber', label: 'BER Meter', category: 'Sinks', description: 'Measure bit error rate', defaults: {}, inputs: ['reference', 'estimate'], outputs: [], gpu_compatible: true },
   { type: 'python', label: 'Python Block', category: 'Custom', description: 'Custom processing · optional vectorized process_batch', defaults: { gain: 1, output_size: 'same', runtime_executor: 'auto', runtime_batch_size: 0 }, inputs: ['in'], outputs: ['out'], gpu_compatible: false },
 ]
 
 export function iconFor(type: string): LucideIcon {
-  return type === 'variables' ? Settings2 : type.includes('source') ? Binary : type.includes('awgn') || type.includes('rayleigh') ? Waves : type.includes('bpsk') || type.includes('qpsk') ? Radio : type === 'ber' ? Gauge : type === 'scope' || type === 'constellation' || type === 'power_meter' ? Activity : type === 'python' ? Braces : Box
+  return type === 'variables' ? Settings2 : type.includes('source') ? Binary : type.includes('awgn') || type.includes('rayleigh') || type.includes('rician') ? Waves : type.includes('bpsk') || type.includes('qpsk') || type.includes('fsk') ? Radio : type === 'ber' ? Gauge : type === 'scope' || type === 'constellation' || type.includes('meter') ? Activity : type === 'python' ? Braces : Box
 }
 
 export function miniMapColor(type: string) {
-  return type === 'variables' ? '#3d6f9e' : type.includes('source') ? '#5b8def' : type.includes('encode') || type.includes('decode') ? '#8b72d9' : type.includes('mod') || type.includes('demod') ? '#e49a45' : type.includes('awgn') || type.includes('rayleigh') ? '#41a987' : type === 'ber' || type.includes('meter') || type === 'scope' || type === 'constellation' ? '#d26782' : type === 'python' ? '#65748b' : '#8493a8'
+  return type === 'variables' ? '#3d6f9e' : type.includes('source') ? '#5b8def' : type.includes('encode') || type.includes('decode') ? '#8b72d9' : type.includes('mod') || type.includes('demod') ? '#e49a45' : type.includes('awgn') || type.includes('rayleigh') || type.includes('rician') ? '#41a987' : type === 'ber' || type.includes('meter') || type === 'scope' || type === 'constellation' ? '#d26782' : type === 'python' ? '#65748b' : '#8493a8'
 }

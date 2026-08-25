@@ -192,5 +192,81 @@
       {"id":"e1","source":"src","target":"py"},{"id":"e2","source":"src","target":"ber","target_handle":"reference"},{"id":"e3","source":"py","target":"ber","target_handle":"estimate"}
     ]},
     "config": {"mode":"specific_steps","trials":100,"max_frames":100,"min_frames":100,"min_errors":0,"workers":0,"seed":2026,"device":"cpu","chunk_size":10}
+  },
+  {
+    "format": "signallab-simulation", "version": "1.0",
+    "sample": {
+      "id": "convolutional-viterbi-bpsk", "title": "Mã chập (7,5), Viterbi và BPSK", "subtitle": "Tuyến thu trellis có BER và EVM đồng thời", "category": "Digital communications", "level": "Nâng cao", "duration_minutes": 50,
+      "summary": "Mô hình chuyên sâu dùng encoder rate-1/2 K=3, BPSK, AWGN và hard-decision Viterbi. Hai sink BER/EVM cho phép đánh giá đồng thời độ tin cậy bit và chất lượng symbol.",
+      "concepts": ["Convolutional code", "Viterbi", "Trellis", "Coding rate", "EVM", "BER"], "uses_python": false,
+      "learning_objectives": ["Theo dõi tỷ lệ kích thước của mã chập rate 1/2", "Hiểu metric Hamming trong hard Viterbi", "Liên hệ EVM trước quyết định với BER sau giải mã"],
+      "instructions": ["Run once và xác nhận 1024 bit tạo thành 2048 coded bits.", "Chọn Viterbi Decoder để quan sát output trở về 1024 bit.", "Mở Results, đối chiếu RMS EVM với BER sau giải mã.", "Run Benchmark từ -2 đến 6 dB rồi so sánh với BPSK không mã hóa."],
+      "expected_observations": ["Viterbi khai thác ràng buộc trellis nên sửa được nhiều mẫu lỗi rời rạc.", "EVM phản ánh nhiễu symbol trước decoder, còn BER phản ánh hiệu quả toàn tuyến sau decoder."]
+    },
+    "graph": { "version": "1.0", "nodes": [
+      {"id":"src","type":"bit_source","label":"Information bits","position":{"x":20,"y":70},"params":{"length":1024,"seed":-1}},
+      {"id":"enc","type":"convolutional_encode","label":"Conv (7,5), R=1/2","position":{"x":220,"y":70}},
+      {"id":"mod","type":"bpsk_mod","label":"BPSK","position":{"x":430,"y":70}},
+      {"id":"ch","type":"awgn","label":"AWGN","position":{"x":640,"y":70},"params":{"ebn0_db":4,"snr_mode":"experiment","seed":-1}},
+      {"id":"demod","type":"bpsk_demod","label":"Hard detector","position":{"x":640,"y":310},"port_orientation":"reversed"},
+      {"id":"dec","type":"viterbi_decode","label":"Hard Viterbi (7,5)","position":{"x":430,"y":310},"port_orientation":"reversed"},
+      {"id":"ber","type":"ber","label":"Decoded BER","position":{"x":190,"y":310},"port_orientation":"reversed"},
+      {"id":"evm","type":"evm_meter","label":"Channel EVM","position":{"x":820,"y":175}}
+    ], "edges": [
+      {"id":"e1","source":"src","target":"enc"},{"id":"e2","source":"enc","target":"mod"},{"id":"e3","source":"mod","target":"ch"},
+      {"id":"e4","source":"ch","target":"demod"},{"id":"e5","source":"demod","target":"dec"},
+      {"id":"e6","source":"enc","source_handle":"reference","target":"ber","target_handle":"reference"},{"id":"e7","source":"dec","target":"ber","target_handle":"estimate"},
+      {"id":"e8","source":"mod","target":"evm","target_handle":"reference"},{"id":"e9","source":"ch","target":"evm","target_handle":"estimate"}
+    ]},
+    "config": {"mode":"ber_benchmark","trials":120,"max_frames":120,"min_frames":20,"min_errors":100,"snr_db_start":-2,"snr_db_stop":6,"snr_db_step":2,"workers":4,"seed":2026,"device":"cpu","engine":"auto","chunk_size":4}
+  },
+  {
+    "format": "signallab-simulation", "version": "1.0",
+    "sample": {
+      "id": "qpsk-rician-evm", "title": "QPSK qua Rician: BER, EVM và constellation", "subtitle": "Đánh giá tuyến có thành phần LOS bằng nhiều sink", "category": "Digital communications", "level": "Nâng cao", "duration_minutes": 45,
+      "summary": "QPSK được chuẩn hóa công suất trước khi đi qua kênh Rician có K-factor. Constellation, EVM và BER tạo bộ chỉ tiêu gần với quy trình đánh giá modem thực tế.",
+      "concepts": ["Rician fading", "K-factor", "QPSK", "Power normalization", "EVM", "Constellation"], "uses_python": false,
+      "learning_objectives": ["Phân biệt Rician với Rayleigh bằng thành phần LOS", "Đo EVM RMS theo symbol lý tưởng", "Quan sát quan hệ K-factor, constellation và BER"],
+      "instructions": ["Run once và xác nhận Normalize Power đưa công suất QPSK về 1.", "Chọn Rician Fading, đổi K-factor từ 12 dB xuống 0 dB.", "Quan sát Constellation và EVM thay đổi sau mỗi Run once.", "Run Benchmark rồi so sánh BER khi bật/tắt Flat fading."],
+      "expected_observations": ["K-factor lớn tạo tuyến gần LOS và constellation tập trung hơn.", "EVM tăng khi fading/nhiễu mạnh hơn; BER hard-decision thường tăng theo."]
+    },
+    "graph": { "version": "1.0", "nodes": [
+      {"id":"src","type":"bit_source","label":"QPSK bits","position":{"x":20,"y":90},"params":{"length":4096,"seed":-1}},
+      {"id":"mod","type":"qpsk_mod","label":"QPSK mapper","position":{"x":220,"y":90}},
+      {"id":"norm","type":"normalize_power","label":"Normalize Es","position":{"x":420,"y":90},"params":{"target_power":1}},
+      {"id":"ch","type":"rician","label":"Rician K=12 dB","position":{"x":620,"y":90},"params":{"k_factor_db":12,"flat":false,"ebn0_db":8,"snr_mode":"experiment","seed":-1}},
+      {"id":"demod","type":"qpsk_demod","label":"QPSK detector","position":{"x":820,"y":90}},
+      {"id":"ber","type":"ber","label":"BER meter","position":{"x":820,"y":300},"port_orientation":"reversed"},
+      {"id":"evm","type":"evm_meter","label":"RMS EVM","position":{"x":590,"y":330},"port_orientation":"reversed"},
+      {"id":"const","type":"constellation","label":"Rician constellation","position":{"x":350,"y":330}}
+    ], "edges": [
+      {"id":"e1","source":"src","target":"mod"},{"id":"e2","source":"mod","target":"norm"},{"id":"e3","source":"norm","target":"ch"},{"id":"e4","source":"ch","target":"demod"},
+      {"id":"e5","source":"src","target":"ber","target_handle":"reference"},{"id":"e6","source":"demod","target":"ber","target_handle":"estimate"},
+      {"id":"e7","source":"norm","target":"evm","target_handle":"reference"},{"id":"e8","source":"ch","target":"evm","target_handle":"estimate"},{"id":"e9","source":"ch","target":"const"}
+    ]},
+    "config": {"mode":"ber_benchmark","trials":200,"max_frames":200,"min_frames":30,"min_errors":200,"snr_db_start":0,"snr_db_stop":14,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","engine":"auto","chunk_size":10}
+  },
+  {
+    "format": "signallab-simulation", "version": "1.0",
+    "sample": {
+      "id": "orthogonal-fsk-awgn", "title": "2-FSK trực giao qua AWGN", "subtitle": "Symbol phức trực giao và quyết định khoảng cách", "category": "Digital communications", "level": "Trung cấp", "duration_minutes": 30,
+      "summary": "Bit được ánh xạ lên hai symbol phức trực giao, truyền qua AWGN và quyết định theo khoảng cách Euclid. Sample bổ sung một họ điều chế ngoài PSK/QAM/OOK.",
+      "concepts": ["2-FSK", "Orthogonal signaling", "Euclidean detector", "AWGN", "BER"], "uses_python": false,
+      "learning_objectives": ["Nhận biết hai symbol cơ sở trực giao", "Hiểu quyết định nearest-symbol", "Đo BER của 2-FSK theo SNR"],
+      "instructions": ["Run once và xem output mapper gồm hai điểm 1+0j và 0+1j.", "Chọn Noisy symbols để quan sát hai cụm constellation.", "Run Benchmark từ -4 đến 12 dB.", "So sánh BER với BPSK và QPSK ở cùng cấu hình frame."],
+      "expected_observations": ["Mỗi bit tương ứng đúng một complex symbol.", "Khoảng cách giữa hai symbol quyết định độ nhạy với AWGN."]
+    },
+    "graph": { "version": "1.0", "nodes": [
+      {"id":"src","type":"bit_source","label":"Random bits","position":{"x":40,"y":140},"params":{"length":4096,"seed":-1}},
+      {"id":"mod","type":"fsk2_mod","label":"Orthogonal 2-FSK","position":{"x":270,"y":140}},
+      {"id":"ch","type":"awgn","label":"Complex AWGN","position":{"x":500,"y":140},"params":{"ebn0_db":4,"snr_mode":"experiment","seed":-1}},
+      {"id":"demod","type":"fsk2_demod","label":"Euclidean detector","position":{"x":730,"y":140}},
+      {"id":"ber","type":"ber","label":"BER meter","position":{"x":730,"y":340},"port_orientation":"reversed"},
+      {"id":"const","type":"constellation","label":"Noisy symbols","position":{"x":500,"y":340}}
+    ], "edges": [
+      {"id":"e1","source":"src","target":"mod"},{"id":"e2","source":"mod","target":"ch"},{"id":"e3","source":"ch","target":"demod"},
+      {"id":"e4","source":"src","target":"ber","target_handle":"reference"},{"id":"e5","source":"demod","target":"ber","target_handle":"estimate"},{"id":"e6","source":"ch","target":"const"}
+    ]},
+    "config": {"mode":"ber_benchmark","trials":220,"max_frames":220,"min_frames":35,"min_errors":200,"snr_db_start":-4,"snr_db_stop":12,"snr_db_step":2,"workers":0,"seed":2026,"device":"auto","engine":"auto","chunk_size":10}
   }
 ]

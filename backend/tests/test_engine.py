@@ -558,6 +558,63 @@ def test_python_runtime_parameters_are_validated():
     assert validate_parameters("python", {"output_size": "same", "runtime_executor": "auto", "runtime_batch_size": 4097})
 
 
+def test_advanced_signal_processing_and_fsk_blocks_preserve_contracts():
+    context = make_context(np, np.random.default_rng(9), 0, 9, "cpu")
+    bits = np.asarray([0, 1, 1, 0, 1, 0], dtype=np.int8)
+    symbols = PROCESSORS["fsk2_mod"]({"in": bits}, {}, context)["out"]
+    assert np.array_equal(PROCESSORS["fsk2_demod"]({"in": symbols}, {}, context)["out"], bits)
+
+    biased = np.linspace(-1, 1, 64) + 3.0
+    blocked = PROCESSORS["dc_blocker"]({"in": biased}, {"alpha": 0.99}, context)["out"]
+    filtered = PROCESSORS["fir_filter"]({"in": blocked}, {"taps": "0.25,0.5,0.25"}, context)["out"]
+    normalized = PROCESSORS["normalize_power"]({"in": filtered}, {"target_power": 2.0}, context)["out"]
+    assert blocked.shape == filtered.shape == normalized.shape == biased.shape
+    assert np.mean(np.abs(normalized) ** 2) == pytest.approx(2.0)
+
+
+def test_convolutional_viterbi_round_trip_and_size_contract():
+    context = make_context(np, np.random.default_rng(10), 0, 10, "cpu")
+    bits = np.random.default_rng(11).integers(0, 2, 257, dtype=np.int8)
+    encoded = PROCESSORS["convolutional_encode"]({"in": bits}, {}, context)
+    decoded = PROCESSORS["viterbi_decode"]({"in": encoded["out"]}, {}, context)["out"]
+    assert np.array_equal(decoded, bits)
+    assert encoded["out"].size == bits.size * 2
+    assert np.array_equal(encoded["reference"], bits)
+    with pytest.raises(ValueError, match="multiple of 2"):
+        validate_inputs("viterbi_decode", {"in": encoded["out"][:-1]}, {})
+
+
+def test_rician_channel_and_evm_sink_report_modulation_quality():
+    graph = Graph(nodes=[
+        {"id": "source", "type": "bit_source", "label": "Bits", "params": {"length": 128, "seed": 4}},
+        {"id": "mod", "type": "qpsk_mod", "label": "QPSK", "params": {}},
+        {"id": "channel", "type": "rician", "label": "Rician", "params": {"k_factor_db": 12, "flat": False, "ebn0_db": 18, "snr_mode": "fixed", "seed": 5}},
+        {"id": "evm", "type": "evm_meter", "label": "EVM", "params": {}},
+    ], edges=[
+        {"id": "e1", "source": "source", "target": "mod"},
+        {"id": "e2", "source": "mod", "target": "channel"},
+        {"id": "e3", "source": "mod", "target": "evm", "target_handle": "reference"},
+        {"id": "e4", "source": "channel", "target": "evm", "target_handle": "estimate"},
+    ])
+    result = run_once(graph, SimulationConfig(mode="specific_steps", max_frames=1, min_frames=1, engine="python", device="cpu"))
+    assert result["sink_metrics"]["evm_symbol_count"] == 64
+    assert 0 < result["sink_metrics"]["evm_rms_percent"] < 100
+    assert math.isfinite(result["sink_metrics"]["evm_rms_db"])
+    benchmark = run_simulation(graph, SimulationConfig(mode="specific_steps", max_frames=2, min_frames=2, workers=1, engine="python", device="cpu"))
+    assert benchmark["sink_metrics"]["evm_symbol_count"] == 128
+    assert benchmark["sink_metrics"]["evm_rms_percent"] > 0
+
+
+@pytest.mark.parametrize(("block_type", "params"), [
+    ("dc_blocker", {"alpha": 1.0}),
+    ("fir_filter", {"taps": "0.5,nan"}),
+    ("normalize_power", {"target_power": 0}),
+    ("rician", {"k_factor_db": float("inf"), "ebn0_db": 4, "snr_mode": "fixed", "seed": 1}),
+])
+def test_advanced_block_parameters_are_validated(block_type, params):
+    assert validate_parameters(block_type, params)
+
+
 def test_validation_highlights_duplicate_variables_blocks():
     graph = Graph(nodes=[
         {"id": "first", "type": "variables", "label": "Variables A", "params": {"definitions": "rate = 1"}},

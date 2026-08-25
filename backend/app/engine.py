@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -492,6 +493,11 @@ def _sink_metrics(aggregate: dict[str, float]) -> dict[str, float]:
         sink_metrics["symbol_errors"] = aggregate.get("symbol_errors", 0)
         sink_metrics["total_symbols"] = aggregate["total_symbols"]
         sink_metrics["ser"] = aggregate.get("symbol_errors", 0) / aggregate["total_symbols"]
+    if aggregate.get("evm_reference_energy", 0):
+        ratio = aggregate.get("evm_error_energy", 0) / aggregate["evm_reference_energy"]
+        sink_metrics["evm_rms_percent"] = math.sqrt(max(0.0, ratio)) * 100.0
+        sink_metrics["evm_rms_db"] = 10.0 * math.log10(max(ratio, np.finfo(float).tiny))
+        sink_metrics["evm_symbol_count"] = aggregate.get("evm_symbol_count", 0)
     return sink_metrics
 
 
@@ -660,29 +666,7 @@ def run_simulation(
             pool.shutdown(wait=True, cancel_futures=True)
     elapsed = time.perf_counter() - started
     bits = aggregate["total_bits"]
-    sink_metrics: dict[str, float] = {}
-    if aggregate.get("power_count", 0):
-        sink_metrics["power_mean"] = aggregate.get("power_sum", 0) / aggregate["power_count"]
-    if aggregate.get("scope_count", 0):
-        sink_metrics["scope_mean_amplitude"] = aggregate.get("scope_sum", 0) / aggregate["scope_count"]
-        sink_metrics["scope_peak_amplitude"] = aggregate.get("scope_peak", 0)
-    if aggregate.get("constellation_count", 0):
-        count = aggregate["constellation_count"]
-        sink_metrics["constellation_mean_i"] = aggregate.get("constellation_i_sum", 0) / count
-        sink_metrics["constellation_mean_q"] = aggregate.get("constellation_q_sum", 0) / count
-        sink_metrics["constellation_mean_power"] = aggregate.get("constellation_power_sum", 0) / count
-    if aggregate.get("source_frame_count", 0):
-        frames = aggregate["source_frame_count"]
-        symbols = aggregate.get("source_symbol_count", 0)
-        sink_metrics["source_entropy"] = aggregate.get("source_entropy_sum", 0) / frames
-        sink_metrics["source_max_entropy"] = aggregate.get("source_max_entropy_sum", 0) / frames
-        sink_metrics["source_efficiency_percent"] = aggregate.get("source_efficiency_sum", 0) / frames
-        sink_metrics["source_average_information"] = aggregate.get("source_information_sum", 0) / symbols if symbols else 0
-        sink_metrics["source_alphabet_size"] = aggregate.get("source_alphabet_size_peak", 0)
-    if aggregate.get("total_symbols", 0):
-        sink_metrics["symbol_errors"] = aggregate.get("symbol_errors", 0)
-        sink_metrics["total_symbols"] = aggregate["total_symbols"]
-        sink_metrics["ser"] = aggregate.get("symbol_errors", 0) / aggregate["total_symbols"]
+    sink_metrics = _sink_metrics(aggregate)
     preview_capture = execute_trial(graph_dict, 0, config.seed, device, snr_values[0], capture_ports=True) if not was_cancelled else {"port_previews": {}, "_port_values": {}}
     return {
         **aggregate,

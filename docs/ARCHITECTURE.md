@@ -54,6 +54,8 @@ features/experiment/config.ts   mode, mặc định và phép tính điểm SNR
 
 Catalog bài học canonical nằm tại `samples/catalog.json`. Mỗi entry là một project `signallab-simulation` hợp lệ kèm metadata giáo dục (mục tiêu, khái niệm, các bước và kết quả cần quan sát). Frontend bundle JSON để dùng offline; `materializeSample()` chỉ chuyển schema project sang React Flow dựa trên `BlockSpec` đang hoạt động. Backend test đọc cùng file, validate graph và Run once từng bài nên UI và engine không thể âm thầm lệch port/kích thước. Sample mở ra luôn là project Unsaved và ngắt file target hiện tại, tránh ghi đè catalog hoặc file của người dùng.
 
+Sample gate chạy thêm một benchmark compatibility ngắn cho **mọi** project, không chỉ Run once. Điều này khóa cả scheduler, metric reduction và stopping path; các graph Hamming/Viterbi/Rician/2-FSK/Python phải thực thi hoàn chỉnh trước khi catalog được phát hành.
+
 Python editor dùng CodeMirror 6 với Python language grammar, line number, fold gutter, active-line highlight, bracket matching, auto-close và autocomplete. `PythonCodeEditor` là lớp editor dùng chung; `PythonEditorModal` giữ draft riêng và chỉ cập nhật node khi Apply. Hai module được tải bằng `React.lazy`, vì vậy bundle CodeMirror chỉ được tải khi người dùng chọn Python Block hoặc mở editor lớn, không làm tăng thời gian tải workspace thông thường.
 
 Backend tách hợp đồng block khỏi thuật toán xử lý: `block_registry.py` chứa `BlockSpec`, catalog và khả năng GPU; `blocks.py` chỉ chứa processor; `engine.py` biên dịch/thực thi DAG; `jobs.py` quản lý vòng đời job; `main.py` chỉ là lớp HTTP. Nhờ vậy đổi nhãn/port/default không đụng thuật toán, còn thêm processor không làm phình API layer.
@@ -63,6 +65,8 @@ Backend tách hợp đồng block khỏi thuật toán xử lý: `block_registry
 `snapshots.py` giữ tối đa bốn frame đại diện gần nhất bằng LRU trong RAM. Kết quả Run once/Benchmark chỉ trả `snapshot_id` và summary nhỏ; tab Block gọi API port theo trang 128 phần tử, còn Copy all đọc tuần tự theo chunk 4096. Vì vậy polling job không mang buffer lớn lặp lại, block ảnh không khiến DOM render hàng triệu dòng cùng lúc, nhưng người dùng vẫn truy cập được mọi phần tử. Mỗi output chỉ được đóng băng/copy về host một lần; input downstream tham chiếu lại snapshot output upstream nên không nhân đôi buffer trên từng cạnh.
 
 Canvas quản lý selection của node và edge tách biệt: click edge đặt trạng thái chọn để highlight và đưa thông tin hai endpoint/port vào Properties inspector; click node đưa tham số và port data của block vào cùng inspector. Left sidebar đã được loại bỏ; Block Picker được mount mới mỗi lần bấm Add nên search rỗng và mọi nhóm đều thu gọn mặc định. Toolbar nổi có thứ tự `Add | Run once, Run Benchmark, Config | Results, Reset`; Config và Results sở hữu hai modal riêng. Reset chỉ xóa runtime state/snapshot/preview, không sửa graph hoặc config. Sự kiện bắt đầu/kết thúc connection đặt cờ UI dùng chung để tạm ẩn tooltip port và Current port data trong lúc kéo.
+
+`NumericInput` giữ text draft trong lúc focus, chỉ phát số hữu hạn hoàn chỉnh và chấp nhận exponent; vì vậy `Backspace/Delete` có thể để trống tạm thời mà không ép thành 0. Experiment Config giữ một `configDraft` độc lập và chỉ commit vào project khi bấm Save. `BenchmarkStatusBubble` đọc trực tiếp job polling, hiển thị percent/SNR step/frame dưới Results; trạng thái nút Results chỉ suy ra từ job status nên không có state animation song song dễ lệch.
 
 `SignalNode` suy ra trạng thái marker trực tiếp từ `portPreviews[direction][port].size`: chưa có preview hoặc size bằng 0 dùng marker vàng; preview có dữ liệu dùng marker xanh lá. Vì topology/parameter edit và Reset đều đi qua `clearDiagnostics()`, trạng thái màu không cần một state song song và không thể lệch khỏi snapshot đang hiển thị.
 
@@ -97,7 +101,7 @@ Job **Run Benchmark** vẫn chạy Monte-Carlo bất đồng bộ qua polling. K
 - Compatibility GPU: runtime thử nạp CuPy/CUDA và kiểm tra device; các built-in dùng namespace mảng `context.xp`. Đây không phải lựa chọn mặc định trên máy Intel Arc.
 - Auto: planner thử native CPU trước cho topology được hỗ trợ, sau đó mới dùng backend tương thích theo lựa chọn device.
 
-Các built-in OOK, 8-PSK Gray và 16-QAM Gray dùng phép toán tương thích namespace NumPy/CuPy. Contract tập trung buộc input 8-PSK chia hết cho 3, 16-QAM chia hết cho 4 và khóa tỷ lệ bit/symbol ở cả modulator/demodulator. Package `signallab.modulation` cung cấp cùng ánh xạ để Python Block và built-in cho kết quả nhất quán.
+Các built-in OOK, 2-FSK, 8-PSK Gray và 16-QAM Gray dùng phép toán tương thích namespace NumPy/CuPy. Contract tập trung buộc input 8-PSK chia hết cho 3, 16-QAM chia hết cho 4 và khóa tỷ lệ bit/symbol ở cả modulator/demodulator. Mã chập K=3 (7,5) phát hai coded bit trên mỗi input; hard Viterbi khôi phục một nửa kích thước bằng metric Hamming. FIR/DC Blocker/Normalize Power giữ nguyên chiều dài; Rician thêm K-factor/flat fading/seed; EVM Meter giảm tổng error/reference energy thành RMS percent và dB qua cùng `_sink_metrics` cho Run once lẫn Benchmark.
 
 ## Source và file blocks
 

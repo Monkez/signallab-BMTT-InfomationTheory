@@ -13,3 +13,5 @@
 11. Khi mở rộng native fast path, cập nhật đồng thời matcher trong `backend/app/native_engine.py`, kernel ở `native/src`, test so sánh/tái lập và `docs/NATIVE_ENGINE.md`; không cho planner nhận topology chưa được chứng minh tương thích.
 12. Build native bằng `build_native.bat`; trước release chạy `test.bat`, `benchmark_regression.bat` và `build_app.bat`. Kiểm tra `_native_core` cùng TBB DLL được PyInstaller gom cạnh package backend.
 13. Khi sửa Python Custom Block runtime, khóa cả API frame/PORTS cũ, `process_batch`, params riêng từng frame, persistent worker trên Windows và benchmark `benchmark_python.bat`; không suy luận rằng process pool luôn nhanh hơn inline.
+14. Numeric UI phải cho phép draft rỗng và scientific notation; không dùng `Number(input.value)` trực tiếp trong controlled input vì `Number("")` biến thao tác xóa thành 0.
+15. Sample mới/sửa phải pass cả Run once lẫn benchmark ngắn trong `test_samples.py`; sink metric mới phải đi qua helper tổng hợp dùng chung cho hai đường chạy.

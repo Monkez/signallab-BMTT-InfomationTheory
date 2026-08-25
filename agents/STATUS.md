@@ -1,5 +1,11 @@
 # Trạng thái dự án
 
+- Mốc đang hoàn thiện 2026-08-25: native v0.2 mở rộng typed modulation plan sang QPSK (không mã hóa/Hamming/Repetition) và 16-QAM không mã hóa. Kernel 16-QAM lấy mẫu trực tiếp vùng quyết định Gaussian; không materialize waveform.
+- Scientific/performance gates: thêm kiểm tra BER 6σ cho BPSK/QPSK/16-QAM, determinism 16-QAM giữa số worker, exact-topology rejection, benchmark warm-up + median + `--min-speedup`, và `benchmark_regression.bat` ba workload.
+- Diagnostics: native result ghi modulation/coding/kernel/version; Auto compatibility result ghi lý do fallback và Results hiển thị cho người dùng. Backend 86/86 pass, frontend build pass.
+- Performance gate cô lập (1.000 × 4.096 bit, median 3 lượt): Hamming+BPSK 210,4 Mbit/s và 30,39×; Hamming+QPSK 314,3 Mbit/s và 52,96×; 16-QAM không mã hóa 568,2 Mbit/s và 16,28× so với Python một worker.
+- Frozen release v0.2: `build_app.bat` thành công; API health báo đúng ba fused modulation feature. Job 16-QAM thật chạy qua `SignalLabCore.exe` hoàn tất bằng `native_cpp`, plan `qam16/none`, 204.800 bit; các tiến trình smoke test đã được dừng có phạm vi.
+
 - Ngày cập nhật: 2026-08-25
 - Mốc hiện tại: Native Batch Executor C++20/oneTBB đã tích hợp vào Auto planner cho BPSK/AWGN/BER không mã hóa, Hamming (7,4) và Repetition-3; graph tổng quát fallback về Python/NumPy/CuPy.
 - Tối ưu: kernel fuse không materialize tín hiệu trung gian, Philox tái lập độc lập số thread, early-stop theo tile và semaphore chống hai benchmark nặng oversubscribe cùng máy. Heuristic Python Auto tránh process pool cho workload nhỏ.

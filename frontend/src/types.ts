@@ -120,6 +120,14 @@ export type Job = {
     throughput_bps: number
     device: string
     engine: string
+    execution?: {
+      backend: string
+      version?: string
+      modulation?: string
+      coding?: string
+      kernel?: string
+      fallback_reason?: string | null
+    }
     workers: number
     warnings: string[]
     sink_metrics: Record<string, number>

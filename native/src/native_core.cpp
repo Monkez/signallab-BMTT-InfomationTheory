@@ -182,7 +182,46 @@ Totals run_repetition_range(
     return totals;
 }
 
-py::dict run_bpsk_awgn_batch(
+inline double normal_cdf(const double value) noexcept {
+    return 0.5 * std::erfc(-value / std::sqrt(2.0));
+}
+
+Totals run_qam16_range(
+    const oneapi::tbb::blocked_range<std::uint64_t>& range,
+    const std::uint64_t groups_per_trial,
+    const std::uint64_t trial_start,
+    const std::uint64_t source_seed,
+    const std::uint64_t noise_seed,
+    const std::array<std::array<double, 3>, 4>& cumulative_regions) {
+    static constexpr std::array<std::uint8_t, 4> DECODED_STATE{0U, 1U, 3U, 2U};
+    Totals totals;
+    for (std::uint64_t flat = range.begin(); flat != range.end(); ++flat) {
+        const std::uint64_t local_trial = flat / groups_per_trial;
+        const std::uint64_t group = flat - local_trial * groups_per_trial;
+        const std::uint64_t trial = trial_start + local_trial;
+        const Counter4 source = philox4x32x10(group, trial, source_seed);
+        const Counter4 noise = philox4x32x10(group, trial, noise_seed);
+        const std::array<std::uint32_t, 4> source_lanes{source.x0, source.x1, source.x2, source.x3};
+        const std::array<std::uint32_t, 2> noise_lanes{noise.x0, noise.x1};
+        for (std::size_t dimension = 0; dimension < 2U; ++dimension) {
+            const std::size_t bit = dimension * 2U;
+            const std::uint8_t state = static_cast<std::uint8_t>(
+                ((source_lanes[bit] & 1U) << 1U) | (source_lanes[bit + 1U] & 1U));
+            const double uniform = (static_cast<double>(noise_lanes[dimension]) + 0.5) / 4294967296.0;
+            const auto& thresholds = cumulative_regions[state];
+            const std::size_t region = uniform < thresholds[0] ? 0U
+                : uniform < thresholds[1] ? 1U
+                : uniform < thresholds[2] ? 2U
+                : 3U;
+            const std::uint8_t difference = static_cast<std::uint8_t>(state ^ DECODED_STATE[region]);
+            totals.errors += (difference & 1U) + ((difference >> 1U) & 1U);
+        }
+        totals.bits += 4U;
+    }
+    return totals;
+}
+
+py::dict run_modulated_awgn_batch(
     const std::uint64_t bit_length,
     const std::uint64_t trial_start,
     const std::uint64_t trial_count,
@@ -190,12 +229,19 @@ py::dict run_bpsk_awgn_batch(
     const std::uint64_t source_seed,
     const std::uint64_t noise_seed,
     const int workers,
-    const int coding) {
+    const int coding,
+    const int modulation) {
     if (bit_length == 0U || trial_count == 0U) {
         throw std::invalid_argument("bit_length and trial_count must be positive");
     }
     if (coding < 0 || coding > 2) {
         throw std::invalid_argument("coding must be 0 (none), 1 (Hamming 7,4), or 2 (Repetition-3)");
+    }
+    if (modulation < 0 || modulation > 2) {
+        throw std::invalid_argument("modulation must be 0 (BPSK), 1 (QPSK), or 2 (16-QAM)");
+    }
+    if (modulation == 2 && coding != 0) {
+        throw std::invalid_argument("16-QAM native v0.2 currently supports the uncoded chain only");
     }
     if (coding == 1 && bit_length % 4U != 0U) {
         throw std::invalid_argument("Hamming (7,4) native execution requires bit_length divisible by 4");
@@ -204,14 +250,50 @@ py::dict run_bpsk_awgn_batch(
         throw std::invalid_argument("snr_db must be finite");
     }
     const int concurrency = std::max(1, workers);
-    const double error_probability = 0.5 * std::erfc(std::sqrt(std::pow(10.0, snr_db / 10.0)));
+    if (modulation == 1 && bit_length % 2U != 0U) {
+        throw std::invalid_argument("QPSK native execution requires an even modulated bit count");
+    }
+    if (modulation == 2 && bit_length % 4U != 0U) {
+        throw std::invalid_argument("16-QAM native execution requires bit_length divisible by 4");
+    }
+    const double linear_snr = std::pow(10.0, snr_db / 10.0);
+    const double error_probability = modulation == 1
+        ? 0.5 * std::erfc(std::sqrt(linear_snr / 2.0))
+        : 0.5 * std::erfc(std::sqrt(linear_snr));
     const std::uint64_t error_threshold = static_cast<std::uint64_t>(
         std::clamp(error_probability, 0.0, 1.0) * 4294967296.0);
+    std::array<std::array<double, 3>, 4> qam16_regions{};
+    if (modulation == 2) {
+        static constexpr std::array<double, 4> LEVELS{-3.0, -1.0, 3.0, 1.0};
+        static constexpr std::array<double, 3> BOUNDARIES{-2.0, 0.0, 2.0};
+        const double scaled_sigma = std::sqrt(5.0 / linear_snr);
+        for (std::size_t state = 0; state < LEVELS.size(); ++state) {
+            for (std::size_t boundary = 0; boundary < BOUNDARIES.size(); ++boundary) {
+                qam16_regions[state][boundary] = normal_cdf(
+                    (BOUNDARIES[boundary] - LEVELS[state]) / scaled_sigma);
+            }
+        }
+    }
     Totals totals;
     {
         py::gil_scoped_release release;
         oneapi::tbb::task_arena arena(concurrency);
         totals = arena.execute([&] {
+            if (modulation == 2) {
+                const std::uint64_t groups = bit_length / 4U;
+                const std::uint64_t total_groups = groups * trial_count;
+                return oneapi::tbb::parallel_reduce(
+                    oneapi::tbb::blocked_range<std::uint64_t>(0U, total_groups, 4096U),
+                    Totals{},
+                    [&](const auto& range, Totals local) {
+                        local += run_qam16_range(range, groups, trial_start, source_seed, noise_seed, qam16_regions);
+                        return local;
+                    },
+                    [](Totals left, const Totals& right) {
+                        left += right;
+                        return left;
+                    });
+            }
             if (coding == 1) {
                 const std::uint64_t groups = bit_length / 4U;
                 const std::uint64_t total_groups = groups * trial_count;
@@ -268,10 +350,10 @@ py::dict run_bpsk_awgn_batch(
 
 PYBIND11_MODULE(_native_core, module) {
     module.doc() = "SignalLab fused single-machine Monte-Carlo kernels";
-    module.attr("__version__") = "0.1.0";
+    module.attr("__version__") = "0.2.0";
     module.def(
-        "run_bpsk_awgn_batch",
-        &run_bpsk_awgn_batch,
+        "run_modulated_awgn_batch",
+        &run_modulated_awgn_batch,
         py::arg("bit_length"),
         py::arg("trial_start"),
         py::arg("trial_count"),
@@ -280,5 +362,6 @@ PYBIND11_MODULE(_native_core, module) {
         py::arg("noise_seed"),
         py::arg("workers"),
         py::arg("coding"),
-        "Run a fused BPSK/AWGN/BER batch with no code, Hamming (7,4), or Repetition-3.");
+        py::arg("modulation"),
+        "Run a fused BPSK, QPSK, or 16-QAM AWGN/BER batch.");
 }

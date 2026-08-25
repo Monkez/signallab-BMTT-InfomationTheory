@@ -55,7 +55,7 @@ def native_status() -> dict[str, Any]:
         "available": True,
         "backend": "cpp_onetbb",
         "version": str(getattr(native, "__version__", "unknown")),
-        "features": ["fused-bpsk-awgn", "hamming74", "repetition3", "philox", "single-machine-threading"],
+        "features": ["fused-bpsk-awgn", "fused-qpsk-awgn", "fused-qam16-awgn", "hamming74", "repetition3", "philox", "single-machine-threading"],
     }
 
 
@@ -63,6 +63,7 @@ def native_status() -> dict[str, Any]:
 class NativePlan:
     bit_length: int
     coding: str
+    modulation: str
     source_seed: int
     noise_seed: int
     awgn_fixed_snr: float | None
@@ -82,6 +83,23 @@ def _match_unique_types(graph: Graph, expected: list[str]) -> dict[str, Any] | N
     return by_type if len(by_type) == len(expected) else None
 
 
+def _match_pipeline(graph: Graph, modulation: str, coding: str) -> dict[str, Any] | None:
+    modulator, demodulator = {
+        "bpsk": ("bpsk_mod", "bpsk_demod"),
+        "qpsk": ("qpsk_mod", "qpsk_demod"),
+        "qam16": ("qam16_mod", "qam16_demod"),
+    }[modulation]
+    coding_types = {
+        "none": [],
+        "hamming74": ["hamming74_encode", "hamming74_decode"],
+        "repetition3": ["repetition3_encode", "repetition3_decode"],
+    }[coding]
+    return _match_unique_types(
+        graph,
+        ["bit_source", modulator, "awgn", demodulator, "ber", *coding_types],
+    )
+
+
 def _seed_key(base_seed: int, experiment_seed: int, node_id: str) -> int:
     value = (int(base_seed) & 0xFFFFFFFFFFFFFFFF) ^ ((int(experiment_seed) & 0xFFFFFFFF) << 32)
     value ^= zlib.crc32(node_id.encode("utf-8"))
@@ -95,26 +113,31 @@ def compile_native_plan(graph: Graph, config: SimulationConfig) -> tuple[NativeP
     if _load_native() is None:
         return None, _NATIVE_ERROR or "Native module is unavailable"
     if config.device == "gpu":
-        return None, "The native v0.1 plan currently targets CPU only"
+        return None, "The native v0.2 plan currently targets CPU only"
 
-    hamming_types = ["bit_source", "hamming74_encode", "bpsk_mod", "awgn", "bpsk_demod", "hamming74_decode", "ber"]
-    repetition_types = ["bit_source", "repetition3_encode", "bpsk_mod", "awgn", "bpsk_demod", "repetition3_decode", "ber"]
-    uncoded_types = ["bit_source", "bpsk_mod", "awgn", "bpsk_demod", "ber"]
-    by_type = _match_unique_types(graph, hamming_types)
-    coding = "hamming74" if by_type is not None else "none"
-    if by_type is None:
-        by_type = _match_unique_types(graph, repetition_types)
+    by_type = None
+    modulation = "bpsk"
+    coding = "none"
+    for candidate_modulation, candidate_coding in (
+        ("bpsk", "hamming74"),
+        ("bpsk", "repetition3"),
+        ("bpsk", "none"),
+        ("qpsk", "hamming74"),
+        ("qpsk", "repetition3"),
+        ("qpsk", "none"),
+        ("qam16", "none"),
+    ):
+        by_type = _match_pipeline(graph, candidate_modulation, candidate_coding)
         if by_type is not None:
-            coding = "repetition3"
+            modulation, coding = candidate_modulation, candidate_coding
+            break
     if by_type is None:
-        by_type = _match_unique_types(graph, uncoded_types)
-    if by_type is None:
-        return None, "Native v0.1 supports the BPSK/AWGN/BER chain with no code, Hamming (7,4), or Repetition-3"
+        return None, "Native v0.2 supports exact AWGN/BER chains using BPSK, QPSK, or uncoded 16-QAM"
 
     source = by_type["bit_source"]
-    modulator = by_type["bpsk_mod"]
+    modulator = by_type[f"{modulation}_mod"]
     channel = by_type["awgn"]
-    demodulator = by_type["bpsk_demod"]
+    demodulator = by_type[f"{modulation}_demod"]
     meter = by_type["ber"]
     if coding == "hamming74":
         encoder, decoder = by_type["hamming74_encode"], by_type["hamming74_decode"]
@@ -131,12 +154,16 @@ def compile_native_plan(graph: Graph, config: SimulationConfig) -> tuple[NativeP
         (encoder.id, "reference", meter.id, "reference") if encoder else (source.id, "out", meter.id, "reference"),
         (decoder.id, "out", meter.id, "estimate") if decoder else (demodulator.id, "out", meter.id, "estimate"),
     }
-    if not required.issubset(_edge_set(graph)):
-        return None, "The supported native blocks are not connected as a complete BPSK/AWGN/BER chain"
+    if required != _edge_set(graph):
+        return None, "The supported native blocks must form one exact modulation/AWGN/BER chain without extra edges"
 
     bit_length = int(source.params.get("length", 4096))
     if coding == "hamming74" and bit_length % 4:
         return None, "Native Hamming execution requires the Bit Source length to be divisible by 4"
+    coded_length = bit_length if coding == "none" else bit_length * 3 if coding == "repetition3" else bit_length // 4 * 7
+    bits_per_symbol = {"bpsk": 1, "qpsk": 2, "qam16": 4}[modulation]
+    if coded_length % bits_per_symbol:
+        return None, f"Native {modulation.upper()} execution requires the coded bit count to be divisible by {bits_per_symbol}"
     random_root = secrets.randbits(64)
     source_base = random_root if int(source.params.get("seed", -1)) == -1 else int(source.params.get("seed", -1))
     noise_base = random_root if int(channel.params.get("seed", -1)) == -1 else int(channel.params.get("seed", -1))
@@ -144,6 +171,7 @@ def compile_native_plan(graph: Graph, config: SimulationConfig) -> tuple[NativeP
     return NativePlan(
         bit_length=bit_length,
         coding=coding,
+        modulation=modulation,
         source_seed=_seed_key(source_base, config.seed, source.id),
         noise_seed=_seed_key(noise_base, config.seed, channel.id),
         awgn_fixed_snr=fixed_snr,
@@ -208,7 +236,7 @@ def run_native_simulation(
             else:
                 requested_tile = max(tile_floor, target_bits_per_tile // max(1, plan.bit_length))
             tile_frames = min(remaining, max(1, min(1024, requested_tile)))
-            result = native.run_bpsk_awgn_batch(
+            result = native.run_modulated_awgn_batch(
                 plan.bit_length,
                 int(point["frames"]),
                 tile_frames,
@@ -217,6 +245,7 @@ def run_native_simulation(
                 plan.noise_seed ^ snr_index,
                 workers,
                 {"none": 0, "hamming74": 1, "repetition3": 2}[plan.coding],
+                {"bpsk": 0, "qpsk": 1, "qam16": 2}[plan.modulation],
             )
             point["bit_errors"] += int(result["bit_errors"])
             point["total_bits"] += int(result["total_bits"])
@@ -273,5 +302,12 @@ def run_native_simulation(
         "cancelled": was_cancelled,
         "snr_points": points,
         "sink_metrics": {},
+        "execution": {
+            "backend": "cpp_onetbb",
+            "version": str(getattr(native, "__version__", "unknown")),
+            "modulation": plan.modulation,
+            "coding": plan.coding,
+            "kernel": "fused_metric_only",
+        },
         "warnings": [],
     }, None

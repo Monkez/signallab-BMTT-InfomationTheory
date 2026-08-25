@@ -11,4 +11,4 @@
 9. Nếu thêm block phải cập nhật backend registry, processor map, frontend fallback catalog, tài liệu và test trong cùng thay đổi.
 10. Nếu thêm/sửa bài học Open Samples, cập nhật `samples/catalog.json`; bảo đảm metadata học tập đầy đủ, graph chạy được bằng Run once và `backend/tests/test_samples.py` pass.
 11. Khi mở rộng native fast path, cập nhật đồng thời matcher trong `backend/app/native_engine.py`, kernel ở `native/src`, test so sánh/tái lập và `docs/NATIVE_ENGINE.md`; không cho planner nhận topology chưa được chứng minh tương thích.
-12. Build native bằng `build_native.bat`; trước release chạy `test.bat`, `benchmark.bat` và `build_app.bat`. Kiểm tra `_native_core` cùng TBB DLL được PyInstaller gom cạnh package backend.
+12. Build native bằng `build_native.bat`; trước release chạy `test.bat`, `benchmark_regression.bat` và `build_app.bat`. Kiểm tra `_native_core` cùng TBB DLL được PyInstaller gom cạnh package backend.

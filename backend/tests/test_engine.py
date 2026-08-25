@@ -1,4 +1,5 @@
 import base64
+import math
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,7 +11,7 @@ from backend.app.contracts import validate_inputs, validate_outputs, validate_pa
 from backend.app.engine import execute_trial, run_once, run_simulation, validate_graph
 from backend.app.models import Edge, Graph, SimulationConfig
 from backend.app.main import app
-from backend.app.native_engine import native_status
+from backend.app.native_engine import compile_native_plan, native_status
 from backend.app.variables import VariableDefinitionError, parse_variable_definitions
 from backend.app.python_ports import PythonPortDefinitionError, parse_python_ports
 import numpy as np
@@ -32,6 +33,27 @@ def sample_graph():
         {"id": "e56", "source": "5", "target": "6", "source_handle": "out", "target_handle": "estimate"},
     ]
     return Graph(nodes=nodes, edges=edges)
+
+
+def uncoded_modulation_graph(modulation: str, length: int = 4096) -> Graph:
+    modulator, demodulator = {
+        "bpsk": ("bpsk_mod", "bpsk_demod"),
+        "qpsk": ("qpsk_mod", "qpsk_demod"),
+        "qam16": ("qam16_mod", "qam16_demod"),
+    }[modulation]
+    return Graph(nodes=[
+        {"id": "source", "type": "bit_source", "label": "Bits", "params": {"length": length, "seed": 123}},
+        {"id": "mod", "type": modulator, "label": modulator, "params": {}},
+        {"id": "channel", "type": "awgn", "label": "AWGN", "params": {"ebn0_db": 4, "snr_mode": "experiment", "seed": 456}},
+        {"id": "demod", "type": demodulator, "label": demodulator, "params": {}},
+        {"id": "meter", "type": "ber", "label": "BER", "params": {}},
+    ], edges=[
+        {"id": "source-mod", "source": "source", "target": "mod", "source_handle": "out", "target_handle": "in"},
+        {"id": "mod-channel", "source": "mod", "target": "channel", "source_handle": "out", "target_handle": "in"},
+        {"id": "channel-demod", "source": "channel", "target": "demod", "source_handle": "out", "target_handle": "in"},
+        {"id": "reference", "source": "source", "target": "meter", "source_handle": "out", "target_handle": "reference"},
+        {"id": "estimate", "source": "demod", "target": "meter", "source_handle": "out", "target_handle": "estimate"},
+    ])
 
 
 def test_graph_is_valid_and_high_snr_has_no_errors():
@@ -642,6 +664,106 @@ def test_native_repetition3_pipeline_runs_fused():
     assert result["total_bits"] == 17 * 401
 
 
+def _native_scientific_run(modulation: str, snr_db: float, workers: int = 4):
+    return run_simulation(uncoded_modulation_graph(modulation, 4096), SimulationConfig(
+        mode="specific_steps",
+        max_frames=500,
+        min_frames=500,
+        snr_db_start=snr_db,
+        workers=workers,
+        chunk_size=50,
+        device="cpu",
+        engine="native",
+        seed=2026,
+    ))
+
+
+def _assert_ber_within_confidence(result, expected: float):
+    count = result["total_bits"]
+    six_sigma = 6.0 * math.sqrt(expected * (1.0 - expected) / count)
+    assert result["ber"] == pytest.approx(expected, abs=six_sigma + 2.0 / count)
+
+
+def _qam16_theoretical_ber(snr_db: float) -> float:
+    linear = 10.0 ** (snr_db / 10.0)
+    sigma = math.sqrt(5.0 / linear)
+    levels = (-3.0, -1.0, 3.0, 1.0)
+    decoded = (0, 1, 3, 2)
+    boundaries = (-math.inf, -2.0, 0.0, 2.0, math.inf)
+    expected_errors_per_dimension = 0.0
+    for source_state, level in enumerate(levels):
+        for region, decoded_state in enumerate(decoded):
+            low = 0.0 if math.isinf(boundaries[region]) else 0.5 * math.erfc(-(boundaries[region] - level) / (sigma * math.sqrt(2.0)))
+            high = 1.0 if math.isinf(boundaries[region + 1]) else 0.5 * math.erfc(-(boundaries[region + 1] - level) / (sigma * math.sqrt(2.0)))
+            expected_errors_per_dimension += 0.25 * (high - low) * ((source_state ^ decoded_state).bit_count())
+    return expected_errors_per_dimension / 2.0
+
+
+@pytest.mark.skipif(not NATIVE_AVAILABLE, reason="native extension is not built")
+@pytest.mark.parametrize(("modulation", "snr_db", "theory"), [
+    ("bpsk", 2.0, lambda value: 0.5 * math.erfc(math.sqrt(10.0 ** (value / 10.0)))),
+    ("qpsk", 4.0, lambda value: 0.5 * math.erfc(math.sqrt(10.0 ** (value / 10.0) / 2.0))),
+    ("qam16", 8.0, _qam16_theoretical_ber),
+])
+def test_native_awgn_ber_matches_theory(modulation, snr_db, theory):
+    result = _native_scientific_run(modulation, snr_db)
+    assert result["execution"]["modulation"] == modulation
+    _assert_ber_within_confidence(result, theory(snr_db))
+
+
+@pytest.mark.skipif(not NATIVE_AVAILABLE, reason="native extension is not built")
+def test_native_qam16_is_deterministic_across_worker_counts():
+    serial = _native_scientific_run("qam16", 8.0, workers=1)
+    parallel = _native_scientific_run("qam16", 8.0, workers=4)
+    assert serial["bit_errors"] == parallel["bit_errors"]
+    assert serial["total_bits"] == parallel["total_bits"]
+
+
+@pytest.mark.skipif(not NATIVE_AVAILABLE, reason="native extension is not built")
+def test_native_hamming_qpsk_pipeline_runs_fused():
+    graph = sample_graph()
+    graph.nodes[0].params["length"] = 4096
+    graph.nodes[2].type = "qpsk_mod"
+    graph.nodes[2].label = "QPSK Modulator"
+    graph.nodes[4].type = "qpsk_demod"
+    graph.nodes[4].label = "QPSK Demodulator"
+    graph.nodes[3].params["snr_mode"] = "experiment"
+    result = run_simulation(graph, SimulationConfig(
+        mode="specific_steps",
+        max_frames=31,
+        min_frames=31,
+        snr_db_start=4,
+        workers=4,
+        chunk_size=8,
+        device="cpu",
+        engine="native",
+        seed=2026,
+    ))
+    assert result["execution"] == {
+        "backend": "cpp_onetbb",
+        "version": "0.2.0",
+        "modulation": "qpsk",
+        "coding": "hamming74",
+        "kernel": "fused_metric_only",
+    }
+    assert result["total_bits"] == 31 * 4096
+
+
+@pytest.mark.skipif(not NATIVE_AVAILABLE, reason="native extension is not built")
+def test_native_planner_rejects_extra_topology_edges():
+    graph = uncoded_modulation_graph("qpsk")
+    graph.edges.append(Edge(
+        id="extra-channel-input",
+        source="source",
+        target="channel",
+        source_handle="out",
+        target_handle="in",
+    ))
+    plan, reason = compile_native_plan(graph, SimulationConfig(engine="native", device="cpu"))
+    assert plan is None
+    assert "without extra edges" in str(reason)
+
+
 def test_forced_native_rejects_unsupported_graph():
     graph = Graph(
         nodes=[
@@ -654,7 +776,28 @@ def test_forced_native_rejects_unsupported_graph():
         run_simulation(graph, SimulationConfig(engine="native", device="cpu"))
 
 
+def test_auto_reports_why_graph_fell_back_to_python():
+    graph = Graph(
+        nodes=[
+            {"id": "source", "type": "bit_source", "label": "Bits", "params": {"length": 8}},
+            {"id": "sink", "type": "power_meter", "label": "Power", "params": {}},
+        ],
+        edges=[{"id": "edge", "source": "source", "target": "sink", "source_handle": "out", "target_handle": "in"}],
+    )
+    result = run_simulation(graph, SimulationConfig(
+        mode="specific_steps",
+        max_frames=1,
+        min_frames=1,
+        engine="auto",
+        device="cpu",
+    ))
+    assert result["engine"] == "python_numpy"
+    assert "supports exact AWGN/BER chains" in result["execution"]["fallback_reason"]
+
+
 def test_health_reports_native_capability():
     response = TestClient(app).get("/api/health")
     assert response.status_code == 200
-    assert "native" in response.json()
+    status = response.json()["native"]
+    assert status["version"] == "0.2.0"
+    assert "fused-qam16-awgn" in status["features"]

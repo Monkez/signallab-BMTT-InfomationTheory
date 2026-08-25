@@ -41,7 +41,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 ### V2 — Nghiên cứu
 
 - LDPC, Polar, Turbo; OFDM/MIMO; channel estimation.
-- Mở rộng typed native IR/fusion sang QPSK/QAM, Rayleigh và các metric phổ biến; đo trước khi thêm kernel mới.
+- Typed native plan/fusion đã hỗ trợ QPSK và 16-QAM/AWGN/BER; tiếp tục nghiên cứu Rayleigh có equalization rõ ràng và các metric phổ biến trước khi nhận topology mới.
 - Scheduler theo batch cho GPU, nhiều GPU và máy từ xa (ngoài phạm vi tối ưu single-machine hiện tại).
 - Cache trung gian, checkpoint job, plugin package có version.
 - Experiment matrix, artifact store, so sánh và xuất báo cáo.

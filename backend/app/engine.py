@@ -402,6 +402,7 @@ def run_simulation(
     validation = validate_graph(graph)
     if not validation.valid:
         raise ValueError("; ".join(validation.errors))
+    native_reason: str | None = None
     if config.engine != "python":
         native_result, native_reason = run_native_simulation(graph, config, progress, cancelled)
         if native_result is not None:
@@ -567,6 +568,10 @@ def run_simulation(
         "throughput_bps": bits / elapsed if elapsed else 0,
         "device": device,
         "engine": "python_multiprocessing" if pool is not None else "python_numpy",
+        "execution": {
+            "backend": "python_compatibility",
+            "fallback_reason": native_reason if config.engine == "auto" else None,
+        },
         "workers": workers,
         "cancelled": was_cancelled,
         "snr_points": point_results,

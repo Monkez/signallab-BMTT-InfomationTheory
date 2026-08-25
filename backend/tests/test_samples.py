@@ -15,7 +15,7 @@ def test_learning_sample_catalog_is_complete_and_executable():
     assert len(catalog) >= 9
     assert len(ids) == len(set(ids))
     assert {project["sample"]["category"] for project in catalog} == {
-        "Digital communications", "Information theory", "Python labs",
+        "Digital communications", "Analog communications", "Information theory", "Python labs",
     }
     assert sum(bool(project["sample"]["uses_python"]) for project in catalog) >= 2
 

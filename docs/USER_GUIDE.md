@@ -30,7 +30,7 @@ Nút **Open Samples** trên topbar mở thư viện bài học được đóng g
 
 Nhấn **Open this sample** để nạp graph cùng cấu hình Experiment đã hiệu chỉnh cho bài đó. Sample luôn được mở dưới dạng simulation **Unsaved**, không liên kết với file gốc; do đó có thể thay đổi tùy ý rồi dùng Save/`Ctrl+S` để chọn tên và vị trí lưu thành bài riêng. Nếu simulation hiện tại chưa lưu, app hỏi xác nhận trước khi thay thế.
 
-Catalog hiện có 12 bài:
+Catalog hiện có 14 bài, được chia nhóm có thể thu gọn/mở rộng:
 
 1. BPSK không mã hóa qua AWGN — đường BER chuẩn.
 2. Hamming (7,4) hệ thống qua AWGN — syndrome, sửa lỗi đơn và coding gain.
@@ -44,6 +44,10 @@ Catalog hiện có 12 bài:
 10. Mã chập (7,5), hard Viterbi và BPSK — trellis, coding rate, BER và EVM.
 11. QPSK qua Rician — K-factor, chuẩn hóa công suất, constellation, EVM và BER.
 12. 2-FSK trực giao qua AWGN — symbol trực giao và detector khoảng cách Euclid.
+13. AM envelope modulation/demodulation — Python Block, carrier recovery đơn giản và Spectrum Analyzer.
+14. FM frequency modulation/demodulation — discriminator theo sai phân pha, Spectrum Analyzer và Constellation.
+
+Trong cửa sổ thư viện, nhóm Digital communications và Analog communications mở sẵn; nhóm còn lại có thể mở khi cần. Search sẽ tự mở các nhóm có kết quả. Khi xem chi tiết sample, nút **Open this sample** nằm trong thanh chân dính ở cuối panel để luôn dễ chọn dù phần hướng dẫn dài.
 
 Hai bài Python minh họa đúng mô hình lập trình của SignalLab: người học chỉ viết `process(signal, params)` cho một frame; runtime tự xử lý worker và song song hóa Monte-Carlo. Mã nguồn nằm ngay trong Python Block để đọc, chạy và sửa.
 
@@ -93,7 +97,7 @@ Hai bài Python minh họa đúng mô hình lập trình của SignalLab: ngư�
 - Kết quả hiển thị tên executor thực tế như `native_cpp`, `python_numpy` hoặc `python_multiprocessing`. Native result ghi modulation/coding plan; compatibility result giải thích lý do Auto fallback và Python runtime ghi inline/process/batch. Có thể chạy `benchmark_python.bat` để đo custom block hoặc `benchmark_regression.bat` để chạy toàn bộ performance gate. Xem thêm [Python Block](python/PYTHON_BLOCK.md) và [Native CPU Engine](NATIVE_ENGINE.md).
 - Reference BER được lưu theo tên trong trình duyệt; khi Browse/load một đường có cùng tên, đường cũ được thay thế để legend không xuất hiện các curve trùng tên.
 - Trên biểu đồ BER, trục SNR tự chọn bước chia phù hợp với miền dữ liệu; trục BER log có mốc chính cho từng decade và tick phụ 2–9 để đọc giá trị chính xác hơn. Kích thước chữ/tỷ lệ nét được tối ưu riêng cho preview, Results và Details. Chọn **Copy** để copy ảnh PNG hoặc **PNG** để tải ảnh. Bảng **Results by SNR** hỗ trợ **Copy** (TSV), **CSV** và **PNG**, thuận tiện đưa vào báo cáo.
-- Thư viện có thêm Text/File/Image Source, Differential, Huffman, Shannon-Fano, RLE, ZIP/DEFLATE, Repetition-3, mã chập (7,5)/Viterbi, QPSK, **OOK, 2-FSK, 8-PSK Gray, 16-QAM Gray**, AWGN/Rayleigh/Rician, FIR Filter, DC Blocker, Normalize Power, Window Function, FFT/IFFT/FFT Shift, Signal Scope, Spectrum Analyzer, Spectrum Waterfall, Constellation, Power và EVM Meter. Spectrum/Waterfall dùng tần số chuẩn hóa `−0.5…+0.5 fₛ`; chọn Hann, Hamming, Blackman hoặc Rectangular và đặt FFT size `8…4096`. File Source cho phép chọn file trực tiếp trong panel Block; dữ liệu được lưu trong project dưới dạng base64 để chạy được cả desktop và dev server.
+- Thư viện có thêm Text/File/Image Source, Differential, Huffman, Shannon-Fano, RLE, ZIP/DEFLATE, Repetition-3, mã chập (7,5)/Viterbi, QPSK, **OOK, 2-FSK, 8-PSK Gray, 16-QAM Gray**, AWGN/Rayleigh/Rician, FIR Filter, DC Blocker, Normalize Power, Window Function, FFT/IFFT/FFT Shift, Signal Scope, Spectrum Analyzer, Spectrum Waterfall, Constellation, Power và EVM Meter. Spectrum/Waterfall dùng tần số chuẩn hóa `−0.5…+0.5 fₛ`; chọn Hann, Hamming, Blackman hoặc Rectangular và đặt FFT size `8…4096`. Sample QPSK/Rician mặc định dùng **flat fading theo frame** để BER giảm đúng theo SNR; nếu chọn fading biến thiên theo symbol (`flat=false`) mà chưa thêm equalizer, error floor ở SNR cao là hành vi vật lý dự kiến. File Source cho phép chọn file trực tiếp trong panel Block; dữ liệu được lưu trong project dưới dạng base64 để chạy được cả desktop và dev server.
 - Các codec nguồn kinh điển làm việc trên stream bit: Encoder có cổng `reference` để nối vào BER, Decoder dùng cùng tham số codebook/codec để khôi phục stream. Huffman và Shannon-Fano dùng nhóm symbol 2-bit với trọng số có thể chỉnh; RLE dùng cặp count/value; ZIP dùng DEFLATE chuẩn.
 
 ## Thực hành lý thuyết nguồn với text

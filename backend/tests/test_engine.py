@@ -658,6 +658,21 @@ def test_rician_channel_and_evm_sink_report_modulation_quality():
     assert benchmark["sink_metrics"]["evm_rms_percent"] > 0
 
 
+def test_rician_learning_sample_uses_flat_fading_for_high_snr_ber_curve():
+    import json
+    from pathlib import Path
+
+    catalog = json.loads((Path(__file__).parents[2] / "samples" / "catalog.json").read_text(encoding="utf-8"))
+    sample = next(item for item in catalog if item["sample"]["id"] == "qpsk-rician-evm")
+    channel = next(node for node in sample["graph"]["nodes"] if node["id"] == "ch")
+    assert channel["params"]["flat"] is True
+    result = run_simulation(
+        Graph.model_validate(sample["graph"]),
+        SimulationConfig(mode="ber_benchmark", snr_db_start=30, snr_db_stop=30, snr_db_step=1, max_frames=120, min_frames=120, min_errors=10**9, workers=1, engine="python", device="cpu", seed=2026),
+    )
+    assert result["snr_points"][0]["ber"] <= 1e-3
+
+
 @pytest.mark.parametrize(("block_type", "params"), [
     ("dc_blocker", {"alpha": 1.0}),
     ("fir_filter", {"taps": "0.5,nan"}),

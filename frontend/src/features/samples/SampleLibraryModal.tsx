@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowRight, Blocks, CheckCircle2, Clock3, Code2, GraduationCap, Search, X } from 'lucide-react'
+import { ArrowRight, Blocks, CheckCircle2, ChevronDown, ChevronRight, Clock3, Code2, GraduationCap, Search, X } from 'lucide-react'
 import { sampleCatalog, sampleCategories } from './catalog'
 import type { SampleProject } from './types'
 
@@ -14,6 +14,7 @@ export function SampleLibraryModal({ open, onClose, onOpenSample }: Props) {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<(typeof sampleCategories)[number]>('All')
   const [selectedId, setSelectedId] = useState(sampleCatalog[0]?.sample.id || '')
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set(sampleCategories.filter(item => item !== 'Digital communications' && item !== 'All')))
 
   const samples = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('vi')
@@ -26,10 +27,22 @@ export function SampleLibraryModal({ open, onClose, onOpenSample }: Props) {
   }, [category, query])
 
   const selected = samples.find(project => project.sample.id === selectedId) || samples[0]
+  const groupedSamples = useMemo(() => {
+    const groups = new Map<string, typeof samples>()
+    for (const project of samples) {
+      const group = project.sample.category
+      groups.set(group, [...(groups.get(group) || []), project])
+    }
+    return [...groups.entries()]
+  }, [samples])
 
   useEffect(() => {
     if (open && samples.length && !samples.some(project => project.sample.id === selectedId)) setSelectedId(samples[0].sample.id)
   }, [open, samples, selectedId])
+
+  useEffect(() => {
+    if (query.trim()) setCollapsedGroups(new Set())
+  }, [query])
 
   useEffect(() => {
     if (!open) return
@@ -62,14 +75,22 @@ export function SampleLibraryModal({ open, onClose, onOpenSample }: Props) {
         <div className="samples-body">
           <aside className="samples-list" aria-label="Available samples">
             <div className="samples-count">{samples.length} bài thực hành</div>
-            {samples.map(project => {
-              const item = project.sample
-              return <button key={item.id} className={`sample-card ${selected?.sample.id === item.id ? 'selected' : ''}`} onClick={() => setSelectedId(item.id)}>
-                <div className="sample-card-top"><span>{item.category}</span>{item.uses_python && <em><Code2 size={11} /> Python</em>}</div>
-                <strong>{item.title}</strong>
-                <small>{item.subtitle}</small>
-                <footer><span><GraduationCap size={12} />{item.level}</span><span><Clock3 size={12} />{item.duration_minutes} phút</span><span><Blocks size={12} />{project.graph.nodes.length} blocks</span></footer>
-              </button>
+            {groupedSamples.map(([group, projects]) => {
+              const collapsed = collapsedGroups.has(group) && !query.trim()
+              return <section className="sample-group" key={group}>
+                <button className="sample-group-toggle" onClick={() => setCollapsedGroups(current => { const next = new Set(current); if (next.has(group)) next.delete(group); else next.add(group); return next })} aria-expanded={!collapsed}>
+                  {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}<strong>{group}</strong><span>{projects.length}</span>
+                </button>
+                {!collapsed && projects.map(project => {
+                  const item = project.sample
+                  return <button key={item.id} className={`sample-card ${selected?.sample.id === item.id ? 'selected' : ''}`} onClick={() => setSelectedId(item.id)}>
+                    <div className="sample-card-top"><span>{item.category}</span>{item.uses_python && <em><Code2 size={11} /> Python</em>}</div>
+                    <strong>{item.title}</strong>
+                    <small>{item.subtitle}</small>
+                    <footer><span><GraduationCap size={12} />{item.level}</span><span><Clock3 size={12} />{item.duration_minutes} phút</span><span><Blocks size={12} />{project.graph.nodes.length} blocks</span></footer>
+                  </button>
+                })}
+              </section>
             })}
             {!samples.length && <div className="samples-empty"><Search size={22} /><strong>Không tìm thấy bài phù hợp</strong><span>Thử từ khóa hoặc nhóm nội dung khác.</span></div>}
           </aside>

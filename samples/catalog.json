@@ -2,6 +2,53 @@
   {
     "format": "signallab-simulation", "version": "1.0",
     "sample": {
+      "id": "am-envelope-modem", "title": "AM điều chế và giải điều chế bao tín hiệu", "subtitle": "AM-DSB-LC với synchronous detector và BER", "category": "Analog communications", "level": "Trung cấp", "duration_minutes": 35,
+      "summary": "Bit được ánh xạ thành message ±1, điều chế biên độ lên sóng mang rồi giải điều chế coherent bằng tích phân theo symbol. Đây là bài nối trực tiếp giữa điều chế tương tự và kiểm thử BER số.",
+      "concepts": ["AM", "Carrier", "Envelope", "Synchronous detection", "AWGN", "BER"], "uses_python": true,
+      "learning_objectives": ["Quan sát tác động của modulation index lên biên độ sóng AM", "Hiểu tích phân coherent theo carrier", "Đo BER sau giải điều chế qua AWGN"],
+      "instructions": ["Run once và xem Spectrum Analyzer của tín hiệu AM", "Đổi modulation index từ 0.8 xuống 0.3 rồi quan sát biên độ", "Tăng SNR Start và kiểm tra BER sau AM Demodulator", "Mở AM Modulator/AM Demodulator để đọc công thức Python"],
+      "expected_observations": ["Sóng mang xuất hiện quanh tần số carrier trong phổ", "BER giảm rõ khi SNR tăng; modulation index thấp làm khoảng cách hai mức nhỏ hơn."]
+    },
+    "graph": { "version": "1.0", "nodes": [
+      {"id":"src","type":"bit_source","label":"AM message bits","position":{"x":25,"y":130},"params":{"length":256,"seed":-1}},
+      {"id":"mod","type":"python","label":"AM Modulator","position":{"x":235,"y":130},"params":{"samples_per_symbol":16,"carrier_cycles":3,"modulation_index":0.8,"output_size":"any"},"code":"import numpy as np\n\ndef process(signal, params):\n    bits = np.asarray(signal).reshape(-1)\n    sps = int(params.get('samples_per_symbol', 16))\n    cycles = float(params.get('carrier_cycles', 3))\n    index = float(params.get('modulation_index', 0.8))\n    message = np.repeat(2.0 * bits - 1.0, sps)\n    t = np.arange(message.size)\n    carrier = np.cos(2.0 * np.pi * cycles * t / sps)\n    return (1.0 + index * message) * carrier\n"},
+      {"id":"ch","type":"awgn","label":"AM AWGN","position":{"x":470,"y":130},"params":{"ebn0_db":8,"snr_mode":"experiment","seed":-1}},
+      {"id":"demod","type":"python","label":"AM Demodulator","position":{"x":700,"y":130},"params":{"samples_per_symbol":16,"carrier_cycles":3,"output_size":"any"},"code":"import numpy as np\n\ndef process(signal, params):\n    samples = np.asarray(signal).reshape(-1)\n    sps = int(params.get('samples_per_symbol', 16))\n    cycles = float(params.get('carrier_cycles', 3))\n    usable = (samples.size // sps) * sps\n    t = np.arange(usable)\n    carrier = np.cos(2.0 * np.pi * cycles * t / sps)\n    metric = (2.0 * (samples[:usable] * carrier)).reshape(-1, sps).mean(axis=1)\n    return (metric >= 0.7).astype(np.int8)\n"},
+      {"id":"ber","type":"ber","label":"AM BER","position":{"x":700,"y":340},"port_orientation":"reversed"},
+      {"id":"spectrum","type":"spectrum_analyzer","label":"AM spectrum","position":{"x":470,"y":340},"params":{"fft_size":256,"window":"hann"}}
+    ], "edges": [
+      {"id":"e1","source":"src","target":"mod"},{"id":"e2","source":"mod","target":"ch"},{"id":"e3","source":"ch","target":"demod"},
+      {"id":"e4","source":"src","target":"ber","target_handle":"reference"},{"id":"e5","source":"demod","target":"ber","target_handle":"estimate"},{"id":"e6","source":"ch","target":"spectrum"}
+    ]},
+    "config": {"mode":"ber_benchmark","trials":80,"max_frames":80,"min_frames":20,"min_errors":100,"snr_db_start":0,"snr_db_stop":14,"snr_db_step":2,"workers":0,"seed":2026,"device":"cpu","engine":"python","chunk_size":8}
+  },
+  {
+    "format": "signallab-simulation", "version": "1.0",
+    "sample": {
+      "id": "fm-frequency-modem", "title": "FM điều chế và giải điều chế tần số", "subtitle": "FM baseband với discriminator và BER", "category": "Analog communications", "level": "Trung cấp", "duration_minutes": 40,
+      "summary": "Message nhị phân điều khiển độ dốc pha của sóng FM. Bộ discriminator đo pha vi phân từng mẫu, tích phân theo symbol rồi khôi phục bit sau AWGN.",
+      "concepts": ["FM", "Frequency deviation", "Phase discriminator", "Complex baseband", "AWGN", "BER"], "uses_python": true,
+      "learning_objectives": ["Liên hệ message amplitude với instantaneous frequency", "Hiểu discriminator dùng pha vi phân", "So sánh độ bền FM với AM ở cùng SNR"],
+      "instructions": ["Run once và mở Spectrum Analyzer để thấy năng lượng FM trải quanh carrier", "Đổi frequency deviation từ 0.22 xuống 0.08", "Tăng SNR Start rồi quan sát BER sau FM Demodulator", "Đọc hai Python Block để thay đổi discriminator hoặc thêm lọc"],
+      "expected_observations": ["Pha thay đổi nhanh hơn khi message = +1 và chậm/ngược khi message = -1", "BER giảm theo SNR nhưng phụ thuộc mạnh vào frequency deviation và samples/symbol."]
+    },
+    "graph": { "version": "1.0", "nodes": [
+      {"id":"src","type":"bit_source","label":"FM message bits","position":{"x":25,"y":130},"params":{"length":256,"seed":-1}},
+      {"id":"mod","type":"python","label":"FM Modulator","position":{"x":235,"y":130},"params":{"samples_per_symbol":16,"deviation":0.22,"output_size":"any"},"code":"import numpy as np\n\ndef process(signal, params):\n    bits = np.asarray(signal).reshape(-1)\n    sps = int(params.get('samples_per_symbol', 16))\n    deviation = float(params.get('deviation', 0.22))\n    message = np.repeat(2.0 * bits - 1.0, sps)\n    phase = np.cumsum(2.0 * np.pi * deviation * message / sps)\n    return np.exp(1j * phase)\n"},
+      {"id":"ch","type":"awgn","label":"FM AWGN","position":{"x":470,"y":130},"params":{"ebn0_db":8,"snr_mode":"experiment","seed":-1}},
+      {"id":"demod","type":"python","label":"FM Discriminator","position":{"x":700,"y":130},"params":{"samples_per_symbol":16,"output_size":"any"},"code":"import numpy as np\n\ndef process(signal, params):\n    samples = np.asarray(signal).reshape(-1)\n    sps = int(params.get('samples_per_symbol', 16))\n    usable = (samples.size // sps) * sps\n    samples = samples[:usable]\n    delta = np.angle(samples[1:] * np.conj(samples[:-1]))\n    delta = np.concatenate(([delta[0] if delta.size else 0.0], delta))\n    metric = delta.reshape(-1, sps).mean(axis=1)\n    return (metric >= 0).astype(np.int8)\n"},
+      {"id":"ber","type":"ber","label":"FM BER","position":{"x":700,"y":340},"port_orientation":"reversed"},
+      {"id":"spectrum","type":"spectrum_analyzer","label":"FM spectrum","position":{"x":470,"y":340},"params":{"fft_size":256,"window":"hann"}},
+      {"id":"const","type":"constellation","label":"FM phase","position":{"x":235,"y":340}}
+    ], "edges": [
+      {"id":"e1","source":"src","target":"mod"},{"id":"e2","source":"mod","target":"ch"},{"id":"e3","source":"ch","target":"demod"},
+      {"id":"e4","source":"src","target":"ber","target_handle":"reference"},{"id":"e5","source":"demod","target":"ber","target_handle":"estimate"},{"id":"e6","source":"ch","target":"spectrum"},{"id":"e7","source":"ch","target":"const"}
+    ]},
+    "config": {"mode":"ber_benchmark","trials":80,"max_frames":80,"min_frames":20,"min_errors":100,"snr_db_start":0,"snr_db_stop":14,"snr_db_step":2,"workers":0,"seed":2026,"device":"cpu","engine":"python","chunk_size":8}
+  },
+  {
+    "format": "signallab-simulation", "version": "1.0",
+    "sample": {
       "id": "bpsk-awgn-baseline", "title": "BPSK không mã hóa qua AWGN", "subtitle": "Đường chuẩn BER và ảnh hưởng của Eb/N0", "category": "Digital communications", "level": "Cơ bản", "duration_minutes": 20,
       "summary": "Bài mở đầu xây dựng tuyến truyền bit nhị phân dùng BPSK, kênh AWGN và quyết định cứng. Đây là đường chuẩn để so sánh với các hệ thống có mã kênh.",
       "concepts": ["BPSK", "AWGN", "Eb/N0", "BER", "Monte-Carlo"], "uses_python": false,
@@ -224,17 +271,17 @@
     "format": "signallab-simulation", "version": "1.0",
     "sample": {
       "id": "qpsk-rician-evm", "title": "QPSK qua Rician: BER, EVM và constellation", "subtitle": "Đánh giá tuyến có thành phần LOS bằng nhiều sink", "category": "Digital communications", "level": "Nâng cao", "duration_minutes": 45,
-      "summary": "QPSK được chuẩn hóa công suất trước khi đi qua kênh Rician có K-factor. Constellation, EVM, phổ và waterfall tạo bộ chỉ tiêu gần với quy trình đánh giá modem thực tế.",
+      "summary": "QPSK được chuẩn hóa công suất trước khi đi qua kênh Rician có K-factor. Sample dùng flat fading theo frame để bộ giải điều chế coherent giữ đúng xu hướng BER giảm theo SNR; Constellation, EVM, phổ và waterfall tạo bộ chỉ tiêu gần với quy trình đánh giá modem thực tế.",
       "concepts": ["Rician fading", "K-factor", "QPSK", "Power normalization", "EVM", "Constellation", "Spectrum", "Waterfall"], "uses_python": false,
       "learning_objectives": ["Phân biệt Rician với Rayleigh bằng thành phần LOS", "Đo EVM RMS theo symbol lý tưởng", "Quan sát đồng thời constellation, phổ, waterfall và BER"],
-      "instructions": ["Run once và xác nhận Normalize Power đưa công suất QPSK về 1.", "Chọn Rician Fading, đổi K-factor từ 12 dB xuống 0 dB.", "Quan sát Constellation, Spectrum Analyzer và Waterfall sau mỗi Run once.", "Run Benchmark rồi so sánh BER/EVM khi bật/tắt Flat fading."],
+      "instructions": ["Run once và xác nhận Normalize Power đưa công suất QPSK về 1.", "Chọn Rician Fading, đổi K-factor từ 12 dB xuống 0 dB.", "Quan sát Constellation, Spectrum Analyzer và Waterfall sau mỗi Run once.", "Run Benchmark rồi so sánh BER/EVM khi bật/tắt Flat fading; flat=false không có equalizer sẽ tạo error floor vật lý ở SNR rất cao."],
       "expected_observations": ["K-factor lớn tạo tuyến gần LOS và constellation tập trung hơn.", "EVM tăng khi fading/nhiễu mạnh hơn; BER hard-decision thường tăng theo."]
     },
     "graph": { "version": "1.0", "nodes": [
       {"id":"src","type":"bit_source","label":"QPSK bits","position":{"x":20,"y":90},"params":{"length":4096,"seed":-1}},
       {"id":"mod","type":"qpsk_mod","label":"QPSK mapper","position":{"x":220,"y":90}},
       {"id":"norm","type":"normalize_power","label":"Normalize Es","position":{"x":420,"y":90},"params":{"target_power":1}},
-      {"id":"ch","type":"rician","label":"Rician K=12 dB","position":{"x":620,"y":90},"params":{"k_factor_db":12,"flat":false,"ebn0_db":8,"snr_mode":"experiment","seed":-1}},
+      {"id":"ch","type":"rician","label":"Rician K=12 dB · flat","position":{"x":620,"y":90},"params":{"k_factor_db":12,"flat":true,"ebn0_db":8,"snr_mode":"experiment","seed":-1}},
       {"id":"demod","type":"qpsk_demod","label":"QPSK detector","position":{"x":820,"y":90}},
       {"id":"ber","type":"ber","label":"BER meter","position":{"x":820,"y":300},"port_orientation":"reversed"},
       {"id":"evm","type":"evm_meter","label":"RMS EVM","position":{"x":590,"y":330},"port_orientation":"reversed"},

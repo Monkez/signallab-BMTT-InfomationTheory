@@ -13,6 +13,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 - Job Monte-Carlo bất đồng bộ, seed tái lập, chạy tuần tự hoặc đa tiến trình.
 - Chế độ `auto`, `cpu`, `gpu`; tự phát hiện CuPy/CUDA và tự hạ cấp an toàn về CPU.
 - Dashboard tiến độ, BER, số lỗi bit, throughput, thời gian và cảnh báo.
+- Catalog sample theo nhóm có thể thu gọn, bổ sung pipeline AM/FM điều chế–giải điều chế bằng Python Block và giữ QPSK ở cả bài AWGN/Rician.
 - Quét SNR dB theo start/stop/step; mỗi điểm có giới hạn frame tối thiểu/tối đa và số lỗi tối thiểu.
 - AWGN tham chiếu SNR của Experiment hoặc giữ giá trị cố định; Sink BER hiển thị đồ thị BER theo SNR.
 - Canvas dùng toàn bộ vùng bên trái; thư viện block mở từ nút Add trên toolbar, có search và các nhóm thu gọn mặc định. Chỉ Properties inspector bên phải có thể ẩn/hiện và kéo đổi kích thước.

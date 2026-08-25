@@ -1,5 +1,12 @@
 # Trạng thái dự án
 
+## Cập nhật 2026-08-25 — sample modulation và thư viện nhóm
+
+- Catalog tăng lên 14 sample: thêm AM envelope modulation/demodulation và FM modulation/discriminator bằng Python Block; QPSK tiếp tục có các bài AWGN/Rician.
+- Sample Library Modal đã nhóm Digital communications, Analog communications, Information theory và Python labs bằng vùng thu gọn/mở rộng; tìm kiếm tự mở nhóm có kết quả. Nút Open this sample dùng footer sticky để luôn dễ thấy.
+- BER Results ở cửa sổ rộng dùng bố cục điều khiển gọn theo lưới, có fallback xếp dọc ở màn hình hẹp. QPSK/Rician sample dùng flat fading theo frame để đường BER giảm đúng ở SNR cao.
+- Regression mới kiểm tra BER QPSK/Rician tại 30 dB; cần chạy lại full backend, frontend build và build_app trước khi phát hành.
+
 - Mốc FFT/Spectrum UX 2026-08-25 đã hoàn tất: progress bubble thu thành một dòng percent/step/SNR nhỏ dưới Results, chỉ mount khi queued/running và tự biến mất khi hoàn tất; nút Results vẫn xanh để báo kết quả sẵn sàng.
 - Thư viện tăng 55 → 61 block với Window Function, FFT, IFFT, FFT Shift, Spectrum Analyzer và Waterfall Sink. Spectrum/Waterfall có Hann/Hamming/Blackman/Rectangular, FFT size 8…4096, preview tối đa 2.048 mẫu, đồ thị centered `−0.5…+0.5 fₛ`, metric peak/floor/frequency/time-slice và Details/reference như các sink khác. Sample QPSK/Rician được mở rộng thành 10 block/11 link để minh họa đồng thời constellation, spectrum và waterfall.
 - Xác minh cuối: toàn bộ backend/sample 107/107 pass, frontend production build và `build_app.bat` pass. Browser QA xác nhận 61 block, QPSK/Rician Run once hiển thị Spectrum + Waterfall, bubble nhỏ một dòng khi benchmark Python chạy và `bubbleCount=0` sau hoàn tất trong khi Results giữ class `completed`. Performance gate đạt native 17,95–29,18× Python một worker; Python Custom Block FFT batch-auto đạt 26,17 Msamples/s, nhanh 1,72× frame-serial. Frozen `SignalLab.exe`/`SignalLabCore.exe` responsive qua smoke test 8 giây và hai tiến trình thử đã được dừng có phạm vi.
@@ -142,3 +149,9 @@
 - Toolbar refinement 2026-08-21: bốn simulation actions được thu gọn thành icon button 38px; tooltip hiện khi hover/focus, mỗi nút giữ aria-label động cho trạng thái running và tiến độ benchmark dùng aria-live. Frontend production build pass; browser QA đo toolbar 189px, xác nhận tooltip hover/focus và không có console error. Release chuẩn đã build lại, 73/73 tests pass và smoke test 8 giây thành công tại `dist\SignalLab\SignalLab.exe`.
 - Workspace toolbar/library 2026-08-21: bỏ left sidebar, thêm Block Picker modal có search và 10 nhóm thu gọn mặc định. Toolbar icon 34px theo thứ tự `Add | Run once, Run Benchmark, Config | Results, Reset`; hai Run dùng Play, chỉ Benchmark nền xanh. Config và Results đã tách modal; Properties inspector là sidebar duy nhất. Frontend build pass; browser QA xác nhận thứ tự/size/icon, search AWGN, add block, modal độc lập và không có console error. Release chuẩn đã build lại, 73/73 backend tests pass; `SignalLab.exe` và `SignalLabCore.exe` responsive trong smoke test 8 giây.
 - BER scale/typography 2026-08-21: SNR dùng nice-step với major/minor ticks; BER log hiển thị từng decade, tick phụ 2–9 và grid phụ 2/5. Results dùng dashboard SVG 960px giới hạn 1200px, font tick 12, axis 14, legend 11.5 để không phóng đại theo modal; inspector vẫn dùng preview compact. Frontend build pass; browser QA trên BPSK benchmark xác nhận scale `1e0…1e-8`, SNR `-2…10`, 64 minor log ticks và không có console error. Backend 73/73 pass; do release chuẩn đang mở, bản mới đã build/smoke-test 8 giây tại `dist-update\SignalLab\SignalLab.exe`.
+# Cập nhật 2026-08-25 — sample modulation và thư viện nhóm
+
+- Catalog tăng lên 14 sample: thêm AM envelope modulation/demodulation và FM modulation/discriminator bằng Python Block; QPSK tiếp tục có các bài AWGN/Rician.
+- Sample Library Modal đã nhóm Digital communications, Analog communications, Information theory và Python labs bằng vùng thu gọn/mở rộng; tìm kiếm tự mở nhóm có kết quả. Nút Open this sample dùng footer sticky để luôn dễ thấy.
+- BER Results ở cửa sổ rộng dùng bố cục điều khiển gọn theo lưới, có fallback xếp dọc ở màn hình hẹp. QPSK/Rician sample dùng flat fading theo frame để đường BER giảm đúng ở SNR cao.
+- Regression mới kiểm tra BER QPSK/Rician tại 30 dB; cần chạy lại full backend, frontend build và build_app trước khi phát hành.

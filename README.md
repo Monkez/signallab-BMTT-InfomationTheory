@@ -11,7 +11,7 @@ At runtime they receive the current Experiment point through `params["snr_db"]` 
 
 The interface uses a high-contrast light layout with a bundled SignalLab logo and app icon. Numeric fields can be cleared naturally and accept scientific notation such as `1e6` or `1.52e3`. Monte-Carlo frame budgets no longer have a one-million-frame cap; a frame remains a user-visible graph boundary while the runtime batches tiny frames internally. The 61-block library includes PSK/QAM/OOK/2-FSK, convolutional/Viterbi coding, AWGN/Rayleigh/Rician channels, FIR/DC/power processing, FFT/IFFT/windowing, spectrum/waterfall analysis, BER/SER/EVM and custom Python processing.
 
-Use **Open Samples** on the top bar to browse 12 complete learning labs, including convolutional/Viterbi BPSK, QPSK/Rician/EVM and orthogonal 2-FSK systems. Every sample includes learning objectives, guided steps and expected observations before it is opened as an editable simulation.
+Use **Open Samples** on the top bar to browse 14 complete learning labs. The library is grouped into Digital communications, Analog communications, Information theory and Python labs; AM/FM modulation examples are editable Python-block pipelines, while QPSK is covered by both AWGN and Rician labs. Every sample includes learning objectives, guided steps and expected observations before it is opened as an editable simulation.
 
 ## Quick start (Windows desktop)
 

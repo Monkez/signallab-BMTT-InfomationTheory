@@ -47,7 +47,7 @@ Catalog hiện có 14 bài, được chia nhóm có thể thu gọn/mở rộng:
 13. AM envelope modulation/demodulation — Python Block, carrier recovery đơn giản và Spectrum Analyzer.
 14. FM frequency modulation/demodulation — discriminator theo sai phân pha, Spectrum Analyzer và Constellation.
 
-Trong cửa sổ thư viện, nhóm Digital communications và Analog communications mở sẵn; nhóm còn lại có thể mở khi cần. Search sẽ tự mở các nhóm có kết quả. Khi xem chi tiết sample, nút **Open this sample** nằm trong thanh chân dính ở cuối panel để luôn dễ chọn dù phần hướng dẫn dài.
+Trong cửa sổ thư viện, nhóm Digital communications và Analog communications mở sẵn; nhóm còn lại có thể mở khi cần. Search sẽ tự mở các nhóm có kết quả. Khi xem chi tiết sample, nút **Open this sample** nằm trong thanh chân dính ở cuối panel để luôn dễ chọn dù phần hướng dẫn dài. Block **Oscilloscope Sink** vẽ dạng sóng miền thời gian từ các mẫu đã capture; tín hiệu phức được vẽ hai nét I/Q, phù hợp để xem AM sau AWGN và FM complex-baseband.
 
 Hai bài Python minh họa đúng mô hình lập trình của SignalLab: người học chỉ viết `process(signal, params)` cho một frame; runtime tự xử lý worker và song song hóa Monte-Carlo. Mã nguồn nằm ngay trong Python Block để đọc, chạy và sửa.
 

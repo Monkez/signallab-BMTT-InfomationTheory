@@ -137,7 +137,7 @@ SPECS = [
     BlockSpec("qam16_demod", "16-QAM Demodulator", "Receivers", "Gray-coded hard-decision 16-QAM detector.", {}, ["in"], ["out"]),
     BlockSpec("fsk2_demod", "2-FSK Detector", "Receivers", "Nearest-symbol hard detector for the orthogonal 2-FSK mapper.", {}, ["in"], ["out"]),
     BlockSpec("hamming74_decode", "Hamming (7,4) Decoder", "Channel coding", "Decode systematic [data parity] words and correct one bit.", {}, ["in"], ["out"]),
-    BlockSpec("scope", "Signal Scope", "Sinks", "Summarize amplitude and power of a signal.", {}, ["in"], []),
+    BlockSpec("scope", "Oscilloscope Sink", "Sinks", "Display a time-domain waveform preview and summarize amplitude.", {}, ["in"], []),
     BlockSpec("constellation", "Constellation Sink", "Sinks", "Summarize I/Q samples for constellation inspection.", {}, ["in"], []),
     BlockSpec("power_meter", "Power Meter", "Sinks", "Measure mean signal power.", {}, ["in"], []),
     BlockSpec("spectrum_analyzer", "Spectrum Analyzer", "Sinks", "Display a centered magnitude spectrum in dB.", {"fft_size": 256, "window": "hann"}, ["in"], []),

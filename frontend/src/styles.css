@@ -532,6 +532,12 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .constellation-preview .constellation-tick { fill: #8a99ac; font-size: 7px; }
 .constellation-preview .constellation-label { fill: #687b93; font-size: 9px; font-weight: 600; }
 .constellation-preview circle { fill: #2d6be4; fill-opacity: .72; stroke: #fff; stroke-width: .8; }
+.waveform-preview { display: block; width: 100%; height: 112px; margin-top: 8px; overflow: visible; border: 1px solid #dce5f0; border-radius: 5px; background: #f8fafc; }
+.waveform-preview .waveform-grid line { stroke: #dce5f0; stroke-width: .7; stroke-dasharray: 2 2; }
+.waveform-preview .waveform-line { fill: none; stroke: #2563eb; stroke-width: 1.35; stroke-linejoin: round; stroke-linecap: round; }
+.waveform-preview .waveform-imaginary { stroke: #e8793f; stroke-dasharray: 3 2; }
+.waveform-preview text { fill: #8290a2; font: 7px Consolas, monospace; }
+.waveform-preview .waveform-legend { fill: #64748b; font-weight: 600; }
 .spectrum-card { grid-column: span 2; }
 .spectrum-preview, .waterfall-preview { display: block; width: 100%; height: 112px; margin-top: 8px; overflow: visible; border: 1px solid #dce5f0; border-radius: 5px; background: #081324; }
 .spectrum-preview text, .waterfall-preview text { fill: #91a5bf; font: 7px Consolas, monospace; }
@@ -556,6 +562,7 @@ input:disabled, select:disabled { background: #f2f4f7; color: #8792a0; cursor: n
 .sink-detail-title strong { font-size: 14px; }
 .sink-detail-title span { margin-left: auto; color: #8995a4; font-size: 10px; }
 .constellation-preview.large { height: min(430px, 55vh); margin: 20px 0; }
+.waveform-preview.large { height: min(460px, 58vh); margin: 20px 0; }
 .spectrum-preview.large, .waterfall-preview.large { height: min(460px, 58vh); margin: 20px 0; }
 .sink-detail-metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 24px 0; }
 .sink-detail-metric-grid div { padding: 14px; border: 1px solid #dbe3ed; border-radius: 7px; background: #f8fafc; }

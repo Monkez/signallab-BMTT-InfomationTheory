@@ -175,7 +175,7 @@ def _preview_limit(node_type: str) -> int:
     cloud look like only a few dots, so the constellation sink gets a bounded,
     plot-friendly sample without sending the full signal buffer to the browser.
     """
-    return 2048 if node_type in {"constellation", "spectrum_analyzer", "waterfall_sink"} else 8
+    return 2048 if node_type in {"scope", "constellation", "spectrum_analyzer", "waterfall_sink"} else 8
 
 
 def _capture_value(value: Any) -> np.ndarray:

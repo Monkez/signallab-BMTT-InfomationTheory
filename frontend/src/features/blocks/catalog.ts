@@ -56,7 +56,7 @@ export const fallbackSpecs: BlockSpec[] = [
   { type: 'qam16_demod', label: '16-QAM Demodulator', category: 'Receivers', description: 'Gray-coded I/Q threshold detector', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'fsk2_demod', label: '2-FSK Detector', category: 'Receivers', description: 'Nearest orthogonal-symbol decision', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
   { type: 'hamming74_decode', label: 'Hamming Decoder', category: 'Channel coding', description: 'Systematic decode · correct 1 bit', defaults: {}, inputs: ['in'], outputs: ['out'], gpu_compatible: true },
-  { type: 'scope', label: 'Signal Scope', category: 'Sinks', description: 'Amplitude and peak summary', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
+  { type: 'scope', label: 'Oscilloscope Sink', category: 'Sinks', description: 'Time-domain waveform with amplitude and peak summary', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
   { type: 'constellation', label: 'Constellation Sink', category: 'Sinks', description: 'I/Q sample summary', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
   { type: 'power_meter', label: 'Power Meter', category: 'Sinks', description: 'Mean signal power', defaults: {}, inputs: ['in'], outputs: [], gpu_compatible: true },
   { type: 'spectrum_analyzer', label: 'Spectrum Analyzer', category: 'Sinks', description: 'Centered FFT magnitude in dB', defaults: { fft_size: 256, window: 'hann' }, inputs: ['in'], outputs: [], gpu_compatible: true },

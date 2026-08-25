@@ -14,6 +14,18 @@ const readReferences = (nodeId: string): SinkReference[] => { try { const value 
 const saveReferences = (nodeId: string, references: SinkReference[]) => localStorage.setItem(referenceKey(nodeId), JSON.stringify(references))
 function complexValue(value: string): [number, number] | null { const text = value.trim().replaceAll(' ', '').replace(/j$/i, ''); const match = text.match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)([+-](?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)$/i); if (match) return [Number(match[1]), Number(match[2])]; const scalar = Number(text); return Number.isFinite(scalar) ? [scalar, 0] : null }
 
+export function WaveformPreview({ values, large = false, color = '#2563eb' }: { values: string[]; large?: boolean; color?: string }) {
+  const points = values.map(complexValue).filter((point): point is [number, number] => Boolean(point)).slice(0, 1024)
+  if (!points.length) return <div className="sink-visual-empty">No signal samples captured.</div>
+  const width = 310; const height = large ? 210 : 145; const left = 28; const right = width - 10; const top = 12; const bottom = height - 25
+  const extent = Math.max(1e-9, ...points.map(([real, imag]) => Math.abs(real) + Math.abs(imag)))
+  const x = (index: number) => left + index * (right - left) / Math.max(1, points.length - 1)
+  const y = (value: number) => top + (extent - value) * (bottom - top) / (2 * extent)
+  const path = (selector: (point: [number, number]) => number) => points.map((point, index) => `${index ? 'L' : 'M'}${x(index).toFixed(2)} ${y(selector(point)).toFixed(2)}`).join(' ')
+  const hasImaginary = points.some(([, imag]) => Math.abs(imag) > 1e-7)
+  return <svg className={`waveform-preview ${large ? 'large' : ''}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Oscilloscope time-domain waveform"><g className="waveform-grid"><line x1={left} y1={y(0)} x2={right} y2={y(0)} /><line x1={left} y1={top} x2={left} y2={bottom} />{[0, .25, .5, .75, 1].map(value => <line key={`v${value}`} x1={left + value * (right - left)} y1={top} x2={left + value * (right - left)} y2={bottom} />)}</g><path className="waveform-line" style={{ stroke: color }} d={path(([real]) => real)} />{hasImaginary && <path className="waveform-line waveform-imaginary" d={path(([, imag]) => imag)} />}<text x={left} y={height - 7}>0</text><text x={right} y={height - 7} textAnchor="end">samples</text><text x={left - 4} y={top + 4} textAnchor="end">+{extent.toFixed(1)}</text><text x={left - 4} y={y(0) + 3} textAnchor="end">0</text><text x={left - 4} y={bottom} textAnchor="end">−{extent.toFixed(1)}</text>{hasImaginary && <text className="waveform-legend" x={right - 2} y={top + 9} textAnchor="end">I / Q</text>}</svg>
+}
+
 export function ConstellationPreview({ values, large = false, color = '#2d6be4', xLimit, yLimit }: { values: string[]; large?: boolean; color?: string; xLimit?: number; yLimit?: number }) {
   const points = values.map(complexValue).filter((point): point is [number, number] => Boolean(point)).slice(0, 512)
   if (!points.length) return <div className="sink-visual-empty">No complex samples captured.</div>
@@ -80,7 +92,7 @@ export function SinkResults({ nodes, metrics, berPoints = [], berLive = false }:
   const cards = sinks.map(node => {
     const type = node.data.blockType as SinkKind; const preview = node.data.portPreviews?.inputs?.in; const Icon = iconFor(type); const detail = <button className="sink-detail-button" onClick={() => setDetailNodeId(node.id)}>Details</button>
     if (type === 'power_meter' && metrics.power_mean !== undefined) return <div className="sink-result-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>TX power</span></div><div className="sink-result-value">{metrics.power_mean.toExponential(4)}<small>mean power</small></div>{detail}</div>
-    if (type === 'scope' && metrics.scope_mean_amplitude !== undefined) return <div className="sink-result-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>Scope</span></div><div className="sink-result-stats"><b>{metrics.scope_mean_amplitude.toFixed(4)}<small>mean amplitude</small></b><b>{metrics.scope_peak_amplitude?.toFixed(4) ?? '—'}<small>peak</small></b></div>{detail}</div>
+    if (type === 'scope' && metrics.scope_mean_amplitude !== undefined) return <div className="sink-result-card scope-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>Oscilloscope</span></div><WaveformPreview values={preview?.sample || []} /><div className="sink-result-stats"><b>{metrics.scope_mean_amplitude.toFixed(4)}<small>mean amplitude</small></b><b>{metrics.scope_peak_amplitude?.toFixed(4) ?? '—'}<small>peak</small></b></div>{detail}</div>
     if (type === 'constellation' && metrics.constellation_mean_i !== undefined) return <div className="sink-result-card constellation-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>Constellation</span></div><ConstellationPreview values={preview?.sample || []} /><div className="sink-result-stats"><b>{metrics.constellation_mean_i.toFixed(3)}<small>mean I</small></b><b>{metrics.constellation_mean_q.toFixed(3)}<small>mean Q</small></b><b>{metrics.constellation_mean_power.toFixed(4)}<small>mean |x|</small></b></div>{detail}</div>
     if (type === 'source_analyzer' && metrics.source_entropy !== undefined) return <div className="sink-result-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>Source theory</span></div><div className="sink-result-stats"><b>{metrics.source_entropy.toFixed(4)}<small>H(X)</small></b><b>{metrics.source_efficiency_percent.toFixed(2)}%<small>efficiency</small></b></div>{detail}</div>
     if (type === 'ser' && metrics.ser !== undefined) return <div className="sink-result-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>Symbol error rate</span></div><div className="sink-result-value">{metrics.ser.toExponential(4)}<small>{metrics.symbol_errors} / {metrics.total_symbols} errors</small></div>{detail}</div>
@@ -93,6 +105,7 @@ export function SinkResults({ nodes, metrics, berPoints = [], berLive = false }:
 }
 
 function SinkChartContent({ kind, samples, color, xLimit, yLimit, metrics, fftSize }: { kind: SinkKind; samples: string[]; color: string; xLimit: number; yLimit: number; metrics: Record<string, number>; fftSize: number }) {
+  if (kind === 'scope') return <WaveformPreview values={samples} large color={color} />
   if (kind === 'constellation') return <ConstellationPreview values={samples} large color={color} xLimit={xLimit} yLimit={yLimit} />
   if (kind === 'spectrum_analyzer') return <SpectrumPreview values={samples} fftSize={fftSize} large />
   if (kind === 'waterfall_sink') return <WaterfallPreview values={samples} fftSize={fftSize} large />

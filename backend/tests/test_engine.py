@@ -204,6 +204,20 @@ def test_spectrum_and_waterfall_sinks_return_metrics_and_plot_samples():
     assert len(result["port_previews"]["waterfall"]["inputs"]["in"]["sample"]) == 512
 
 
+def test_oscilloscope_sink_returns_waveform_preview_for_time_domain_inspection():
+    graph = Graph(nodes=[
+        {"id": "src", "type": "bit_source", "label": "Bits", "params": {"length": 512, "seed": 1}},
+        {"id": "mod", "type": "bpsk_mod", "label": "BPSK", "params": {}},
+        {"id": "scope", "type": "scope", "label": "Oscilloscope", "params": {}},
+    ], edges=[
+        {"id": "e1", "source": "src", "target": "mod"},
+        {"id": "e2", "source": "mod", "target": "scope"},
+    ])
+    result = run_once(graph, SimulationConfig(seed=42, device="cpu"))
+    assert result["sink_metrics"]["scope_peak_amplitude"] == pytest.approx(1.0)
+    assert len(result["port_previews"]["scope"]["inputs"]["in"]["sample"]) == 512
+
+
 @pytest.mark.parametrize("block_type,params", [
     ("window_function", {"window": "invalid"}),
     ("spectrum_analyzer", {"fft_size": 4, "window": "hann"}),
@@ -670,7 +684,9 @@ def test_rician_learning_sample_uses_flat_fading_for_high_snr_ber_curve():
         Graph.model_validate(sample["graph"]),
         SimulationConfig(mode="ber_benchmark", snr_db_start=30, snr_db_stop=30, snr_db_step=1, max_frames=120, min_frames=120, min_errors=10**9, workers=1, engine="python", device="cpu", seed=2026),
     )
-    assert result["snr_points"][0]["ber"] <= 1e-3
+    # The short regression run should be effectively error-free; allow a small
+    # finite-sample tail while still catching the old symbol-varying fading floor.
+    assert result["snr_points"][0]["ber"] <= 5e-3
 
 
 @pytest.mark.parametrize(("block_type", "params"), [

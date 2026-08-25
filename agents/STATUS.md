@@ -6,6 +6,7 @@
 - Sample Library Modal đã nhóm Digital communications, Analog communications, Information theory và Python labs bằng vùng thu gọn/mở rộng; tìm kiếm tự mở nhóm có kết quả. Nút Open this sample dùng footer sticky để luôn dễ thấy.
 - BER Results ở cửa sổ rộng dùng bố cục điều khiển gọn theo lưới, có fallback xếp dọc ở màn hình hẹp. QPSK/Rician sample dùng flat fading theo frame để đường BER giảm đúng ở SNR cao.
 - Regression mới kiểm tra BER QPSK/Rician tại 30 dB; cần chạy lại full backend, frontend build và build_app trước khi phát hành.
+- Scope sink được hoàn thiện thành **Oscilloscope Sink**: engine giữ tối đa 2.048 mẫu cho sink, Results có waveform preview và Details có biểu đồ miền thời gian; AM/FM sample đều nối thêm sink này.
 
 - Mốc FFT/Spectrum UX 2026-08-25 đã hoàn tất: progress bubble thu thành một dòng percent/step/SNR nhỏ dưới Results, chỉ mount khi queued/running và tự biến mất khi hoàn tất; nút Results vẫn xanh để báo kết quả sẵn sàng.
 - Thư viện tăng 55 → 61 block với Window Function, FFT, IFFT, FFT Shift, Spectrum Analyzer và Waterfall Sink. Spectrum/Waterfall có Hann/Hamming/Blackman/Rectangular, FFT size 8…4096, preview tối đa 2.048 mẫu, đồ thị centered `−0.5…+0.5 fₛ`, metric peak/floor/frequency/time-slice và Details/reference như các sink khác. Sample QPSK/Rician được mở rộng thành 10 block/11 link để minh họa đồng thời constellation, spectrum và waterfall.

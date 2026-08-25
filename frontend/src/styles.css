@@ -268,7 +268,7 @@ button { color: inherit; border: 0; cursor: pointer; }
 .node-header { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; }
 .node-icon { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 5px; background: #eef2f6; color: #354255; }
 .node-type { margin: 7px 0 15px 33px; font-family: Consolas, monospace; text-transform: uppercase; font-size: 7px; letter-spacing: .06em; color: #8a95a3; }
-.port-label { position: absolute; font-family: Consolas, monospace; font-size: 7px; color: #7c8795; transform: translateY(-50%); }
+.port-label { position: absolute; top: calc(50% + var(--port-offset, 0px)); font-family: Consolas, monospace; font-size: 7px; color: #7c8795; transform: translateY(-50%); }
 .port-label:focus { outline: none; color: #1f57ba; }
 .port-label.input { left: 8px; padding-left: 1px; }
 .port-label.output { right: 8px; padding-right: 1px; }

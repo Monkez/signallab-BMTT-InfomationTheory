@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, type CSSProperties } from 'react'
 import { Handle, Position, useUpdateNodeInternals, type NodeProps } from '@xyflow/react'
 import { AlertTriangle, Binary, Braces, Radio, Waves, Gauge, Box } from 'lucide-react'
 import type { FlowNode, PortPreview } from './types'
@@ -29,12 +29,13 @@ export function SignalNode({ id, data, selected }: NodeProps<FlowNode>) {
   const inputPosition = reversed ? Position.Right : Position.Left
   const outputPosition = reversed ? Position.Left : Position.Right
   const updateNodeInternals = useUpdateNodeInternals()
+  const portStyle = (index: number, count: number): CSSProperties => ({ '--port-offset': `${(index - (count - 1) / 2) * 22}px` } as CSSProperties)
 
   useEffect(() => {
     // Handle positions are dynamic. React Flow needs an explicit measurement
     // refresh so existing edges follow the new side immediately.
     updateNodeInternals(id)
-  }, [id, reversed, updateNodeInternals])
+  }, [id, reversed, data.inputs.length, data.outputs.length, updateNodeInternals])
 
   return (
     <div className={`signal-node ${selected ? 'selected' : ''} ${reversed ? 'ports-reversed' : ''} ${data.runtimeError ? 'invalid' : ''}`} aria-invalid={Boolean(data.runtimeError)}>
@@ -45,14 +46,14 @@ export function SignalNode({ id, data, selected }: NodeProps<FlowNode>) {
       {data.inputs.map((port, index) => {
         const preview = data.portPreviews?.inputs[port]
         const hasData = Boolean(preview && preview.size > 0)
-        return <div className={`port-label input ${hasData ? 'has-data' : ''}`} key={port} style={{ top: 52 + index * 22 }} tabIndex={0}>
+        return <div className={`port-label input ${hasData ? 'has-data' : ''}`} key={port} style={portStyle(index, data.inputs.length)} tabIndex={0}>
           <Handle className={hasData ? 'has-data' : ''} type="target" position={inputPosition} id={port} aria-label={`Input ${port}${hasData ? ' has data' : ' is empty'}`} />{port}<PortTooltip direction="Input" port={port} preview={preview} />
         </div>
       })}
       {data.outputs.map((port, index) => {
         const preview = data.portPreviews?.outputs[port]
         const hasData = Boolean(preview && preview.size > 0)
-        return <div className={`port-label output ${hasData ? 'has-data' : ''}`} key={port} style={{ top: 52 + index * 22 }} tabIndex={0}>
+        return <div className={`port-label output ${hasData ? 'has-data' : ''}`} key={port} style={portStyle(index, data.outputs.length)} tabIndex={0}>
           {port}<Handle className={hasData ? 'has-data' : ''} type="source" position={outputPosition} id={port} aria-label={`Output ${port}${hasData ? ' has data' : ' is empty'}`} /><PortTooltip direction="Output" port={port} preview={preview} />
         </div>
       })}

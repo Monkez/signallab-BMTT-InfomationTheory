@@ -192,3 +192,5 @@ The selected SNR is exposed to channels and Python Blocks as `params["snr_db"]`.
 ### BER Results layout
 
 The BER chart keeps the curve selector and editing controls in one compact toolbar. On wide windows the selector has a bounded width, while the name, color, line style, Save and Browse actions share the remaining space. On narrow windows the toolbar stacks automatically so controls remain usable without horizontal scrolling.
+
+Block ports are centered independently on each side of a block. A single input therefore stays centered on the left edge, while multiple outputs are distributed evenly around the vertical center on the right edge, even when a block title wraps to multiple lines.

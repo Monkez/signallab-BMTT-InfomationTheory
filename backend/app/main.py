@@ -8,6 +8,7 @@ from .contracts import BlockExecutionError
 from .engine import gpu_status, run_once, validate_graph
 from .jobs import manager
 from .models import Graph, SimulationRequest
+from .native_engine import native_status
 from .snapshots import store as snapshot_store
 
 app = FastAPI(title="SignalLab API", version="0.1.0")
@@ -22,7 +23,7 @@ app.add_middleware(
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "gpu": gpu_status()}
+    return {"status": "ok", "gpu": gpu_status(), "native": native_status()}
 
 
 @app.get("/api/blocks")

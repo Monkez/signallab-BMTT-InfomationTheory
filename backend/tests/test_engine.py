@@ -10,9 +10,13 @@ from backend.app.contracts import validate_inputs, validate_outputs, validate_pa
 from backend.app.engine import execute_trial, run_once, run_simulation, validate_graph
 from backend.app.models import Edge, Graph, SimulationConfig
 from backend.app.main import app
+from backend.app.native_engine import native_status
 from backend.app.variables import VariableDefinitionError, parse_variable_definitions
 from backend.app.python_ports import PythonPortDefinitionError, parse_python_ports
 import numpy as np
+
+
+NATIVE_AVAILABLE = bool(native_status().get("available"))
 
 
 def sample_graph():
@@ -54,6 +58,7 @@ def test_simulation_is_reproducible():
         seed=123,
         chunk_size=2,
         device="cpu",
+        engine="python",
     )
     updates = []
     first = run_simulation(graph, config, progress=updates.append)
@@ -545,3 +550,111 @@ def test_symbol_model_contract_rejects_mismatched_probabilities():
 def test_symbol_huffman_codebook_is_deterministic_for_equal_weights():
     assert _stable_huffman_codes([0.5, 0.25, 0.125, 0.125]) == {0: "0", 1: "10", 2: "110", 3: "111"}
     assert _stable_huffman_codes([0.4, 0.3, 0.2, 0.1]) == {0: "0", 1: "10", 3: "110", 2: "111"}
+
+
+@pytest.mark.skipif(not NATIVE_AVAILABLE, reason="native extension is not built")
+def test_native_hamming_bpsk_is_deterministic_across_worker_counts():
+    graph = sample_graph()
+    graph.nodes[0].params["length"] = 4096
+    graph.nodes[3].params["snr_mode"] = "experiment"
+    common = dict(
+        mode="specific_steps",
+        max_frames=64,
+        min_frames=64,
+        snr_db_start=2,
+        chunk_size=8,
+        device="cpu",
+        engine="native",
+        seed=2026,
+    )
+    serial = run_simulation(graph, SimulationConfig(**common, workers=1))
+    parallel = run_simulation(graph, SimulationConfig(**common, workers=4))
+    assert serial["engine"] == parallel["engine"] == "native_cpp"
+    assert serial["bit_errors"] == parallel["bit_errors"]
+    assert serial["total_bits"] == parallel["total_bits"] == 64 * 4096
+    assert serial["port_previews"]["0"]["outputs"]["out"]["size"] == 4096
+
+
+@pytest.mark.skipif(not NATIVE_AVAILABLE, reason="native extension is not built")
+def test_native_bpsk_ber_improves_with_snr():
+    graph = sample_graph()
+    graph.nodes[0].params["length"] = 4096
+    graph.nodes[3].params["snr_mode"] = "experiment"
+    config = SimulationConfig(
+        mode="ber_benchmark",
+        max_frames=100,
+        min_frames=100,
+        min_errors=1_000_000,
+        snr_db_start=0,
+        snr_db_stop=6,
+        snr_db_step=6,
+        workers=4,
+        chunk_size=10,
+        device="cpu",
+        engine="native",
+        seed=2026,
+    )
+    result = run_simulation(graph, config)
+    assert result["snr_points"][0]["ber"] > result["snr_points"][1]["ber"]
+
+
+@pytest.mark.skipif(not NATIVE_AVAILABLE, reason="native extension is not built")
+def test_native_early_stop_honors_minimum_frames():
+    graph = sample_graph()
+    graph.nodes[0].params["length"] = 4096
+    graph.nodes[3].params["snr_mode"] = "experiment"
+    result = run_simulation(graph, SimulationConfig(
+        mode="ber_benchmark",
+        max_frames=100,
+        min_frames=10,
+        min_errors=0,
+        snr_db_start=2,
+        snr_db_stop=2,
+        workers=4,
+        chunk_size=10,
+        device="cpu",
+        engine="native",
+    ))
+    assert result["snr_points"][0]["frames"] == 10
+
+
+@pytest.mark.skipif(not NATIVE_AVAILABLE, reason="native extension is not built")
+def test_native_repetition3_pipeline_runs_fused():
+    graph = sample_graph()
+    graph.nodes[0].params["length"] = 401
+    graph.nodes[1].type = "repetition3_encode"
+    graph.nodes[1].label = "Repetition-3 Encoder"
+    graph.nodes[5].type = "repetition3_decode"
+    graph.nodes[5].label = "Repetition-3 Decoder"
+    graph.nodes[3].params["snr_mode"] = "experiment"
+    result = run_simulation(graph, SimulationConfig(
+        mode="specific_steps",
+        max_frames=17,
+        min_frames=17,
+        snr_db_start=2,
+        workers=4,
+        chunk_size=5,
+        device="cpu",
+        engine="native",
+        seed=2026,
+    ))
+    assert result["engine"] == "native_cpp"
+    assert result["total_bits"] == 17 * 401
+
+
+def test_forced_native_rejects_unsupported_graph():
+    graph = Graph(
+        nodes=[
+            {"id": "source", "type": "bit_source", "label": "Bits", "params": {"length": 8}},
+            {"id": "sink", "type": "power_meter", "label": "Power", "params": {}},
+        ],
+        edges=[{"id": "edge", "source": "source", "target": "sink", "source_handle": "out", "target_handle": "in"}],
+    )
+    with pytest.raises(ValueError, match="Native execution is unavailable"):
+        run_simulation(graph, SimulationConfig(engine="native", device="cpu"))
+
+
+def test_health_reports_native_capability():
+    response = TestClient(app).get("/api/health")
+    assert response.status_code == 200
+    assert "native" in response.json()

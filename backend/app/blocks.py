@@ -7,6 +7,7 @@ import inspect
 import secrets
 import traceback
 import zlib
+from functools import lru_cache
 from io import BytesIO
 from types import SimpleNamespace
 from typing import Any, Callable
@@ -549,6 +550,11 @@ def variables_block(inputs, params, context):
     return {}
 
 
+@lru_cache(maxsize=128)
+def _compile_python_block(code: str):
+    return compile(code, "<python-block>", "exec")
+
+
 def python_block(inputs, params, context, code):
     if not code:
         return {"out": inputs.get("in")}
@@ -565,7 +571,7 @@ def python_block(inputs, params, context, code):
         "__builtins__": __builtins__,
     }
     try:
-        exec(compile(code, "<python-block>", "exec"), namespace, namespace)
+        exec(_compile_python_block(code), namespace, namespace)
     except Exception as exc:
         raise ValueError(_python_process_error(exc, code, {}, ports.inputs)) from exc
     process = namespace.get("process")

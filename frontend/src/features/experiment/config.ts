@@ -13,6 +13,7 @@ export const defaultSimulationConfig: SimulationConfig = {
   workers: 0,
   seed: 2026,
   device: 'auto',
+  engine: 'auto',
   chunk_size: 10,
 }
 
@@ -23,6 +24,7 @@ export function snrPointCount(config: SimulationConfig) {
 
 export function validateSimulationConfig(config: SimulationConfig) {
   if (!['specific_steps', 'ber_benchmark'].includes(config.mode)) return 'Choose a valid experiment mode.'
+  if (!['auto', 'native', 'python'].includes(config.engine)) return 'Choose a valid execution engine.'
   // Specific steps intentionally do not use an SNR sweep. Do not validate
   // hidden start/stop/step fields here: a saved simulation may leave them
   // empty or stale, and they must not prevent a fixed-step run.

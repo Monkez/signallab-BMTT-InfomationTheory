@@ -2,6 +2,8 @@
 
 SignalLab is a local, visual digital-communications simulator inspired by Simulink and GNU Radio. Build a block graph in the browser, edit simple Python blocks, and run reproducible Monte-Carlo experiments on CPU or a compatible GPU.
 
+For supported BER pipelines, the Auto executor uses a fused C++20/oneTBB engine with counter-based Philox random streams, while arbitrary graphs continue to run through the Python/NumPy compatibility engine. See [Native CPU Engine](docs/NATIVE_ENGINE.md) and run `benchmark.bat` for a local comparison.
+
 Python Blocks include a CodeMirror-based IDE editor with Python syntax highlighting, line numbers, bracket matching and a large draft-based editing window.
 At runtime they receive the current Experiment point through `params["snr_db"]` and related keys. A port-free Variables block declares safe typed globals shared by every Python Block without coupling user code to the parallel scheduler.
 

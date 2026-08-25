@@ -19,6 +19,7 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 - Console dock phía dưới ghi lại trạng thái job, cảnh báo và lỗi để debug mô phỏng ngay trong app.
 - Dashboard realtime cập nhật BER theo SNR khi simulation đang chạy; biểu đồ và bảng có thao tác copy/export PNG, TSV và CSV.
 - Engine tối ưu graph lookup, seed theo batch và tái sử dụng process pool; auto mode tránh multiprocessing cho workload nhỏ để giảm độ trễ.
+- Native Batch Executor C++20/oneTBB fuse các chuỗi BER BPSK/AWGN phổ biến, dùng Philox tái lập độc lập số thread; Auto planner fallback về engine Python cho graph chưa hỗ trợ.
 - Python Block dùng API đơn giản `process(signal, params) -> array`; scheduler đảm nhiệm song song hóa các frame, không bắt người dùng viết mã multiprocessing/GPU.
 - Python Block đọc trực tiếp SNR/trial/seed/device của frame hiện tại qua `params`; khối Variables không cổng khai báo literal toàn cục một lần cho mọi Python Block.
 - Package `signallab` trên NumPy/SciPy cung cấp API nhất quán cho nguồn, tín hiệu, lọc, điều chế, kênh, mã và metric; NumPy/SciPy trực tiếp vẫn được hỗ trợ.
@@ -40,7 +41,8 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 ### V2 — Nghiên cứu
 
 - LDPC, Polar, Turbo; OFDM/MIMO; channel estimation.
-- Scheduler theo batch cho GPU, nhiều GPU và máy từ xa.
+- Mở rộng typed native IR/fusion sang QPSK/QAM, Rayleigh và các metric phổ biến; đo trước khi thêm kernel mới.
+- Scheduler theo batch cho GPU, nhiều GPU và máy từ xa (ngoài phạm vi tối ưu single-machine hiện tại).
 - Cache trung gian, checkpoint job, plugin package có version.
 - Experiment matrix, artifact store, so sánh và xuất báo cáo.
 
@@ -63,3 +65,4 @@ SignalLab giúp sinh viên và nhà nghiên cứu xây dựng chuỗi thông tin
 - Python tùy biến là mã tin cậy trong bản local; triển khai nhiều người dùng phải cô lập tiến trình/container.
 - Không phải thuật toán NumPy nào cũng tự chạy GPU. Quy ước `context.xp` giúp code portable; khối không tương thích sẽ chạy CPU.
 - Overhead đa tiến trình có thể lớn với trial quá nhỏ; chế độ `auto` chỉ bật song song khi đủ workload.
+- Native executor chỉ nhận topology được planner chứng minh tương thích; Python Block và graph tổng quát luôn có đường chạy compatibility chính xác.

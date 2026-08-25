@@ -1,5 +1,6 @@
 import type { BlockSpec, FlowEdge, FlowNode, SimulationConfig } from '../../types'
 import { parsePythonPorts } from '../pythonEditor/ports'
+import { defaultSimulationConfig } from '../experiment/config'
 
 export type SampleCategory = 'Digital communications' | 'Information theory' | 'Python labs'
 
@@ -72,5 +73,5 @@ export function materializeSample(sample: SampleProject, specs: BlockSpec[]) {
     sourceHandle: edge.source_handle || 'out',
     targetHandle: edge.target_handle || 'in',
   }))
-  return { nodes, edges, config: { ...sample.config } }
+  return { nodes, edges, config: { ...defaultSimulationConfig, ...sample.config } }
 }

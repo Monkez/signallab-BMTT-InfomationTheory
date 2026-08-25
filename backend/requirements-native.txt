@@ -1,0 +1,6 @@
+cmake==4.1.0
+ninja==1.13.0
+pybind11==3.0.1
+scikit-build-core==0.11.6
+tbb==2022.3.0
+tbb-devel==2022.3.0

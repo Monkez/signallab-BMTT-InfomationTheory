@@ -4,6 +4,9 @@ cd /d "%~dp0"
 if not exist ".venv\Scripts\python.exe" call setup.bat
 if errorlevel 1 exit /b 1
 
+call build_native.bat
+if errorlevel 1 exit /b 1
+
 echo [SignalLab] Installing desktop packager...
 ".venv\Scripts\python.exe" -m pip install -r backend\requirements-desktop.txt
 if errorlevel 1 goto :error

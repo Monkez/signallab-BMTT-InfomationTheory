@@ -11,6 +11,10 @@ if errorlevel 1 goto :error
 echo [SignalLab] Installing frontend packages...
 call npm --prefix frontend install
 if errorlevel 1 goto :error
+if /I "%~1"=="--skip-native" goto :complete
+call build_native.bat
+if errorlevel 1 goto :error
+:complete
 echo.
 echo Setup complete. Run run.bat to start SignalLab.
 exit /b 0
@@ -18,4 +22,3 @@ exit /b 0
 echo.
 echo Setup failed. Review the message above.
 exit /b 1
-

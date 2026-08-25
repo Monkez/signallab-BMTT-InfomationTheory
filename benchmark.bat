@@ -3,8 +3,6 @@ setlocal
 cd /d "%~dp0"
 if not exist ".venv\Scripts\python.exe" call setup.bat
 if errorlevel 1 exit /b 1
-call build_native.bat
+if not exist "backend\app\_native_core*.pyd" call build_native.bat
 if errorlevel 1 exit /b 1
-".venv\Scripts\python.exe" -m pytest backend\tests
-if errorlevel 1 exit /b 1
-call npm --prefix frontend run build
+".venv\Scripts\python.exe" -m tools.benchmark_native %*

@@ -14,8 +14,9 @@ FastAPI job service
   ├─ schema validation + DAG compiler
   ├─ job registry + cancellation
   └─ Monte-Carlo scheduler
-       ├─ local process workers (NumPy)
-       └─ optional GPU worker (CuPy)
+       ├─ fused native CPU executor (C++20 + oneTBB)
+       ├─ compatibility process workers (NumPy)
+       └─ optional compatibility GPU worker (CuPy/CUDA)
              │
        block runtime + metric reducer
 ```
@@ -77,6 +78,8 @@ Launcher tạo một NativeSplash Tk tối giản trước khi import FastAPI/Nu
 
 Mỗi node nhận `inputs`, `params`, `context` và trả về dictionary các output. Graph được topological-sort một lần. Mỗi trial có seed sinh từ `SeedSequence`, vì vậy lịch worker thay đổi không làm mất khả năng tái lập khi các block ngẫu nhiên dùng seed cố định. Metric của sink được giảm theo phép cộng; BER cuối cùng là tổng bit lỗi chia tổng bit đã so sánh, không phải trung bình BER từng trial.
 
+Benchmark có hai executor. Trace Executor Python giữ ngữ nghĩa block tổng quát và tạo snapshot đầy đủ cho Run once/preview. Native Batch Executor nhận một plan đã kiểm tra topology, fuse toàn bộ chuỗi nguồn → mã hóa → BPSK/AWGN → giải mã → BER trong C++20, không tạo mảng trung gian cho từng frame và dùng oneTBB để chia trial trên các core. `Execution engine = Auto` chọn native chỉ khi toàn bộ graph khớp fast path; nếu không, graph chạy bằng Python/NumPy/CuPy. `Native` cưỡng bức fast path và báo lỗi rõ thay vì âm thầm fallback. Danh sách topology và quy tắc tái lập nằm trong [NATIVE_ENGINE.md](NATIVE_ENGINE.md).
+
 `variables.py` parse khối cấu hình Variables bằng `ast.parse` + `ast.literal_eval`, chỉ chấp nhận một phép gán literal trên mỗi statement. Graph chỉ được có một Variables block. Engine compile dictionary global một lần trước Run once/Benchmark rồi truyền vào context serializable cho mọi worker. `python_block` tạo params theo precedence `globals < block params < runtime`, đồng thời cung cấp namespace `params["variables"]` và `params["experiment"]`; nhờ đó SNR step, trial, seed và device không thể bị global ghi đè.
 
 Python Block mặc định giữ contract `in/out`. Nếu code có `PORTS` literal, `python_ports.py` parse tên input/output ở backend; frontend dùng parser nhẹ tương ứng để cập nhật handles và lọc edge cũ. Engine dùng port map động khi kiểm tra cạnh, missing input và declared output; không cần thay đổi `BlockSpec` catalog cho từng số cổng.
@@ -89,9 +92,10 @@ Job **Run Benchmark** vẫn chạy Monte-Carlo bất đồng bộ qua polling. K
 
 ## Song song CPU/GPU
 
-- CPU: trial độc lập được chia thành chunk và chạy bằng `ProcessPoolExecutor`. `workers=0` nghĩa là tự chọn.
-- GPU: runtime thử nạp CuPy và kiểm tra device. Các khối built-in dùng namespace mảng `context.xp`. Bản MVP dùng một GPU worker theo batch nhỏ để tránh nhiều process tranh cùng device.
-- Auto: ưu tiên GPU khi khả dụng và graph tương thích, ngược lại dùng CPU; workload nhỏ chạy inline để tránh overhead.
+- Native CPU: C++20/oneTBB chia dải counter RNG giữa thread, giữ kết quả bit-exact khi đổi số worker. Philox sinh số ngẫu nhiên theo counter nên không cần khóa hoặc state chung. Scheduler chỉ cho một benchmark nặng chiếm máy tại một thời điểm để tránh các job tự oversubscribe lẫn nhau.
+- Compatibility CPU: trial tổng quát được chia chunk qua `ProcessPoolExecutor`. `workers=0` chỉ bật đa tiến trình tự động khi frame và tổng workload đủ lớn; workload nhỏ chạy inline để tránh overhead IPC.
+- Compatibility GPU: runtime thử nạp CuPy/CUDA và kiểm tra device; các built-in dùng namespace mảng `context.xp`. Đây không phải lựa chọn mặc định trên máy Intel Arc.
+- Auto: planner thử native CPU trước cho topology được hỗ trợ, sau đó mới dùng backend tương thích theo lựa chọn device.
 
 Các built-in OOK, 8-PSK Gray và 16-QAM Gray dùng phép toán tương thích namespace NumPy/CuPy. Contract tập trung buộc input 8-PSK chia hết cho 3, 16-QAM chia hết cho 4 và khóa tỷ lệ bit/symbol ở cả modulator/demodulator. Package `signallab.modulation` cung cấp cùng ánh xạ để Python Block và built-in cho kết quả nhất quán.
 
@@ -132,7 +136,8 @@ Console dock là lớp hiển thị phía frontend, nhận sự kiện khi nạp
 
 - Biểu đồ BER có thể copy trực tiếp ảnh PNG vào clipboard hoặc tải xuống; bảng kết quả theo SNR có thể copy dạng TSV, tải CSV hoặc PNG.
 - Graph được biên dịch thành `node_map`, danh sách cạnh vào và thứ tự thực thi một lần trước sweep. Seed được sinh theo từng batch thay vì cấp phát toàn bộ số frame từ đầu.
-- CPU dùng một `ProcessPoolExecutor` dùng lại cho toàn bộ sweep; chế độ tự động chạy inline với workload nhỏ và giới hạn số worker hợp lý để tránh overhead tạo process lớn hơn thời gian tính toán. Người dùng vẫn có thể đặt `Workers` thủ công khi benchmark hệ thống cụ thể.
+- Mã của Python Block được compile và giữ trong LRU cache theo nội dung; mỗi frame vẫn tạo namespace riêng để không rò state giữa các trial.
+- Fast path native fuse BPSK/AWGN/hard decision/BER và Hamming hoặc Repetition tùy graph; compatibility CPU dùng một `ProcessPoolExecutor` dùng lại cho toàn bộ sweep. Người dùng vẫn có thể đặt `Workers` thủ công khi benchmark hệ thống cụ thể.
 
 ## Quy trình mở rộng
 

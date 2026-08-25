@@ -34,6 +34,7 @@ export type PortPreviewMap = Record<string, NodePortPreviews>
 
 export type RunOnceResult = {
   device: string
+  engine: string
   snr_db: number | null
   elapsed_seconds: number
   metrics: Record<string, number>
@@ -84,6 +85,7 @@ export type SimulationConfig = {
   workers: number
   seed: number
   device: 'auto' | 'cpu' | 'gpu'
+  engine: 'auto' | 'native' | 'python'
   chunk_size: number
 }
 
@@ -98,6 +100,7 @@ export type Job = {
   error_block_label?: string
   node_errors?: Record<string, string[]>
   device?: string
+  engine?: string
   workers?: number
   snr_db?: number | null
   snr_index?: number
@@ -116,6 +119,7 @@ export type Job = {
     elapsed_seconds: number
     throughput_bps: number
     device: string
+    engine: string
     workers: number
     warnings: string[]
     sink_metrics: Record<string, number>

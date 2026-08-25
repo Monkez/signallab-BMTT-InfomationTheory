@@ -1,5 +1,13 @@
 # Trạng thái dự án
 
+- Ngày cập nhật: 2026-08-25
+- Mốc hiện tại: Native Batch Executor C++20/oneTBB đã tích hợp vào Auto planner cho BPSK/AWGN/BER không mã hóa, Hamming (7,4) và Repetition-3; graph tổng quát fallback về Python/NumPy/CuPy.
+- Tối ưu: kernel fuse không materialize tín hiệu trung gian, Philox tái lập độc lập số thread, early-stop theo tile và semaphore chống hai benchmark nặng oversubscribe cùng máy. Heuristic Python Auto tránh process pool cho workload nhỏ.
+- Giao diện/script: Experiment chọn Auto/Native/Python, kết quả ghi executor thực tế; có `build_native.bat`, `benchmark.bat`, và setup/build/test tự build extension native.
+- Xác minh cuối mốc: `build_app.bat` thành công, backend 79/79 pass, frontend production build pass; benchmark cô lập 10.000 × 4.096 bit đạt 398,1 Mbit/s native so với 18,3 Mbit/s Python một worker (21,79×).
+- Desktop release: `dist\SignalLab\SignalLab.exe` và `SignalLabCore.exe` sống qua smoke test 10 giây; API health của chính bản frozen xác nhận `native.available=true`, backend `cpp_onetbb`, extension và TBB DLL được đóng gói đúng.
+- Giới hạn chủ ý: native planner hiện chỉ nhận ba topology đã kiểm chứng; Intel SYCL/GPU và HPC/multi-GPU chưa nằm trong mốc single-machine này.
+
 - Ngày cập nhật: 2026-08-21
 - Giai đoạn: bản desktop Windows hoàn tất và đã kiểm thử
 - Kiến trúc: React/TypeScript + React Flow, FastAPI/Python, NumPy/CuPy tùy chọn.

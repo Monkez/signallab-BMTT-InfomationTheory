@@ -18,6 +18,10 @@ class JobManager:
         self.jobs: dict[str, dict[str, Any]] = {}
         self.lock = threading.Lock()
         self.cancel_events: dict[str, threading.Event] = {}
+        # A benchmark may consume every local CPU core (or the single GPU).
+        # Serialize jobs so independent pools/arenas cannot oversubscribe the
+        # machine and make all jobs slower. Queued jobs remain cancellable.
+        self.compute_slot = threading.Semaphore(1)
 
     def create(self, request: SimulationRequest) -> str:
         job_id = uuid.uuid4().hex
@@ -42,6 +46,13 @@ class JobManager:
         return job_id
 
     def _run(self, job_id: str, request: SimulationRequest, event: threading.Event):
+        with self.compute_slot:
+            if event.is_set():
+                self._update(job_id, status="cancelled", progress=0, result={"cancelled": True})
+                return
+            self._run_acquired(job_id, request, event)
+
+    def _run_acquired(self, job_id: str, request: SimulationRequest, event: threading.Event):
         self._update(job_id, status="running")
 
         def progress(data):

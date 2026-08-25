@@ -12,6 +12,7 @@ from .block_registry import SPEC_BY_TYPE
 from .blocks import PROCESSORS, make_context, python_block, to_numpy
 from .contracts import BlockExecutionError, validate_inputs, validate_outputs, validate_parameters
 from .models import Graph, SimulationConfig, ValidationResult
+from .native_engine import run_native_simulation
 from .python_ports import PythonPortDefinitionError, parse_python_ports
 from .variables import VariableDefinitionError, collect_global_variables
 
@@ -292,6 +293,26 @@ def _execution_device(graph: Graph, requested: str) -> tuple[str, list[str]]:
     return device, warnings
 
 
+def _frame_item_hint(graph: Graph) -> int:
+    """Estimate frame width for the compatibility scheduler.
+
+    Windows process startup and graph pickling dominate small vectorized
+    trials. Only choose multiprocessing automatically when both a frame and
+    the total workload are large; custom expensive Python blocks can still
+    opt in explicitly with Workers.
+    """
+    hint = 0
+    for node in graph.nodes:
+        raw = node.params.get("length")
+        if isinstance(raw, (int, float)) and not isinstance(raw, bool) and raw > 0:
+            hint = max(hint, int(raw))
+        if node.type in {"text_source", "text_symbol_source"}:
+            repeat = max(1, int(node.params.get("repeat", 1)))
+            width = len(str(node.params.get("text", "")).encode("utf-8"))
+            hint = max(hint, width * repeat * (8 if node.type == "text_source" else 1))
+    return hint or 4096
+
+
 def run_once(graph: Graph, config: SimulationConfig) -> dict[str, Any]:
     validation = validate_graph(graph)
     if not validation.valid:
@@ -308,6 +329,7 @@ def run_once(graph: Graph, config: SimulationConfig) -> dict[str, Any]:
     captured = execute_trial(graph_dict, 0, config.seed, device, snr_db, capture_ports=True)
     return {
         "device": device,
+        "engine": "python_trace",
         "snr_db": snr_db,
         "elapsed_seconds": time.perf_counter() - started,
         "metrics": captured["metrics"],
@@ -380,6 +402,20 @@ def run_simulation(
     validation = validate_graph(graph)
     if not validation.valid:
         raise ValueError("; ".join(validation.errors))
+    if config.engine != "python":
+        native_result, native_reason = run_native_simulation(graph, config, progress, cancelled)
+        if native_result is not None:
+            graph_dict = graph.model_dump()
+            graph_dict["_global_variables"] = collect_global_variables(graph_dict["nodes"])
+            graph_dict["_random_seed_root"] = int.from_bytes(os.urandom(8), "little")
+            first_snr = native_result["snr_points"][0]["snr_db"] if native_result["snr_points"] else float(config.snr_db_start)
+            preview = execute_trial(graph_dict, 0, config.seed, "cpu", first_snr, capture_ports=True) if not native_result["cancelled"] else {"port_previews": {}, "_port_values": {}}
+            native_result["port_previews"] = preview["port_previews"]
+            native_result["_port_values"] = preview["_port_values"]
+            native_result["warnings"] = validation.warnings + native_result.get("warnings", [])
+            return native_result
+        if config.engine == "native":
+            raise ValueError(f"Native execution is unavailable for this graph: {native_reason}")
     started = time.perf_counter()
     graph_dict = graph.model_dump()
     graph_dict["_global_variables"] = collect_global_variables(graph_dict["nodes"])
@@ -409,12 +445,14 @@ def run_simulation(
             snr_values = [round(float(config.snr_db_start), 6)]
     device, device_warnings = _execution_device(graph, config.device)
     cpu_count = os.cpu_count() or 1
-    # Auto mode avoids creating one OS process per frame on high-core machines
-    # and keeps small vectorized jobs inline, where ProcessPool overhead wins.
+    # Auto mode is deliberately conservative on Windows: local measurements
+    # show that vectorized frames below this threshold are faster inline.
     if config.workers:
         workers = config.workers
     else:
-        workers = 1 if max_frames < 128 else min(32, max(1, cpu_count - 1), max_frames // max(1, config.chunk_size))
+        frame_hint = _frame_item_hint(graph)
+        worth_processes = frame_hint >= 262_144 and frame_hint * max_frames >= 50_000_000
+        workers = min(32, max(1, cpu_count - 1), max_frames // max(1, config.chunk_size)) if worth_processes else 1
     workers = min(workers, max_frames, cpu_count)
     if device == "gpu":
         workers = 1
@@ -470,6 +508,7 @@ def run_simulation(
                         **aggregate,
                         "trials": total_budget,
                         "device": device,
+                        "engine": "python_multiprocessing" if pool is not None else "python_numpy",
                         "workers": workers,
                         "snr_db": snr_db,
                         "snr_index": snr_index,
@@ -527,6 +566,7 @@ def run_simulation(
         "elapsed_seconds": elapsed,
         "throughput_bps": bits / elapsed if elapsed else 0,
         "device": device,
+        "engine": "python_multiprocessing" if pool is not None else "python_numpy",
         "workers": workers,
         "cancelled": was_cancelled,
         "snr_points": point_results,

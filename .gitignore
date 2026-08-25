@@ -9,7 +9,12 @@ frontend/*.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
 build/
+build-native/
+build-update/
 dist/
+dist-update/
+backend/app/_native_core*.pyd
+backend/app/tbb*.dll
 backend/.signallab/
 *.log
 .idea/

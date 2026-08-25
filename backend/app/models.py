@@ -55,6 +55,7 @@ class SimulationConfig(BaseModel):
     workers: int = Field(default=0, ge=0, le=256)
     seed: int = Field(default=2026, ge=0, le=2**32 - 1)
     device: Literal["auto", "cpu", "gpu"] = "auto"
+    engine: Literal["auto", "native", "python"] = "auto"
     chunk_size: int = Field(default=10, ge=1, le=100_000)
 
 

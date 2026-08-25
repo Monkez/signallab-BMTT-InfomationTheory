@@ -51,6 +51,8 @@ Trong cửa sổ thư viện, nhóm Digital communications và Analog communicat
 
 Các nút ẩn/hiện Inspector và Console không còn nằm trên topbar. Inspector có nút thu gọn ngay trong tiêu đề **Properties**, Console có nút tương ứng ở góc phải tiêu đề **Console**. Khi panel đã ẩn, một nút mở lại nhỏ xuất hiện sát mép canvas tương ứng.
 
+Khi chọn **Oscilloscope Sink**, Inspector hiển thị waveform ngay dưới phần port data. Có thể chọn Auto, Real/I, Imaginary/Q, Magnitude hoặc I+Q; giới hạn số mẫu, đặt Y scale thủ công hoặc để Auto, và bật/tắt grid. Các tùy chọn này chỉ ảnh hưởng cách trình bày, không thay đổi dữ liệu mô phỏng.
+
 Hai bài Python minh họa đúng mô hình lập trình của SignalLab: người học chỉ viết `process(signal, params)` cho một frame; runtime tự xử lý worker và song song hóa Monte-Carlo. Mã nguồn nằm ngay trong Python Block để đọc, chạy và sửa.
 
 1. Chọn khối trong thanh bên hoặc dùng sơ đồ mẫu. Khi bắt đầu kéo block, block được chọn ngay.

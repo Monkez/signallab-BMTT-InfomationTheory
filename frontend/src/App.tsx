@@ -13,7 +13,7 @@ import { cancelJob, createJob, getJob, graphPayload, GraphApiError, runGraphOnce
 import { pythonTemplate } from './sample'
 import type { BlockSpec, FlowEdge, FlowNode, Job, PortPreviewMap, SimulationConfig } from './types'
 import { BerChart } from './SinkChart'
-import { ConstellationPreview, SinkResults, SpectrumPreview, WaterfallPreview } from './SinkResults'
+import { ConstellationPreview, SinkResults, SpectrumPreview, WaterfallPreview, WaveformPreview, type WaveformChannel } from './SinkResults'
 import { FlowMiniMapNode } from './components/FlowMiniMapNode'
 import { BenchmarkStatusBubble } from './components/BenchmarkStatusBubble'
 import { NumericInput } from './components/NumericInput'
@@ -81,6 +81,10 @@ function App() {
   const [consoleHeight, setConsoleHeight] = useState(156)
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([])
   const [consoleCopied, setConsoleCopied] = useState(false)
+  const [scopeView, setScopeView] = useState<WaveformChannel | 'auto'>('auto')
+  const [scopeSamples, setScopeSamples] = useState(512)
+  const [scopeYLimit, setScopeYLimit] = useState(0)
+  const [scopeGrid, setScopeGrid] = useState(true)
   const [projectName, setProjectName] = useState('Untitled simulation')
   const [savedSignature, setSavedSignature] = useState(() => projectSignature([], [], defaultSimulationConfig))
   const [splashVisible, setSplashVisible] = useState(true)
@@ -108,6 +112,8 @@ function App() {
   const configDraftIssue = validateSimulationConfig(configDraft)
   const selectedIsStochasticChannel = selected ? ['awgn', 'rayleigh', 'rician'].includes(selected.data.blockType) : false
   const selectedIsFileSource = selected ? ['text_file_source', 'text_file_symbol_source', 'image_file_source'].includes(selected.data.blockType) : false
+  const scopePreview = selected?.data.portPreviews?.inputs?.in?.sample || []
+  const scopeChannel: WaveformChannel = scopeView === 'auto' ? (scopePreview.some(value => /j/i.test(value)) ? 'iq' : 'real') : scopeView
   useEffect(() => {
     if (!fitRequest || !flowInstanceRef.current) return
     // React Flow measures node dimensions after the React commit. Waiting a
@@ -586,7 +592,7 @@ function App() {
            <PortDataInspector snapshotId={snapshotId} nodeId={selected.id} previews={selected.data.portPreviews} /></>}
           {selected.data.blockType === 'ber' && livePoints.length ? <><div className="section-rule"><span>SINK PREVIEW</span></div><BerChart points={livePoints} live={job?.status === 'running'} /></> : null}
           {activeSinkMetrics.power_mean !== undefined && selected.data.blockType === 'power_meter' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean power</span><strong>{activeSinkMetrics.power_mean.toExponential(3)}</strong></div></div></>}
-          {activeSinkMetrics.scope_mean_amplitude !== undefined && selected.data.blockType === 'scope' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean amplitude</span><strong>{activeSinkMetrics.scope_mean_amplitude.toFixed(4)}</strong></div><div><span>Peak</span><strong>{activeSinkMetrics.scope_peak_amplitude?.toFixed(4) ?? '—'}</strong></div></div></>}
+          {selected.data.blockType === 'scope' && <><div className="section-rule"><span>OSCILLOSCOPE</span><em>time-domain display</em></div><div className="scope-inspector"><div className="scope-controls"><label>Channel<select value={scopeView} onChange={event => setScopeView(event.target.value as WaveformChannel | 'auto')}><option value="auto">Auto</option><option value="real">Real / I</option><option value="imaginary">Imaginary / Q</option><option value="magnitude">Magnitude</option><option value="iq">I + Q</option></select></label><label>Samples<input type="number" min="8" max="2048" step="8" value={scopeSamples} onChange={event => setScopeSamples(Math.max(8, Math.min(2048, Number(event.target.value) || 8)))} /></label><label>Y scale<input type="number" min="0" step="any" placeholder="Auto" value={scopeYLimit || ''} onChange={event => setScopeYLimit(Math.max(0, Number(event.target.value) || 0))} /></label><label className="scope-grid-toggle"><span>Grid</span><input type="checkbox" checked={scopeGrid} onChange={event => setScopeGrid(event.target.checked)} /></label></div><WaveformPreview values={scopePreview} channel={scopeChannel} yLimit={scopeYLimit || undefined} showGrid={scopeGrid} sampleLimit={scopeSamples} large />{activeSinkMetrics.scope_mean_amplitude !== undefined && <div className="sink-result"><Activity size={18} /><div><span>Mean amplitude</span><strong>{activeSinkMetrics.scope_mean_amplitude.toFixed(4)}</strong></div><div><span>Peak</span><strong>{activeSinkMetrics.scope_peak_amplitude?.toFixed(4) ?? '—'}</strong></div></div>}</div></>}
           {selected.data.blockType === 'constellation' && <><div className="section-rule"><span>CONSTELLATION RESULT</span><em>captured signal samples</em></div><ConstellationPreview values={selected.data.portPreviews?.inputs?.in?.sample || []} /><div className="sink-result"><Activity size={18} /><div><span>Mean I / Q</span><strong>{activeSinkMetrics.constellation_mean_i !== undefined ? `${activeSinkMetrics.constellation_mean_i.toFixed(3)} / ${activeSinkMetrics.constellation_mean_q.toFixed(3)}` : '—'}</strong></div><div><span>Mean |x|</span><strong>{activeSinkMetrics.constellation_mean_power?.toFixed(4) ?? '—'}</strong></div></div></>}
           {sourceTheoryMetrics && selected.data.blockType === 'source_analyzer' && <><div className="section-rule"><span>SOURCE THEORY RESULTS</span></div><div className="source-theory-result"><div><span>Entropy H(X)</span><strong>{sourceTheoryMetrics.source_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Average information</span><strong>{sourceTheoryMetrics.source_average_information?.toFixed(4)} bit/symbol</strong></div><div><span>Maximum entropy</span><strong>{sourceTheoryMetrics.source_max_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Source efficiency</span><strong>{sourceTheoryMetrics.source_efficiency_percent?.toFixed(2)}%</strong></div><div><span>Alphabet size</span><strong>{sourceTheoryMetrics.source_alphabet_size}</strong></div></div></>}
           {symbolMetrics && selected.data.blockType === 'ser' && <><div className="section-rule"><span>SYMBOL RESULT</span></div><div className="source-theory-result"><div><span>Symbol error rate</span><strong>{symbolMetrics.ser?.toExponential(3)}</strong></div><div><span>Symbol errors</span><strong>{symbolMetrics.symbol_errors} / {symbolMetrics.total_symbols}</strong></div></div></>}

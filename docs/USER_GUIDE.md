@@ -194,3 +194,9 @@ The selected SNR is exposed to channels and Python Blocks as `params["snr_db"]`.
 The BER chart keeps the curve selector and editing controls in one compact toolbar. On wide windows the selector has a bounded width, while the name, color, line style, Save and Browse actions share the remaining space. On narrow windows the toolbar stacks automatically so controls remain usable without horizontal scrolling.
 
 Block ports are centered independently on each side of a block. A single input therefore stays centered on the left edge, while multiple outputs are distributed evenly around the vertical center on the right edge, even when a block title wraps to multiple lines.
+
+### Advanced coding blocks and sink views
+
+The Channel coding group now includes Cyclic Encoder/Decoder, BCH (15,7), Reed-Solomon (byte-symbol RS(15,11) by default), and CRC Encoder/Decoder. BCH uses nearest-codeword decoding; Reed-Solomon supports configurable data/parity symbol counts and optional parity checking. Their size contracts are validated before execution.
+
+Sink Details are responsive to the actual card/dialog width. Spectrum Analyzer Details expose FFT size, window, dB floor and grid controls; Waterfall Details expose FFT size, window and dynamic range; Scope supports real/imaginary/magnitude/IQ, sample limit, Y scale and grid; Constellation supports independent I/Q limits. These settings affect the current report view without changing captured simulation data.

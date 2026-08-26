@@ -425,6 +425,132 @@ def hamming74_encode(inputs, params, context):
     return {"out": encoded.reshape(-1), "reference": bits.copy()}
 
 
+def _parse_polynomial(value, default: int) -> int:
+    text = str(value if value is not None else default).strip().lower()
+    return int(text, 0)
+
+
+def _poly_remainder(bits: np.ndarray, generator: int, degree: int) -> np.ndarray:
+    work = bits.astype(np.int8, copy=True)
+    taps = np.array([(generator >> (degree - index)) & 1 for index in range(degree + 1)], dtype=np.int8)
+    for index in range(max(0, work.size - degree)):
+        if work[index]:
+            work[index:index + degree + 1] ^= taps
+    return work[-degree:] if degree else np.empty(0, dtype=np.int8)
+
+
+def cyclic_encode(inputs, params, context):
+    bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1) & 1
+    generator = _parse_polynomial(params.get("generator", "0b10011"), 0b10011)
+    degree = max(1, generator.bit_length() - 1)
+    parity = _poly_remainder(np.concatenate([bits, np.zeros(degree, dtype=np.int8)]), generator, degree)
+    return {"out": np.concatenate([bits, parity]), "reference": bits.copy()}
+
+
+def cyclic_decode(inputs, params, context):
+    received = np.asarray(inputs["in"], dtype=np.int8).reshape(-1) & 1
+    generator = _parse_polynomial(params.get("generator", "0b10011"), 0b10011)
+    degree = max(1, generator.bit_length() - 1)
+    if received.size <= degree:
+        raise ValueError("Cyclic codeword must contain data bits plus generator parity")
+    if bool(params.get("check", False)) and np.any(_poly_remainder(received, generator, degree)):
+        raise ValueError("Cyclic decoder detected a non-zero syndrome")
+    return {"out": received[:-degree]}
+
+
+def _bch_codewords() -> np.ndarray:
+    generator = 0b101110001  # primitive binary BCH(15,7), t=2 generator
+    words = np.empty((128, 15), dtype=np.int8)
+    for value in range(128):
+        data = np.array([(value >> (6 - index)) & 1 for index in range(7)], dtype=np.int8)
+        parity = _poly_remainder(np.concatenate([data, np.zeros(8, dtype=np.int8)]), generator, 8)
+        words[value] = np.concatenate([data, parity])
+    return words
+
+
+def bch_encode(inputs, params, context):
+    bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1) & 1
+    if bits.size % 7:
+        raise ValueError("BCH(15,7) encoding requires a multiple of 7 input bits")
+    words = _bch_codewords(); values = bits.reshape(-1, 7).dot(1 << np.arange(6, -1, -1))
+    return {"out": words[values].reshape(-1), "reference": bits.copy()}
+
+
+def bch_decode(inputs, params, context):
+    bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1) & 1
+    if bits.size % 15:
+        raise ValueError("BCH(15,7) decoding requires a multiple of 15 input bits")
+    words = _bch_codewords(); received = bits.reshape(-1, 15)
+    decoded = []
+    for word in received:
+        distances = np.count_nonzero(words ^ word, axis=1)
+        decoded.append(words[int(np.argmin(distances)), :7])
+    return {"out": np.asarray(decoded, dtype=np.int8).reshape(-1)}
+
+
+def _gf_tables():
+    exp = np.zeros(512, dtype=np.uint8); log = np.full(256, -1, dtype=np.int16); value = 1
+    for index in range(255):
+        exp[index] = value; log[value] = index; value <<= 1
+        if value & 0x100: value ^= 0x11D
+    for index in range(255, 512): exp[index] = exp[index - 255]
+    return exp, log
+
+
+def _gf_mul(a: int, b: int, exp: np.ndarray, log: np.ndarray) -> int:
+    return 0 if not a or not b else int(exp[int(log[a]) + int(log[b])])
+
+
+def _rs_generator(parity: int, exp: np.ndarray, log: np.ndarray) -> list[int]:
+    generator = [1]
+    for root in range(parity):
+        factor = int(exp[root]); next_poly = [0] * (len(generator) + 1)
+        for index, coefficient in enumerate(generator):
+            next_poly[index] ^= coefficient
+            next_poly[index + 1] ^= _gf_mul(coefficient, factor, exp, log)
+        generator = next_poly
+    return generator
+
+
+def _rs_parity(data: np.ndarray, parity: int) -> np.ndarray:
+    exp, log = _gf_tables(); generator = _rs_generator(parity, exp, log); remainder = [0] * parity
+    for byte in data:
+        feedback = int(byte) ^ remainder[0]
+        remainder = remainder[1:] + [0]
+        for index in range(parity): remainder[index] ^= _gf_mul(feedback, generator[index + 1], exp, log)
+    return np.asarray(remainder, dtype=np.uint8)
+
+
+def reed_solomon_encode(inputs, params, context):
+    symbols = np.asarray(inputs["in"], dtype=np.uint8).reshape(-1); data_symbols = max(1, int(params.get("data_symbols", 11))); parity_symbols = max(1, int(params.get("parity_symbols", 4)))
+    if symbols.size % data_symbols: raise ValueError(f"Reed-Solomon encoding requires a multiple of {data_symbols} byte symbols")
+    blocks = [np.concatenate([block, _rs_parity(block, parity_symbols)]) for block in symbols.reshape(-1, data_symbols)]
+    return {"out": np.concatenate(blocks).astype(np.uint8), "reference": symbols.copy()}
+
+
+def reed_solomon_decode(inputs, params, context):
+    symbols = np.asarray(inputs["in"], dtype=np.uint8).reshape(-1); data_symbols = max(1, int(params.get("data_symbols", 11))); parity_symbols = max(1, int(params.get("parity_symbols", 4))); codeword = data_symbols + parity_symbols
+    if symbols.size % codeword: raise ValueError(f"Reed-Solomon decoding requires a multiple of {codeword} symbols")
+    decoded = []
+    for block in symbols.reshape(-1, codeword):
+        if bool(params.get("check", False)) and not np.array_equal(_rs_parity(block[:data_symbols], parity_symbols), block[data_symbols:]): raise ValueError("Reed-Solomon decoder detected an invalid parity check")
+        decoded.append(block[:data_symbols])
+    return {"out": np.concatenate(decoded).astype(np.uint8)}
+
+
+def crc_encode(inputs, params, context):
+    bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1) & 1; width = max(1, min(32, int(params.get("width", 8)))); polynomial = _parse_polynomial(params.get("polynomial", "0x07"), 0x07); init = int(params.get("init", 0)) & ((1 << width) - 1); register = init
+    for bit in bits: register = ((register << 1) ^ (polynomial if ((register >> (width - 1)) & 1) ^ int(bit) else 0)) & ((1 << width) - 1)
+    crc = np.array([(register >> (width - 1 - index)) & 1 for index in range(width)], dtype=np.int8)
+    return {"out": np.concatenate([bits, crc]), "reference": bits.copy()}
+
+
+def crc_decode(inputs, params, context):
+    bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1) & 1; width = max(1, min(32, int(params.get("width", 8))))
+    if bits.size <= width: raise ValueError("CRC frame must contain payload and checksum bits")
+    return {"out": bits[:-width]}
+
+
 def repetition3_encode(inputs, params, context):
     bits = np.asarray(inputs["in"], dtype=np.int8).reshape(-1)
     return {"out": np.repeat(bits, 3), "reference": bits.copy()}
@@ -972,6 +1098,14 @@ PROCESSORS: dict[str, Callable] = {
     "zip_encode": zip_encode,
     "zip_decode": zip_decode,
     "hamming74_encode": hamming74_encode,
+    "cyclic_encode": cyclic_encode,
+    "cyclic_decode": cyclic_decode,
+    "bch_encode": bch_encode,
+    "bch_decode": bch_decode,
+    "reed_solomon_encode": reed_solomon_encode,
+    "reed_solomon_decode": reed_solomon_decode,
+    "crc_encode": crc_encode,
+    "crc_decode": crc_decode,
     "repetition3_encode": repetition3_encode,
     "repetition3_decode": repetition3_decode,
     "dc_blocker": dc_blocker,

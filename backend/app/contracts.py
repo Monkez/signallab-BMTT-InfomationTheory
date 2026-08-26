@@ -168,6 +168,14 @@ def validate_inputs(block_type: str, inputs: dict[str, Any], params: dict[str, A
             _multiple(primary, 3, "in", "Repetition-3 decoding")
         elif block_type == "viterbi_decode":
             _multiple(primary, 2, "in", "Viterbi decoding")
+        elif block_type == "bch_encode":
+            _multiple(primary, 7, "in", "BCH (15,7) encoding")
+        elif block_type == "bch_decode":
+            _multiple(primary, 15, "in", "BCH (15,7) decoding")
+        elif block_type == "reed_solomon_encode":
+            _multiple(primary, max(1, int(params.get("data_symbols", 11))), "in", "Reed-Solomon encoding")
+        elif block_type == "reed_solomon_decode":
+            _multiple(primary, max(1, int(params.get("data_symbols", 11))) + max(1, int(params.get("parity_symbols", 4))), "in", "Reed-Solomon decoding")
         elif block_type == "qpsk_mod":
             _multiple(primary, 2, "in", "QPSK modulation")
         elif block_type == "psk8_mod":
@@ -234,7 +242,7 @@ def validate_outputs(
         raise SignalContractError(f"Output 'out' must match input 'in': expected {in_size}, received {out_size}")
     if block_type in {"text_source", "text_file_source", "image_file_source", "symbols_to_bits"} and output_sizes.get("reference") != out_size:
         raise SignalContractError("Outputs 'out' and 'reference' must have identical sizes")
-    if block_type in {"huffman_encode", "shannon_fano_encode", "symbol_huffman_encode", "symbol_shannon_fano_encode", "rle_encode", "zip_encode", "hamming74_encode", "repetition3_encode", "convolutional_encode"}:
+    if block_type in {"huffman_encode", "shannon_fano_encode", "symbol_huffman_encode", "symbol_shannon_fano_encode", "rle_encode", "zip_encode", "hamming74_encode", "repetition3_encode", "convolutional_encode", "cyclic_encode", "bch_encode", "reed_solomon_encode", "crc_encode"}:
         if output_sizes.get("reference") != in_size:
             raise SignalContractError(f"Output 'reference' must match input 'in': expected {in_size}, received {output_sizes.get('reference')}")
     if block_type == "bit_source":

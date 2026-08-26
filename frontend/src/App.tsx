@@ -98,6 +98,8 @@ function App() {
   const bootLoggedRef = useRef(false)
   const lastSnrRef = useRef<number | null>(null)
   const consoleResizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
+  const consoleBodyRef = useRef<HTMLDivElement>(null)
+  const consoleAutoScrollRef = useRef(true)
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null)
   const flowInstanceRef = useRef<{ fitView: (options?: Record<string, unknown>) => void; screenToFlowPosition: (position: { x: number; y: number }) => { x: number; y: number } } | null>(null)
   const selected = nodes.find(n => n.id === selectedId)
@@ -133,6 +135,15 @@ function App() {
   const appendLog = useCallback((level: ConsoleLevel, message: string) => {
     setConsoleEntries(entries => [...entries.slice(-199), { id: Date.now() + Math.random(), time: new Date().toLocaleTimeString(), level, message }])
   }, [])
+  const onConsoleScroll = useCallback(() => {
+    const body = consoleBodyRef.current
+    if (!body) return
+    consoleAutoScrollRef.current = body.scrollHeight - body.scrollTop - body.clientHeight < 28
+  }, [])
+  useEffect(() => {
+    const body = consoleBodyRef.current
+    if (body && consoleAutoScrollRef.current) body.scrollTo({ top: body.scrollHeight, behavior: 'smooth' })
+  }, [consoleEntries.length])
   const copyConsole = useCallback(async () => {
     const text = consoleEntries.map(entry => `[${entry.time}] ${entry.level.toUpperCase()} ${entry.message}`).join('\n')
     if (!text) return
@@ -325,6 +336,16 @@ function App() {
       setJob({ id, status: 'queued', progress: 0, completed_trials: 0, trials: totalTrials })
       appendLog('info', `Job ${id.slice(0, 8)} queued · ${config.max_frames} max frames × ${snrPointCount(config)} SNR points.`)
     } catch (e) { executionError(e) }
+  }
+
+  const stopBenchmark = async () => {
+    if (!job || !jobActive) return
+    try {
+      await cancelJob(job.id)
+      appendLog('warning', 'Benchmark stop requested…')
+    } catch (cause) {
+      appendLog('error', `Could not stop benchmark: ${(cause as Error).message}`)
+    }
   }
 
   const projectDocument = useCallback(() => JSON.stringify({
@@ -533,7 +554,7 @@ function App() {
         <section className="experiment-config-modal results-modal" role="dialog" aria-modal="true" aria-labelledby="results-title">
           <header className="experiment-config-header"><div><span>SIMULATION OUTPUT</span><h2 id="results-title">Results</h2><p>Review execution progress and aggregate sink results.</p></div><button type="button" onClick={() => setResultsOpen(false)} title="Close results"><X size={18} /></button></header>
           <div className="results-modal-body">
-            {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} frames processed · {job.trials} max</span><span>{job.device || result?.device || 'preparing'}{(job.engine || result?.engine) ? ` · ${job.engine || result?.engine}` : ''}</span></div>{job.status === 'running' && <button className="cancel" onClick={() => cancelJob(job.id)}><CircleStop size={14} /> Cancel</button>}</div>}
+            {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} frames processed · {job.trials} max</span><span>{job.device || result?.device || 'preparing'}{(job.engine || result?.engine) ? ` · ${job.engine || result?.engine}` : ''}</span></div>{jobActive && <button className="cancel" onClick={() => void stopBenchmark()}><CircleStop size={14} /> Stop benchmark</button>}</div>}
             {error && <div className="error-box">{error}</div>}
             {(result || hasVisibleSinkResults) ? <div className="results" ref={resultsRef}>{result && <div className="metric-row results-runtime"><div className="metric"><span>Elapsed</span><strong>{result.elapsed_seconds.toFixed(2)} s</strong></div><div className="metric"><span>Throughput</span><strong>{formatNumber(result.throughput_bps / 1000)} kb/s</strong></div>{result.execution?.modulation && <div className="metric"><span>Native plan</span><strong>{result.execution.modulation.toUpperCase()} · {result.execution.coding}</strong></div>}{result.execution?.python_blocks ? <div className="metric"><span>Python runtime</span><strong>{result.execution.scheduler === 'persistent_process_pool' ? `${result.workers} processes` : 'inline'}{result.execution.python_batch_blocks ? ` · ${result.execution.python_batch_blocks} batch` : ''}</strong></div> : null}</div>}{result?.execution?.fallback_reason && <p className="warning">Auto used the compatibility engine: {result.execution.fallback_reason}</p>}<SinkResults nodes={sinkNodes} metrics={activeSinkMetrics} berPoints={livePoints} berLive={job?.status === 'running'} />{result?.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}</div> : <div className="experiment-config-empty"><Activity size={28} /><strong>No runtime results</strong><span>Run once or Run Benchmark from the floating toolbar.</span></div>}
           </div>
@@ -557,7 +578,7 @@ function App() {
           <button className="simulation-icon-button add-icon" onClick={() => setBlockPickerOpen(true)} aria-label="Add block" data-tooltip="Add block"><Plus size={17} /></button>
           <span className="simulation-toolbar-divider" />
           <button className="simulation-icon-button run-once-icon" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} aria-label={runOnceActive ? 'Running one frame' : 'Run once'} data-tooltip={runOnceActive ? 'Running…' : 'Run once'}><Play size={17} fill="currentColor" /></button>
-          <button className="simulation-icon-button benchmark-icon" onClick={runBenchmark} disabled={executionActive || Boolean(configIssue)} aria-label={jobActive ? 'Benchmark running' : 'Run Benchmark'} data-tooltip={configIssue || (jobActive ? 'Benchmark running…' : 'Run Benchmark')}><Play size={17} fill="currentColor" /></button>
+          <button className={`simulation-icon-button benchmark-icon ${jobActive ? 'stop-active' : ''}`} onClick={() => jobActive ? void stopBenchmark() : void runBenchmark()} disabled={runOnceActive || (!jobActive && Boolean(configIssue))} aria-label={jobActive ? 'Stop benchmark' : 'Run Benchmark'} data-tooltip={configIssue || (jobActive ? 'Stop benchmark' : 'Run Benchmark')}>{jobActive ? <CircleStop size={17} /> : <Play size={17} fill="currentColor" />}</button>
           <button className="simulation-icon-button config-icon" onClick={openExperimentConfig} aria-label="Experiment config" data-tooltip="Experiment config"><Settings2 size={18} /></button>
           <span className="simulation-toolbar-divider" />
           <span className="results-control">
@@ -615,7 +636,7 @@ function App() {
       {consoleOpen && <section className="console-dock">
         <div className="console-resizer" onPointerDown={startConsoleResize} title="Resize console" />
         <div className="console-header"><div><Terminal size={15} /><strong>Console</strong><span>{consoleEntries.length} events</span></div><div className="console-actions"><button className="console-copy" onClick={() => void copyConsole()} disabled={!consoleEntries.length} title="Copy all console text"><Copy size={13} />{consoleCopied ? 'Copied' : 'Copy'}</button><button className="console-clear" onClick={() => setConsoleEntries([])} title="Clear console"><Trash2 size={14} /></button><button className="panel-collapse" onClick={() => setConsoleOpen(false)} aria-label="Hide console" title="Hide console"><PanelBottomClose size={15} /></button></div></div>
-        <div className="console-body">
+        <div className="console-body" ref={consoleBodyRef} onScroll={onConsoleScroll}>
           {consoleEntries.length ? consoleEntries.map(entry => <div className={`console-line ${entry.level}`} key={entry.id}><time>{entry.time}</time><b>{entry.level}</b><span>{entry.message}</span></div>) : <div className="console-empty">No messages yet.</div>}
         </div>
       </section>}

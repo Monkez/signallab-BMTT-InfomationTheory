@@ -1,647 +1,2706 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ReactFlow, Background, Controls, MiniMap, addEdge, useNodesState, useEdgesState,
-  BackgroundVariant, MarkerType, type Connection, type EdgeChange, type EdgeMouseHandler, type NodeMouseHandler, type OnNodeDrag,
-} from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
-  Activity, ArrowLeftRight, BarChart3, BookOpen, Box, Braces, CircleStop, FilePlus2, FolderOpen, Settings2,
-  Copy, LibraryBig, Maximize2, PanelBottomClose, PanelBottomOpen, PanelRightClose, PanelRightOpen, Play, Plus, RotateCcw, Save, SaveAll, Terminal, Trash2, X,
-} from 'lucide-react'
-import { SignalNode } from './SignalNode'
-import { cancelJob, createJob, getJob, graphPayload, GraphApiError, runGraphOnce } from './api'
-import { pythonTemplate } from './sample'
-import type { BlockSpec, FlowEdge, FlowNode, Job, PortPreviewMap, SimulationConfig } from './types'
-import { BerChart } from './SinkChart'
-import { ConstellationPreview, SinkDetail, SinkResults, SpectrumPreview, WaterfallPreview, WaveformPreview, type WaveformChannel } from './SinkResults'
-import { FlowMiniMapNode } from './components/FlowMiniMapNode'
-import { BenchmarkStatusBubble } from './components/BenchmarkStatusBubble'
-import { NumericInput } from './components/NumericInput'
-import { fallbackSpecs, miniMapColor } from './features/blocks/catalog'
-import { BlockPickerModal } from './features/blocks/BlockPickerModal'
-import { PortDataInspector } from './features/blocks/PortDataInspector'
-import { defaultSimulationConfig, snrPointCount, validateSimulationConfig } from './features/experiment/config'
-import { HuffmanCodebookTable } from './features/sourceTheory/HuffmanCodebookTable'
-import { SampleLibraryModal } from './features/samples/SampleLibraryModal'
-import { materializeSample, type SampleProject } from './features/samples/types'
-import { VariablesEditor } from './features/variables/VariablesEditor'
-import { parsePythonPorts } from './features/pythonEditor/ports'
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  addEdge,
+  useNodesState,
+  useEdgesState,
+  BackgroundVariant,
+  MarkerType,
+  type Connection,
+  type EdgeChange,
+  type EdgeMouseHandler,
+  type NodeMouseHandler,
+  type OnNodeDrag,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 import {
-  attachBrowserProjectFile, clearProjectFileTarget, openProjectFile, projectDisplayName,
-  saveProjectFile, supportsProjectOpenDialog,
-} from './features/projects/projectFiles'
+  Activity,
+  ArrowLeftRight,
+  BarChart3,
+  BookOpen,
+  Box,
+  Braces,
+  CircleStop,
+  FilePlus2,
+  FolderOpen,
+  Settings2,
+  Copy,
+  LibraryBig,
+  Maximize2,
+  PanelBottomClose,
+  PanelBottomOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  Play,
+  Plus,
+  RotateCcw,
+  Save,
+  SaveAll,
+  Terminal,
+  Trash2,
+  X,
+} from "lucide-react";
+import { SignalNode } from "./SignalNode";
+import {
+  cancelJob,
+  createJob,
+  getJob,
+  graphPayload,
+  GraphApiError,
+  runGraphOnce,
+} from "./api";
+import { pythonTemplate } from "./sample";
+import type {
+  BlockSpec,
+  FlowEdge,
+  FlowNode,
+  Job,
+  PortPreviewMap,
+  SimulationConfig,
+} from "./types";
+import { BerChart } from "./SinkChart";
+import {
+  ConstellationPreview,
+  SinkDetail,
+  SinkResults,
+  SpectrumPreview,
+  WaterfallPreview,
+  WaveformPreview,
+  type WaveformChannel,
+} from "./SinkResults";
+import { FlowMiniMapNode } from "./components/FlowMiniMapNode";
+import { BenchmarkStatusBubble } from "./components/BenchmarkStatusBubble";
+import { NumericInput } from "./components/NumericInput";
+import { fallbackSpecs, miniMapColor } from "./features/blocks/catalog";
+import { BlockPickerModal } from "./features/blocks/BlockPickerModal";
+import { PortDataInspector } from "./features/blocks/PortDataInspector";
+import {
+  defaultSimulationConfig,
+  snrPointCount,
+  validateSimulationConfig,
+} from "./features/experiment/config";
+import { HuffmanCodebookTable } from "./features/sourceTheory/HuffmanCodebookTable";
+import { SampleLibraryModal } from "./features/samples/SampleLibraryModal";
+import {
+  materializeSample,
+  type SampleProject,
+} from "./features/samples/types";
+import { VariablesEditor } from "./features/variables/VariablesEditor";
+import { parsePythonPorts } from "./features/pythonEditor/ports";
+import {
+  attachBrowserProjectFile,
+  clearProjectFileTarget,
+  openProjectFile,
+  projectDisplayName,
+  saveProjectFile,
+  supportsProjectOpenDialog,
+} from "./features/projects/projectFiles";
 
-const formatNumber = (n: number) => new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(n)
-const parameterLabel = (key: string) => key === 'include_header' ? 'Include 32-bit symbol-count header' : key.replaceAll('_', ' ')
-const INTEGER_PARAMETER_KEYS = new Set(['length', 'repeat', 'seed', 'runtime_batch_size', 'fft_size'])
+const formatNumber = (n: number) =>
+  new Intl.NumberFormat("en", { maximumFractionDigits: 2 }).format(n);
+const parameterLabel = (key: string) =>
+  key === "include_header"
+    ? "Include 32-bit symbol-count header"
+    : key.replaceAll("_", " ");
+const INTEGER_PARAMETER_KEYS = new Set([
+  "length",
+  "repeat",
+  "seed",
+  "runtime_batch_size",
+  "fft_size",
+]);
 const PARAMETER_OPTIONS: Record<string, { value: string; label: string }[]> = {
   window: [
-    { value: 'hann', label: 'Hann' },
-    { value: 'hamming', label: 'Hamming' },
-    { value: 'blackman', label: 'Blackman' },
-    { value: 'rectangular', label: 'Rectangular' },
+    { value: "hann", label: "Hann" },
+    { value: "hamming", label: "Hamming" },
+    { value: "blackman", label: "Blackman" },
+    { value: "rectangular", label: "Rectangular" },
   ],
-}
-type ConsoleLevel = 'info' | 'success' | 'warning' | 'error'
-type ConsoleEntry = { id: number; time: string; level: ConsoleLevel; message: string }
+};
+type ConsoleLevel = "info" | "success" | "warning" | "error";
+type ConsoleEntry = {
+  id: number;
+  time: string;
+  level: ConsoleLevel;
+  message: string;
+};
 
-const projectSignature = (nodes: FlowNode[], edges: FlowEdge[], config: SimulationConfig) =>
-  JSON.stringify({ graph: graphPayload(nodes, edges), config })
+const projectSignature = (
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+  config: SimulationConfig,
+) => JSON.stringify({ graph: graphPayload(nodes, edges), config });
 
 const openDocuments = () => {
-  const url = new URL(window.location.href)
-  url.hash = '/documents'
-  window.open(url.toString(), 'signallab-documents', 'popup=yes,width=1240,height=820,resizable=yes,scrollbars=yes')?.focus()
-}
+  const url = new URL(window.location.href);
+  url.hash = "/documents";
+  window
+    .open(
+      url.toString(),
+      "signallab-documents",
+      "popup=yes,width=1240,height=820,resizable=yes,scrollbars=yes",
+    )
+    ?.focus();
+};
 
-const PythonCodeEditor = lazy(() => import('./features/pythonEditor/PythonCodeEditor').then(module => ({ default: module.PythonCodeEditor })))
-const PythonEditorModal = lazy(() => import('./features/pythonEditor/PythonEditorModal').then(module => ({ default: module.PythonEditorModal })))
+const PythonCodeEditor = lazy(() =>
+  import("./features/pythonEditor/PythonCodeEditor").then((module) => ({
+    default: module.PythonCodeEditor,
+  })),
+);
+const PythonEditorModal = lazy(() =>
+  import("./features/pythonEditor/PythonEditorModal").then((module) => ({
+    default: module.PythonEditorModal,
+  })),
+);
 
 function App() {
-  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([])
-  const [specs, setSpecs] = useState<BlockSpec[]>(fallbackSpecs)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
-  const [isConnecting, setIsConnecting] = useState(false)
-  const [config, setConfig] = useState<SimulationConfig>(defaultSimulationConfig)
-  const [configDraft, setConfigDraft] = useState<SimulationConfig>(defaultSimulationConfig)
-  const [job, setJob] = useState<Job | null>(null)
-  const [runOnceActive, setRunOnceActive] = useState(false)
-  const [runOnceMetrics, setRunOnceMetrics] = useState<Record<string, number>>({})
-  const [runOnceSinkMetrics, setRunOnceSinkMetrics] = useState<Record<string, number>>({})
-  const [snapshotId, setSnapshotId] = useState<string | null>(null)
-  const [error, setError] = useState('')
-  const [experimentConfigOpen, setExperimentConfigOpen] = useState(false)
-  const [blockPickerOpen, setBlockPickerOpen] = useState(false)
-  const [resultsOpen, setResultsOpen] = useState(false)
-  const [rightOpen, setRightOpen] = useState(true)
-  const [rightWidth, setRightWidth] = useState(360)
-  const [consoleOpen, setConsoleOpen] = useState(true)
-  const [consoleHeight, setConsoleHeight] = useState(156)
-  const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([])
-  const [consoleCopied, setConsoleCopied] = useState(false)
-  const [scopeView, setScopeView] = useState<WaveformChannel | 'auto'>('auto')
-  const [scopeSamples, setScopeSamples] = useState(512)
-  const [scopeYLimit, setScopeYLimit] = useState(0)
-  const [scopeGrid, setScopeGrid] = useState(true)
-  const [inspectorDetailNode, setInspectorDetailNode] = useState<FlowNode | null>(null)
-  const [projectName, setProjectName] = useState('Untitled simulation')
-  const [savedSignature, setSavedSignature] = useState(() => projectSignature([], [], defaultSimulationConfig))
-  const [splashVisible, setSplashVisible] = useState(true)
-  const [savingProject, setSavingProject] = useState(false)
-  const [samplesOpen, setSamplesOpen] = useState(false)
-  const [pythonEditorOpen, setPythonEditorOpen] = useState(false)
-  const [fitRequest, setFitRequest] = useState(0)
-  const fileRef = useRef<HTMLInputElement>(null)
-  const resultsRef = useRef<HTMLDivElement>(null)
-  const bootLoggedRef = useRef(false)
-  const lastSnrRef = useRef<number | null>(null)
-  const consoleResizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
-  const consoleBodyRef = useRef<HTMLDivElement>(null)
-  const consoleAutoScrollRef = useRef(true)
-  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null)
-  const flowInstanceRef = useRef<{ fitView: (options?: Record<string, unknown>) => void; screenToFlowPosition: (position: { x: number; y: number }) => { x: number; y: number } } | null>(null)
-  const selected = nodes.find(n => n.id === selectedId)
-  const selectedEdge = edges.find(edge => edge.id === selectedEdgeId)
-  const selectedEdgeSource = selectedEdge ? nodes.find(node => node.id === selectedEdge.source) : undefined
-  const selectedEdgeTarget = selectedEdge ? nodes.find(node => node.id === selectedEdge.target) : undefined
-  const selectedSpec = selected ? specs.find(spec => spec.type === selected.data.blockType) : undefined
-  const jobActive = job?.status === 'queued' || job?.status === 'running'
-  const executionActive = jobActive || runOnceActive
-  const currentSignature = useMemo(() => projectSignature(nodes, edges, config), [config, edges, nodes])
-  const projectDirty = currentSignature !== savedSignature
-  const configIssue = validateSimulationConfig(config)
-  const configDraftIssue = validateSimulationConfig(configDraft)
-  const selectedIsStochasticChannel = selected ? ['awgn', 'rayleigh', 'rician'].includes(selected.data.blockType) : false
-  const selectedIsFileSource = selected ? ['text_file_source', 'text_file_symbol_source', 'image_file_source'].includes(selected.data.blockType) : false
-  const scopePreview = selected?.data.portPreviews?.inputs?.in?.sample || []
-  const scopeChannel: WaveformChannel = scopeView === 'auto' ? (scopePreview.some(value => /j/i.test(value)) ? 'iq' : 'real') : scopeView
+  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
+  const [specs, setSpecs] = useState<BlockSpec[]>(fallbackSpecs);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [config, setConfig] = useState<SimulationConfig>(
+    defaultSimulationConfig,
+  );
+  const [configDraft, setConfigDraft] = useState<SimulationConfig>(
+    defaultSimulationConfig,
+  );
+  const [job, setJob] = useState<Job | null>(null);
+  const [runOnceActive, setRunOnceActive] = useState(false);
+  const [runOnceMetrics, setRunOnceMetrics] = useState<Record<string, number>>(
+    {},
+  );
+  const [runOnceSinkMetrics, setRunOnceSinkMetrics] = useState<
+    Record<string, number>
+  >({});
+  const [snapshotId, setSnapshotId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [experimentConfigOpen, setExperimentConfigOpen] = useState(false);
+  const [blockPickerOpen, setBlockPickerOpen] = useState(false);
+  const [resultsOpen, setResultsOpen] = useState(false);
+  const [rightOpen, setRightOpen] = useState(true);
+  const [rightWidth, setRightWidth] = useState(360);
+  const [consoleOpen, setConsoleOpen] = useState(true);
+  const [consoleHeight, setConsoleHeight] = useState(156);
+  const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([]);
+  const [consoleCopied, setConsoleCopied] = useState(false);
+  const [scopeView, setScopeView] = useState<WaveformChannel | "auto">("auto");
+  const [scopeSamples, setScopeSamples] = useState(512);
+  const [scopeYLimit, setScopeYLimit] = useState(0);
+  const [scopeGrid, setScopeGrid] = useState(true);
+  const [inspectorDetailNode, setInspectorDetailNode] =
+    useState<FlowNode | null>(null);
+  const [projectName, setProjectName] = useState("Untitled simulation");
+  const [savedSignature, setSavedSignature] = useState(() =>
+    projectSignature([], [], defaultSimulationConfig),
+  );
+  const [splashVisible, setSplashVisible] = useState(true);
+  const [savingProject, setSavingProject] = useState(false);
+  const [samplesOpen, setSamplesOpen] = useState(false);
+  const [pythonEditorOpen, setPythonEditorOpen] = useState(false);
+  const [fitRequest, setFitRequest] = useState(0);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const bootLoggedRef = useRef(false);
+  const lastSnrRef = useRef<number | null>(null);
+  const consoleResizeRef = useRef<{
+    startY: number;
+    startHeight: number;
+  } | null>(null);
+  const consoleBodyRef = useRef<HTMLDivElement>(null);
+  const consoleAutoScrollRef = useRef(true);
+  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const flowInstanceRef = useRef<{
+    fitView: (options?: Record<string, unknown>) => void;
+    screenToFlowPosition: (position: { x: number; y: number }) => {
+      x: number;
+      y: number;
+    };
+  } | null>(null);
+  const selected = nodes.find((n) => n.id === selectedId);
+  const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
+  const selectedEdgeSource = selectedEdge
+    ? nodes.find((node) => node.id === selectedEdge.source)
+    : undefined;
+  const selectedEdgeTarget = selectedEdge
+    ? nodes.find((node) => node.id === selectedEdge.target)
+    : undefined;
+  const selectedSpec = selected
+    ? specs.find((spec) => spec.type === selected.data.blockType)
+    : undefined;
+  const jobActive = job?.status === "queued" || job?.status === "running";
+  const executionActive = jobActive || runOnceActive;
+  const currentSignature = useMemo(
+    () => projectSignature(nodes, edges, config),
+    [config, edges, nodes],
+  );
+  const projectDirty = currentSignature !== savedSignature;
+  const configIssue = validateSimulationConfig(config);
+  const configDraftIssue = validateSimulationConfig(configDraft);
+  const selectedIsStochasticChannel = selected
+    ? ["awgn", "rayleigh", "rician"].includes(selected.data.blockType)
+    : false;
+  const selectedIsFileSource = selected
+    ? [
+        "text_file_source",
+        "text_file_symbol_source",
+        "image_file_source",
+      ].includes(selected.data.blockType)
+    : false;
+  const scopePreview = selected?.data.portPreviews?.inputs?.in?.sample || [];
+  const scopeChannel: WaveformChannel =
+    scopeView === "auto"
+      ? scopePreview.some((value) => /j/i.test(value))
+        ? "iq"
+        : "real"
+      : scopeView;
   useEffect(() => {
-    if (!fitRequest || !flowInstanceRef.current) return
+    if (!fitRequest || !flowInstanceRef.current) return;
     // React Flow measures node dimensions after the React commit. Waiting a
     // couple of frames avoids fitting against zero-sized nodes (which zooms to
     // maxZoom and makes a newly opened sample appear enormous).
-    const timer = window.setTimeout(() => flowInstanceRef.current?.fitView({ padding: 0.18, duration: 320 }), 100)
-    return () => window.clearTimeout(timer)
-  }, [fitRequest, nodes.length])
-  const visibleParams = selected ? Object.entries(selected.data.params).filter(([key]) => {
-    if (key === 'data_base64' || key === 'file_name') return false
-    if (selected.data.blockType === 'variables' && key === 'definitions') return false
-    if (selectedIsStochasticChannel && (key === 'snr_mode' || key === 'ebn0_db')) return false
-    if (selected.data.blockType === 'image_file_source' && key === 'mode') return false
-    return true
-  }) : []
+    const timer = window.setTimeout(
+      () => flowInstanceRef.current?.fitView({ padding: 0.18, duration: 320 }),
+      100,
+    );
+    return () => window.clearTimeout(timer);
+  }, [fitRequest, nodes.length]);
+  const visibleParams = selected
+    ? Object.entries(selected.data.params).filter(([key]) => {
+        if (key === "data_base64" || key === "file_name") return false;
+        if (selected.data.blockType === "variables" && key === "definitions")
+          return false;
+        if (
+          selectedIsStochasticChannel &&
+          (key === "snr_mode" || key === "ebn0_db")
+        )
+          return false;
+        if (selected.data.blockType === "image_file_source" && key === "mode")
+          return false;
+        return true;
+      })
+    : [];
   const appendLog = useCallback((level: ConsoleLevel, message: string) => {
-    setConsoleEntries(entries => [...entries.slice(-199), { id: Date.now() + Math.random(), time: new Date().toLocaleTimeString(), level, message }])
-  }, [])
+    setConsoleEntries((entries) => [
+      ...entries.slice(-199),
+      {
+        id: Date.now() + Math.random(),
+        time: new Date().toLocaleTimeString(),
+        level,
+        message,
+      },
+    ]);
+  }, []);
   const onConsoleScroll = useCallback(() => {
-    const body = consoleBodyRef.current
-    if (!body) return
-    consoleAutoScrollRef.current = body.scrollHeight - body.scrollTop - body.clientHeight < 28
-  }, [])
+    const body = consoleBodyRef.current;
+    if (!body) return;
+    consoleAutoScrollRef.current =
+      body.scrollHeight - body.scrollTop - body.clientHeight < 28;
+  }, []);
   useEffect(() => {
-    const body = consoleBodyRef.current
-    if (body && consoleAutoScrollRef.current) body.scrollTo({ top: body.scrollHeight, behavior: 'smooth' })
-  }, [consoleEntries.length])
+    const body = consoleBodyRef.current;
+    if (body && consoleAutoScrollRef.current)
+      body.scrollTo({ top: body.scrollHeight, behavior: "smooth" });
+  }, [consoleEntries.length]);
   const copyConsole = useCallback(async () => {
-    const text = consoleEntries.map(entry => `[${entry.time}] ${entry.level.toUpperCase()} ${entry.message}`).join('\n')
-    if (!text) return
+    const text = consoleEntries
+      .map(
+        (entry) =>
+          `[${entry.time}] ${entry.level.toUpperCase()} ${entry.message}`,
+      )
+      .join("\n");
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(text)
-      setConsoleCopied(true)
-      window.setTimeout(() => setConsoleCopied(false), 1400)
+      await navigator.clipboard.writeText(text);
+      setConsoleCopied(true);
+      window.setTimeout(() => setConsoleCopied(false), 1400);
     } catch (cause) {
-      appendLog('warning', `Could not copy console text: ${(cause as Error).message || 'clipboard unavailable'}`)
+      appendLog(
+        "warning",
+        `Could not copy console text: ${(cause as Error).message || "clipboard unavailable"}`,
+      );
     }
-  }, [appendLog, consoleEntries])
-  const applyPortPreviews = useCallback((previews: PortPreviewMap) => {
-    setNodes(items => items.map(node => ({ ...node, data: { ...node.data, portPreviews: previews[node.id] } })))
-  }, [setNodes])
+  }, [appendLog, consoleEntries]);
+  const applyPortPreviews = useCallback(
+    (previews: PortPreviewMap) => {
+      setNodes((items) =>
+        items.map((node) => ({
+          ...node,
+          data: { ...node.data, portPreviews: previews[node.id] },
+        })),
+      );
+    },
+    [setNodes],
+  );
   const clearDiagnostics = useCallback(() => {
-    setSnapshotId(null)
-    setRunOnceMetrics({})
-    setRunOnceSinkMetrics({})
-    setNodes(items => items.map(node => node.data.portPreviews || node.data.runtimeError ? { ...node, data: { ...node.data, portPreviews: undefined, runtimeError: undefined } } : node))
-  }, [setNodes])
-  const applyNodeErrors = useCallback((errors: Record<string, string[]>) => {
-    setNodes(items => items.map(node => ({ ...node, data: { ...node.data, runtimeError: errors[node.id]?.join(' · ') } })))
-  }, [setNodes])
-  const executionError = useCallback((cause: unknown) => {
-    const issue = cause as Error
-    if (cause instanceof GraphApiError) applyNodeErrors(cause.nodeErrors)
-    const message = issue.message || 'Graph execution failed'
-    setError(message)
-    appendLog('error', message)
-  }, [appendLog, applyNodeErrors])
+    setSnapshotId(null);
+    setRunOnceMetrics({});
+    setRunOnceSinkMetrics({});
+    setNodes((items) =>
+      items.map((node) =>
+        node.data.portPreviews || node.data.runtimeError
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                portPreviews: undefined,
+                runtimeError: undefined,
+              },
+            }
+          : node,
+      ),
+    );
+  }, [setNodes]);
+  const applyNodeErrors = useCallback(
+    (errors: Record<string, string[]>) => {
+      setNodes((items) =>
+        items.map((node) => ({
+          ...node,
+          data: { ...node.data, runtimeError: errors[node.id]?.join(" · ") },
+        })),
+      );
+    },
+    [setNodes],
+  );
+  const executionError = useCallback(
+    (cause: unknown) => {
+      const issue = cause as Error;
+      if (cause instanceof GraphApiError) applyNodeErrors(cause.nodeErrors);
+      const message = issue.message || "Graph execution failed";
+      setError(message);
+      appendLog("error", message);
+    },
+    [appendLog, applyNodeErrors],
+  );
 
-  useEffect(() => { clearDiagnostics() }, [clearDiagnostics, config])
+  useEffect(() => {
+    clearDiagnostics();
+  }, [clearDiagnostics, config]);
 
   useEffect(() => {
     // Hide on the first painted frame instead of imposing a fixed startup delay.
     // The tiny CSS fade keeps the transition readable without slowing the app.
-    const frame = window.requestAnimationFrame(() => setSplashVisible(false))
-    return () => window.cancelAnimationFrame(frame)
-  }, [])
+    const frame = window.requestAnimationFrame(() => setSplashVisible(false));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
   useEffect(() => {
-    if (bootLoggedRef.current) return
-    bootLoggedRef.current = true
-    appendLog('info', 'SignalLab ready · build the graph, then run an experiment.')
-    fetch('/api/blocks').then(r => r.ok ? r.json() : fallbackSpecs).then(data => { setSpecs(data); appendLog('success', `${data.length} blocks loaded into the library.`) }).catch(() => appendLog('warning', 'Backend unavailable; using the built-in block library.'))
-  }, [appendLog])
+    if (bootLoggedRef.current) return;
+    bootLoggedRef.current = true;
+    appendLog(
+      "info",
+      "SignalLab ready · build the graph, then run an experiment.",
+    );
+    fetch("/api/blocks")
+      .then((r) => (r.ok ? r.json() : fallbackSpecs))
+      .then((data) => {
+        setSpecs(data);
+        appendLog("success", `${data.length} blocks loaded into the library.`);
+      })
+      .catch(() =>
+        appendLog(
+          "warning",
+          "Backend unavailable; using the built-in block library.",
+        ),
+      );
+  }, [appendLog]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!['Delete', 'Backspace'].includes(event.key) || (!selectedId && !selectedEdgeId)) return
-      const target = event.target as HTMLElement | null
-      if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return
-      event.preventDefault()
+      if (
+        !["Delete", "Backspace"].includes(event.key) ||
+        (!selectedId && !selectedEdgeId)
+      )
+        return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) ||
+          target.isContentEditable)
+      )
+        return;
+      event.preventDefault();
       if (selectedEdgeId) {
-        setEdges(items => items.filter(edge => edge.id !== selectedEdgeId))
-        setSelectedEdgeId(null)
-        clearDiagnostics()
+        setEdges((items) => items.filter((edge) => edge.id !== selectedEdgeId));
+        setSelectedEdgeId(null);
+        clearDiagnostics();
       } else if (selectedId) {
-        setNodes(items => items.filter(node => node.id !== selectedId).map(node => ({ ...node, data: { ...node.data, portPreviews: undefined, runtimeError: undefined } })))
-        setEdges(items => items.filter(edge => edge.source !== selectedId && edge.target !== selectedId))
-        setSelectedId(null)
+        setNodes((items) =>
+          items
+            .filter((node) => node.id !== selectedId)
+            .map((node) => ({
+              ...node,
+              data: {
+                ...node.data,
+                portPreviews: undefined,
+                runtimeError: undefined,
+              },
+            })),
+        );
+        setEdges((items) =>
+          items.filter(
+            (edge) => edge.source !== selectedId && edge.target !== selectedId,
+          ),
+        );
+        setSelectedId(null);
       }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [clearDiagnostics, selectedEdgeId, selectedId, setEdges, setNodes])
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [clearDiagnostics, selectedEdgeId, selectedId, setEdges, setNodes]);
   useEffect(() => {
-    if (!job || !['queued', 'running'].includes(job.status)) return
+    if (!job || !["queued", "running"].includes(job.status)) return;
     const timer = window.setInterval(async () => {
-      try { setJob(await getJob(job.id)) } catch (e) { const message = (e as Error).message; setError(message); appendLog('error', message) }
-    }, 500)
-    return () => window.clearInterval(timer)
-  }, [appendLog, job?.id, job?.status])
+      try {
+        setJob(await getJob(job.id));
+      } catch (e) {
+        const message = (e as Error).message;
+        setError(message);
+        appendLog("error", message);
+      }
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [appendLog, job?.id, job?.status]);
   useEffect(() => {
-    if (job?.status === 'completed' && job.result) {
-      applyPortPreviews(job.result.port_previews || {})
-      setSnapshotId(job.result.snapshot_id || null)
-      appendLog('success', `Benchmark completed · BER ${job.result.ber === null ? 'n/a' : job.result.ber.toExponential(3)} · ${job.result.snr_points.length} SNR points.`)
+    if (job?.status === "completed" && job.result) {
+      applyPortPreviews(job.result.port_previews || {});
+      setSnapshotId(job.result.snapshot_id || null);
+      appendLog(
+        "success",
+        `Benchmark completed · BER ${job.result.ber === null ? "n/a" : job.result.ber.toExponential(3)} · ${job.result.snr_points.length} SNR points.`,
+      );
     }
-    if (job?.status === 'failed' && job.error) {
-      applyNodeErrors(job.node_errors || {})
-      setError(job.error)
-      appendLog('error', job.error)
+    if (job?.status === "failed" && job.error) {
+      applyNodeErrors(job.node_errors || {});
+      setError(job.error);
+      appendLog("error", job.error);
     }
-    if (job?.status === 'cancelled') appendLog('warning', 'Benchmark cancelled by the user.')
-  }, [appendLog, applyNodeErrors, applyPortPreviews, job?.status])
+    if (job?.status === "cancelled")
+      appendLog("warning", "Benchmark cancelled by the user.");
+  }, [appendLog, applyNodeErrors, applyPortPreviews, job?.status]);
   useEffect(() => {
-    if (job?.status !== 'completed') return
-    window.setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
-  }, [job?.status])
+    if (job?.status !== "completed") return;
+    window.setTimeout(
+      () =>
+        resultsRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        }),
+      80,
+    );
+  }, [job?.status]);
   useEffect(() => {
-    if (job?.status !== 'running' || typeof job.snr_db !== 'number') return
-    if (lastSnrRef.current === job.snr_db) return
-    lastSnrRef.current = job.snr_db
-    appendLog('info', `SNR ${job.snr_db.toFixed(2)} dB · point ${(job.snr_index ?? 0) + 1}/${job.snr_count ?? '?'}`)
-  }, [appendLog, job?.snr_count, job?.snr_db, job?.snr_index, job?.status])
+    if (job?.status !== "running" || typeof job.snr_db !== "number") return;
+    if (lastSnrRef.current === job.snr_db) return;
+    lastSnrRef.current = job.snr_db;
+    appendLog(
+      "info",
+      `SNR ${job.snr_db.toFixed(2)} dB · point ${(job.snr_index ?? 0) + 1}/${job.snr_count ?? "?"}`,
+    );
+  }, [appendLog, job?.snr_count, job?.snr_db, job?.snr_index, job?.status]);
 
-  const onConnect = useCallback((connection: Connection) => { clearDiagnostics(); setSelectedEdgeId(null); setEdges(eds => addEdge({ ...connection, markerEnd: { type: MarkerType.ArrowClosed }, animated: true }, eds)) }, [clearDiagnostics, setEdges])
-  const onEdgesChangeWithPreview = useCallback((changes: EdgeChange[]) => {
-    if (changes.some(change => change.type === 'remove')) clearDiagnostics()
-    onEdgesChange(changes)
-  }, [clearDiagnostics, onEdgesChange])
-  const onNodeClick: NodeMouseHandler<FlowNode> = (_, node) => { setSelectedEdgeId(null); setSelectedId(node.id); setRightOpen(true) }
-  const onNodeDragStart: OnNodeDrag<FlowNode> = (_, node) => { setSelectedEdgeId(null); setSelectedId(node.id); setRightOpen(true) }
-  const onEdgeClick: EdgeMouseHandler<FlowEdge> = (_, edge) => { setSelectedId(null); setSelectedEdgeId(edge.id); setRightOpen(true) }
-  const updateSelected = (patch: Partial<FlowNode['data']>) => setNodes(items => items.map(n => ({ ...n, data: { ...n.data, ...(n.id === selectedId ? patch : {}), portPreviews: undefined, runtimeError: undefined } })))
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      clearDiagnostics();
+      setSelectedEdgeId(null);
+      setEdges((eds) =>
+        addEdge(
+          {
+            ...connection,
+            markerEnd: { type: MarkerType.ArrowClosed },
+            animated: true,
+          },
+          eds,
+        ),
+      );
+    },
+    [clearDiagnostics, setEdges],
+  );
+  const onEdgesChangeWithPreview = useCallback(
+    (changes: EdgeChange[]) => {
+      if (changes.some((change) => change.type === "remove"))
+        clearDiagnostics();
+      onEdgesChange(changes);
+    },
+    [clearDiagnostics, onEdgesChange],
+  );
+  const onNodeClick: NodeMouseHandler<FlowNode> = (_, node) => {
+    setSelectedEdgeId(null);
+    setSelectedId(node.id);
+    setRightOpen(true);
+  };
+  const onNodeDragStart: OnNodeDrag<FlowNode> = (_, node) => {
+    setSelectedEdgeId(null);
+    setSelectedId(node.id);
+    setRightOpen(true);
+  };
+  const onEdgeClick: EdgeMouseHandler<FlowEdge> = (_, edge) => {
+    setSelectedId(null);
+    setSelectedEdgeId(edge.id);
+    setRightOpen(true);
+  };
+  const updateSelected = (patch: Partial<FlowNode["data"]>) =>
+    setNodes((items) =>
+      items.map((n) => ({
+        ...n,
+        data: {
+          ...n.data,
+          ...(n.id === selectedId ? patch : {}),
+          portPreviews: undefined,
+          runtimeError: undefined,
+        },
+      })),
+    );
   const updatePythonCode = (code: string) => {
-    if (!selected || selected.data.blockType !== 'python') return
-    const layout = parsePythonPorts(code)
-    const nextInputs = new Set(layout.inputs)
-    const nextOutputs = new Set(layout.outputs)
-    const removed = edges.filter(edge => (edge.source === selected.id && !nextOutputs.has(edge.sourceHandle || 'out')) || (edge.target === selected.id && !nextInputs.has(edge.targetHandle || 'in')))
-    if (removed.length) appendLog('warning', `${removed.length} connection${removed.length === 1 ? '' : 's'} removed because the Python port declaration changed.`)
-    if (removed.length) setEdges(items => items.filter(edge => !removed.some(item => item.id === edge.id)))
-    updateSelected({ code, inputs: layout.inputs, outputs: layout.outputs })
-  }
+    if (!selected || selected.data.blockType !== "python") return;
+    const layout = parsePythonPorts(code);
+    const nextInputs = new Set(layout.inputs);
+    const nextOutputs = new Set(layout.outputs);
+    const removed = edges.filter(
+      (edge) =>
+        (edge.source === selected.id &&
+          !nextOutputs.has(edge.sourceHandle || "out")) ||
+        (edge.target === selected.id &&
+          !nextInputs.has(edge.targetHandle || "in")),
+    );
+    if (removed.length)
+      appendLog(
+        "warning",
+        `${removed.length} connection${removed.length === 1 ? "" : "s"} removed because the Python port declaration changed.`,
+      );
+    if (removed.length)
+      setEdges((items) =>
+        items.filter((edge) => !removed.some((item) => item.id === edge.id)),
+      );
+    updateSelected({ code, inputs: layout.inputs, outputs: layout.outputs });
+  };
   const loadSourceFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file || !selected) return
-    const bytes = new Uint8Array(await file.arrayBuffer())
-    let binary = ''
-    for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000))
-    updateSelected({ params: { ...selected.data.params, file_name: file.name, data_base64: btoa(binary) } })
-    appendLog('success', `${file.name} loaded into ${selected.data.label} (${bytes.length.toLocaleString()} bytes).`)
-  }
+    const file = event.target.files?.[0];
+    if (!file || !selected) return;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = "";
+    for (let index = 0; index < bytes.length; index += 0x8000)
+      binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+    updateSelected({
+      params: {
+        ...selected.data.params,
+        file_name: file.name,
+        data_base64: btoa(binary),
+      },
+    });
+    appendLog(
+      "success",
+      `${file.name} loaded into ${selected.data.label} (${bytes.length.toLocaleString()} bytes).`,
+    );
+  };
   const startResize = (event: React.PointerEvent) => {
-    event.preventDefault()
-    resizeRef.current = { startX: event.clientX, startWidth: rightWidth }
+    event.preventDefault();
+    resizeRef.current = { startX: event.clientX, startWidth: rightWidth };
     const move = (moveEvent: PointerEvent) => {
-      const current = resizeRef.current
-      if (!current) return
-      const delta = moveEvent.clientX - current.startX
-      setRightWidth(Math.min(520, Math.max(300, current.startWidth - delta)))
-    }
-    const stop = () => { resizeRef.current = null; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop) }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', stop)
-  }
+      const current = resizeRef.current;
+      if (!current) return;
+      const delta = moveEvent.clientX - current.startX;
+      setRightWidth(Math.min(520, Math.max(300, current.startWidth - delta)));
+    };
+    const stop = () => {
+      resizeRef.current = null;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+  };
   const startConsoleResize = (event: React.PointerEvent) => {
-    event.preventDefault()
-    consoleResizeRef.current = { startY: event.clientY, startHeight: consoleHeight }
+    event.preventDefault();
+    consoleResizeRef.current = {
+      startY: event.clientY,
+      startHeight: consoleHeight,
+    };
     const move = (moveEvent: PointerEvent) => {
-      const current = consoleResizeRef.current
-      if (!current) return
-      setConsoleHeight(Math.min(320, Math.max(92, current.startHeight - (moveEvent.clientY - current.startY))))
-    }
-    const stop = () => { consoleResizeRef.current = null; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop) }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', stop)
-  }
+      const current = consoleResizeRef.current;
+      if (!current) return;
+      setConsoleHeight(
+        Math.min(
+          320,
+          Math.max(
+            92,
+            current.startHeight - (moveEvent.clientY - current.startY),
+          ),
+        ),
+      );
+    };
+    const stop = () => {
+      consoleResizeRef.current = null;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+  };
 
   const addBlock = (spec: BlockSpec, position?: { x: number; y: number }) => {
-    if (spec.type === 'variables' && nodes.some(node => node.data.blockType === 'variables')) {
-      const existing = nodes.find(node => node.data.blockType === 'variables')!
-      setSelectedId(existing.id); setRightOpen(true)
-      appendLog('warning', 'A simulation can contain only one Variables block; selected the existing block.')
-      return
+    if (
+      spec.type === "variables" &&
+      nodes.some((node) => node.data.blockType === "variables")
+    ) {
+      const existing = nodes.find(
+        (node) => node.data.blockType === "variables",
+      )!;
+      setSelectedId(existing.id);
+      setRightOpen(true);
+      appendLog(
+        "warning",
+        "A simulation can contain only one Variables block; selected the existing block.",
+      );
+      return;
     }
-    clearDiagnostics()
-    const id = `${spec.type}-${Date.now()}`
+    clearDiagnostics();
+    const id = `${spec.type}-${Date.now()}`;
     const node: FlowNode = {
-      id, type: 'signal', position: position || { x: 300 + Math.random() * 300, y: 140 + Math.random() * 300 },
-      data: { label: spec.label, blockType: spec.type, category: spec.category, params: { ...spec.defaults }, inputs: spec.inputs, outputs: spec.outputs, portOrientation: 'standard', code: spec.type === 'python' ? pythonTemplate : undefined },
-    }
-    setNodes(ns => [...ns, node]); setSelectedId(id); setRightOpen(true)
-  }
+      id,
+      type: "signal",
+      position: position || {
+        x: 300 + Math.random() * 300,
+        y: 140 + Math.random() * 300,
+      },
+      data: {
+        label: spec.label,
+        blockType: spec.type,
+        category: spec.category,
+        params: { ...spec.defaults },
+        inputs: spec.inputs,
+        outputs: spec.outputs,
+        portOrientation: "standard",
+        code: spec.type === "python" ? pythonTemplate : undefined,
+      },
+    };
+    setNodes((ns) => [...ns, node]);
+    setSelectedId(id);
+    setRightOpen(true);
+  };
 
   const runOnce = async () => {
-    if (configIssue) { setError(configIssue); return }
-    clearDiagnostics()
-    setError(''); setRunOnceActive(true); setJob(null)
-    appendLog('info', config.mode === 'specific_steps' ? 'Running specific steps with channel defaults…' : `Running one frame at ${config.snr_db_start} dB…`)
+    if (configIssue) {
+      setError(configIssue);
+      return;
+    }
+    clearDiagnostics();
+    setError("");
+    setRunOnceActive(true);
+    setJob(null);
+    appendLog(
+      "info",
+      config.mode === "specific_steps"
+        ? "Running specific steps with channel defaults…"
+        : `Running one frame at ${config.snr_db_start} dB…`,
+    );
     try {
-      const snapshot = await runGraphOnce(nodes, edges, config)
-      applyPortPreviews(snapshot.port_previews)
-      setSnapshotId(snapshot.snapshot_id)
-      setRunOnceMetrics(snapshot.metrics)
-      setRunOnceSinkMetrics(snapshot.sink_metrics || {})
-      appendLog('success', `Run once completed in ${(snapshot.elapsed_seconds * 1000).toFixed(1)} ms on ${snapshot.device.toUpperCase()} · hover any port to inspect data.`)
-    } catch (e) { executionError(e) } finally { setRunOnceActive(false) }
-  }
+      const snapshot = await runGraphOnce(nodes, edges, config);
+      applyPortPreviews(snapshot.port_previews);
+      setSnapshotId(snapshot.snapshot_id);
+      setRunOnceMetrics(snapshot.metrics);
+      setRunOnceSinkMetrics(snapshot.sink_metrics || {});
+      appendLog(
+        "success",
+        `Run once completed in ${(snapshot.elapsed_seconds * 1000).toFixed(1)} ms on ${snapshot.device.toUpperCase()} · hover any port to inspect data.`,
+      );
+    } catch (e) {
+      executionError(e);
+    } finally {
+      setRunOnceActive(false);
+    }
+  };
 
   const runBenchmark = async () => {
-    if (configIssue) { setError(configIssue); return }
-    setError(''); lastSnrRef.current = null; setRunOnceMetrics({}); setRunOnceSinkMetrics({})
-    clearDiagnostics()
-    const sweepLabel = config.mode === 'specific_steps' ? `${config.max_frames} fixed steps (channel defaults)` : `${config.snr_db_start}…${config.snr_db_stop} dB`
-    appendLog('info', `Starting ${config.mode === 'ber_benchmark' ? 'BER benchmark' : 'specific-step experiment'}: ${sweepLabel}.`)
+    if (configIssue) {
+      setError(configIssue);
+      return;
+    }
+    setError("");
+    lastSnrRef.current = null;
+    setRunOnceMetrics({});
+    setRunOnceSinkMetrics({});
+    clearDiagnostics();
+    const sweepLabel =
+      config.mode === "specific_steps"
+        ? `${config.max_frames} fixed steps (channel defaults)`
+        : `${config.snr_db_start}…${config.snr_db_stop} dB`;
+    appendLog(
+      "info",
+      `Starting ${config.mode === "ber_benchmark" ? "BER benchmark" : "specific-step experiment"}: ${sweepLabel}.`,
+    );
     try {
-      const id = await createJob(nodes, edges, config)
-      const totalTrials = snrPointCount(config) * config.max_frames
-      setJob({ id, status: 'queued', progress: 0, completed_trials: 0, trials: totalTrials })
-      appendLog('info', `Job ${id.slice(0, 8)} queued · ${config.max_frames} max frames × ${snrPointCount(config)} SNR points.`)
-    } catch (e) { executionError(e) }
-  }
+      const id = await createJob(nodes, edges, config);
+      const totalTrials = snrPointCount(config) * config.max_frames;
+      setJob({
+        id,
+        status: "queued",
+        progress: 0,
+        completed_trials: 0,
+        trials: totalTrials,
+      });
+      appendLog(
+        "info",
+        `Job ${id.slice(0, 8)} queued · ${config.max_frames} max frames × ${snrPointCount(config)} SNR points.`,
+      );
+    } catch (e) {
+      executionError(e);
+    }
+  };
 
   const stopBenchmark = async () => {
-    if (!job || !jobActive) return
+    if (!job || !jobActive) return;
     try {
-      await cancelJob(job.id)
-      appendLog('warning', 'Benchmark stop requested…')
+      await cancelJob(job.id);
+      appendLog("warning", "Benchmark stop requested…");
     } catch (cause) {
-      appendLog('error', `Could not stop benchmark: ${(cause as Error).message}`)
+      appendLog(
+        "error",
+        `Could not stop benchmark: ${(cause as Error).message}`,
+      );
     }
-  }
+  };
 
-  const projectDocument = useCallback(() => JSON.stringify({
-    format: 'signallab-simulation',
-    version: '1.0',
-    saved_at: new Date().toISOString(),
-    graph: graphPayload(nodes, edges),
-    config,
-  }, null, 2), [config, edges, nodes])
+  const projectDocument = useCallback(
+    () =>
+      JSON.stringify(
+        {
+          format: "signallab-simulation",
+          version: "1.0",
+          saved_at: new Date().toISOString(),
+          graph: graphPayload(nodes, edges),
+          config,
+        },
+        null,
+        2,
+      ),
+    [config, edges, nodes],
+  );
 
-  const applyProject = useCallback((content: string, filename: string) => {
-    try {
-      const project = JSON.parse(content)
-      if (!project?.graph || !Array.isArray(project.graph.nodes) || !Array.isArray(project.graph.edges)) throw new Error('Missing graph data')
-      const specMap = new Map(specs.map(s => [s.type, s]))
-      const importedNodes = project.graph.nodes.map((n: any) => {
-        const pythonPorts = n.type === 'python' ? parsePythonPorts(n.code || '') : undefined
-        return {
-        id: n.id, type: 'signal', position: n.position,
-        data: { label: n.label, blockType: n.type, category: specMap.get(n.type)?.category || '', params: { ...(specMap.get(n.type)?.defaults || {}), ...(n.params || {}) }, code: n.code, portOrientation: n.port_orientation || 'standard', inputs: pythonPorts?.inputs || specMap.get(n.type)?.inputs || ['in'], outputs: pythonPorts?.outputs || specMap.get(n.type)?.outputs || ['out'] },
-        }
-      }) as FlowNode[]
-      const importedEdges = project.graph.edges.map((e: any) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.source_handle, targetHandle: e.target_handle }))
-      const imported = project.config || {}
-      const importedMaxFrames = imported.max_frames ?? imported.trials ?? defaultSimulationConfig.max_frames
-      const importedConfig = { ...defaultSimulationConfig, ...imported, mode: imported.mode === 'ber_benchmark' ? 'ber_benchmark' : 'specific_steps', snr_db_points: Array.isArray(imported.snr_db_points) && imported.snr_db_points.length ? imported.snr_db_points : [0], trials: imported.trials ?? importedMaxFrames, max_frames: importedMaxFrames }
-      setNodes(importedNodes)
-      setEdges(importedEdges)
-      setFitRequest(value => value + 1)
-      setConfig(importedConfig)
-      setSavedSignature(projectSignature(importedNodes, importedEdges, importedConfig))
-      setProjectName(projectDisplayName(filename))
-      setSelectedId(null); setJob(null); setSnapshotId(null); setError('')
-      appendLog('success', `${filename} opened · ${importedNodes.length} blocks and ${importedEdges.length} links.`)
-      return true
-    } catch {
-      setError('This SignalLab simulation file is not valid.')
-      appendLog('error', `Could not open ${filename}: invalid simulation file.`)
-      return false
-    }
-  }, [appendLog, setEdges, setNodes, specs])
-
-  const saveProject = useCallback(async (saveAs = false) => {
-    if (savingProject) return
-    setSavingProject(true)
-    try {
-      const result = await saveProjectFile(projectDocument(), projectName, saveAs)
-      if (!result) return
-      const filename = result.name || `${projectName}.slab.json`
-      setProjectName(projectDisplayName(filename))
-      setSavedSignature(currentSignature)
-      appendLog('success', `${filename} saved${result.direct === false ? ' as a download' : ''}.`)
-    } catch (cause) {
-      if ((cause as DOMException).name !== 'AbortError') {
-        const message = (cause as Error).message || 'Could not save the simulation file.'
-        setError(message); appendLog('error', message)
+  const applyProject = useCallback(
+    (content: string, filename: string) => {
+      try {
+        const project = JSON.parse(content);
+        if (
+          !project?.graph ||
+          !Array.isArray(project.graph.nodes) ||
+          !Array.isArray(project.graph.edges)
+        )
+          throw new Error("Missing graph data");
+        const specMap = new Map(specs.map((s) => [s.type, s]));
+        const importedNodes = project.graph.nodes.map((n: any) => {
+          const pythonPorts =
+            n.type === "python" ? parsePythonPorts(n.code || "") : undefined;
+          return {
+            id: n.id,
+            type: "signal",
+            position: n.position,
+            data: {
+              label: n.label,
+              blockType: n.type,
+              category: specMap.get(n.type)?.category || "",
+              params: {
+                ...(specMap.get(n.type)?.defaults || {}),
+                ...(n.params || {}),
+              },
+              code: n.code,
+              portOrientation: n.port_orientation || "standard",
+              inputs: pythonPorts?.inputs ||
+                specMap.get(n.type)?.inputs || ["in"],
+              outputs: pythonPorts?.outputs ||
+                specMap.get(n.type)?.outputs || ["out"],
+            },
+          };
+        }) as FlowNode[];
+        const importedEdges = project.graph.edges.map((e: any) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          sourceHandle: e.source_handle,
+          targetHandle: e.target_handle,
+        }));
+        const imported = project.config || {};
+        const importedMaxFrames =
+          imported.max_frames ??
+          imported.trials ??
+          defaultSimulationConfig.max_frames;
+        const importedConfig = {
+          ...defaultSimulationConfig,
+          ...imported,
+          mode:
+            imported.mode === "ber_benchmark"
+              ? "ber_benchmark"
+              : "specific_steps",
+          snr_db_points:
+            Array.isArray(imported.snr_db_points) &&
+            imported.snr_db_points.length
+              ? imported.snr_db_points
+              : [0],
+          trials: imported.trials ?? importedMaxFrames,
+          max_frames: importedMaxFrames,
+        };
+        setNodes(importedNodes);
+        setEdges(importedEdges);
+        setFitRequest((value) => value + 1);
+        setConfig(importedConfig);
+        setSavedSignature(
+          projectSignature(importedNodes, importedEdges, importedConfig),
+        );
+        setProjectName(projectDisplayName(filename));
+        setSelectedId(null);
+        setJob(null);
+        setSnapshotId(null);
+        setError("");
+        appendLog(
+          "success",
+          `${filename} opened · ${importedNodes.length} blocks and ${importedEdges.length} links.`,
+        );
+        return true;
+      } catch {
+        setError("This SignalLab simulation file is not valid.");
+        appendLog(
+          "error",
+          `Could not open ${filename}: invalid simulation file.`,
+        );
+        return false;
       }
-    } finally { setSavingProject(false) }
-  }, [appendLog, currentSignature, projectDocument, projectName, savingProject])
+    },
+    [appendLog, setEdges, setNodes, specs],
+  );
+
+  const saveProject = useCallback(
+    async (saveAs = false) => {
+      if (savingProject) return;
+      setSavingProject(true);
+      try {
+        const result = await saveProjectFile(
+          projectDocument(),
+          projectName,
+          saveAs,
+        );
+        if (!result) return;
+        const filename = result.name || `${projectName}.slab.json`;
+        setProjectName(projectDisplayName(filename));
+        setSavedSignature(currentSignature);
+        appendLog(
+          "success",
+          `${filename} saved${result.direct === false ? " as a download" : ""}.`,
+        );
+      } catch (cause) {
+        if ((cause as DOMException).name !== "AbortError") {
+          const message =
+            (cause as Error).message || "Could not save the simulation file.";
+          setError(message);
+          appendLog("error", message);
+        }
+      } finally {
+        setSavingProject(false);
+      }
+    },
+    [appendLog, currentSignature, projectDocument, projectName, savingProject],
+  );
 
   const openProject = useCallback(async () => {
-    if (projectDirty && !window.confirm('Discard unsaved changes and open another simulation?')) return
+    if (
+      projectDirty &&
+      !window.confirm("Discard unsaved changes and open another simulation?")
+    )
+      return;
     try {
-      if (!supportsProjectOpenDialog()) { fileRef.current?.click(); return }
-      const opened = await openProjectFile()
-      if (opened?.content && !applyProject(opened.content, opened.name || 'simulation.slab.json')) await clearProjectFileTarget()
+      if (!supportsProjectOpenDialog()) {
+        fileRef.current?.click();
+        return;
+      }
+      const opened = await openProjectFile();
+      if (
+        opened?.content &&
+        !applyProject(opened.content, opened.name || "simulation.slab.json")
+      )
+        await clearProjectFileTarget();
     } catch (cause) {
-      if ((cause as DOMException).name !== 'AbortError') {
-        const message = (cause as Error).message || 'Could not open the simulation file.'
-        setError(message); appendLog('error', message)
+      if ((cause as DOMException).name !== "AbortError") {
+        const message =
+          (cause as Error).message || "Could not open the simulation file.";
+        setError(message);
+        appendLog("error", message);
       }
     }
-  }, [appendLog, applyProject, projectDirty])
+  }, [appendLog, applyProject, projectDirty]);
 
   const importProject = async (file?: File) => {
-    if (!file) return
-    const opened = await attachBrowserProjectFile(file)
-    applyProject(opened.content, opened.name)
-  }
+    if (!file) return;
+    const opened = await attachBrowserProjectFile(file);
+    applyProject(opened.content, opened.name);
+  };
 
   const newSimulation = () => {
-    if (projectDirty && !window.confirm('Discard unsaved changes and create a new simulation?')) return
-    clearDiagnostics()
-    setNodes([])
-    setEdges([])
-    setConfig({ ...defaultSimulationConfig })
-    setSelectedId(null)
-    setJob(null)
-    setSnapshotId(null)
-    setError('')
-    setProjectName('Untitled simulation')
-    setSavedSignature('')
-    lastSnrRef.current = null
-    void clearProjectFileTarget()
-    appendLog('info', 'New blank simulation created. Use Save to choose a project file.')
-  }
+    if (
+      projectDirty &&
+      !window.confirm("Discard unsaved changes and create a new simulation?")
+    )
+      return;
+    clearDiagnostics();
+    setNodes([]);
+    setEdges([]);
+    setConfig({ ...defaultSimulationConfig });
+    setSelectedId(null);
+    setJob(null);
+    setSnapshotId(null);
+    setError("");
+    setProjectName("Untitled simulation");
+    setSavedSignature("");
+    lastSnrRef.current = null;
+    void clearProjectFileTarget();
+    appendLog(
+      "info",
+      "New blank simulation created. Use Save to choose a project file.",
+    );
+  };
 
   const resetPortData = () => {
-    clearDiagnostics()
-    setJob(null)
-    setError('')
-    lastSnrRef.current = null
-    appendLog('info', 'All runtime data and port previews were cleared. The graph and experiment configuration were kept.')
-  }
+    clearDiagnostics();
+    setJob(null);
+    setError("");
+    lastSnrRef.current = null;
+    appendLog(
+      "info",
+      "All runtime data and port previews were cleared. The graph and experiment configuration were kept.",
+    );
+  };
 
   const openCatalogSample = (sample: SampleProject) => {
-    if (projectDirty && !window.confirm('Discard unsaved changes and open this sample?')) return
-    const materialized = materializeSample(sample, specs)
-    clearDiagnostics()
-    setNodes(materialized.nodes)
-    setEdges(materialized.edges)
-    setFitRequest(value => value + 1)
-    setConfig(materialized.config)
-    setSelectedId(null)
-    setJob(null)
-    setSnapshotId(null)
-    setError('')
-    setProjectName(sample.sample.title)
-    setSavedSignature('')
-    lastSnrRef.current = null
-    void clearProjectFileTarget()
-    setSamplesOpen(false)
-    appendLog('success', `Sample “${sample.sample.title}” opened · ${materialized.nodes.length} blocks and ${materialized.edges.length} links.`)
-    appendLog('info', `Learning goal: ${sample.sample.learning_objectives[0]}`)
-  }
+    if (
+      projectDirty &&
+      !window.confirm("Discard unsaved changes and open this sample?")
+    )
+      return;
+    const materialized = materializeSample(sample, specs);
+    clearDiagnostics();
+    setNodes(materialized.nodes);
+    setEdges(materialized.edges);
+    setFitRequest((value) => value + 1);
+    setConfig(materialized.config);
+    setSelectedId(null);
+    setJob(null);
+    setSnapshotId(null);
+    setError("");
+    setProjectName(sample.sample.title);
+    setSavedSignature("");
+    lastSnrRef.current = null;
+    void clearProjectFileTarget();
+    setSamplesOpen(false);
+    appendLog(
+      "success",
+      `Sample “${sample.sample.title}” opened · ${materialized.nodes.length} blocks and ${materialized.edges.length} links.`,
+    );
+    appendLog("info", `Learning goal: ${sample.sample.learning_objectives[0]}`);
+  };
 
   useEffect(() => {
     const onSaveShortcut = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 's') return
-      event.preventDefault()
-      void saveProject(event.shiftKey)
-    }
-    window.addEventListener('keydown', onSaveShortcut)
-    return () => window.removeEventListener('keydown', onSaveShortcut)
-  }, [saveProject])
-  const result = job?.result
-  const livePointsRaw = job?.status === 'running' ? (job.snr_points || []) : (result?.snr_points || job?.snr_points || [])
-  const livePoints = livePointsRaw.filter(point => Number.isFinite(point.snr_db)).map(point => ({ ...point, snr_db: point.snr_db as number }))
-  const activeSinkMetrics = result?.sink_metrics || runOnceSinkMetrics
-  const hasBerSink = nodes.some(node => node.data.blockType === 'ber')
-  const sinkNodes = nodes.filter(node => ['ber', 'power_meter', 'constellation', 'scope', 'source_analyzer', 'ser', 'evm_meter', 'spectrum_analyzer', 'waterfall_sink'].includes(node.data.blockType))
-  const hasVisibleSinkResults = Object.keys(activeSinkMetrics).length > 0 || (hasBerSink && livePoints.length > 0)
-  const sourceFrames = runOnceMetrics.source_frame_count || 0
-  const sourceSymbols = runOnceMetrics.source_symbol_count || 0
-  const sourceTheoryMetrics = activeSinkMetrics.source_entropy !== undefined ? activeSinkMetrics : sourceFrames ? {
-    source_entropy: runOnceMetrics.source_entropy_sum / sourceFrames,
-    source_max_entropy: runOnceMetrics.source_max_entropy_sum / sourceFrames,
-    source_efficiency_percent: runOnceMetrics.source_efficiency_sum / sourceFrames,
-    source_average_information: sourceSymbols ? runOnceMetrics.source_information_sum / sourceSymbols : 0,
-    source_alphabet_size: runOnceMetrics.source_alphabet_size_peak,
-  } : undefined
-  const symbolMetrics = activeSinkMetrics.ser !== undefined ? activeSinkMetrics : runOnceMetrics.total_symbols ? {
-    ser: runOnceMetrics.symbol_errors / runOnceMetrics.total_symbols,
-    symbol_errors: runOnceMetrics.symbol_errors,
-    total_symbols: runOnceMetrics.total_symbols,
-  } : undefined
+      if (
+        event.defaultPrevented ||
+        !(event.ctrlKey || event.metaKey) ||
+        event.key.toLowerCase() !== "s"
+      )
+        return;
+      event.preventDefault();
+      void saveProject(event.shiftKey);
+    };
+    window.addEventListener("keydown", onSaveShortcut);
+    return () => window.removeEventListener("keydown", onSaveShortcut);
+  }, [saveProject]);
+  const result = job?.result;
+  const livePointsRaw =
+    job?.status === "running"
+      ? job.snr_points || []
+      : result?.snr_points || job?.snr_points || [];
+  const livePoints = livePointsRaw
+    .filter((point) => Number.isFinite(point.snr_db))
+    .map((point) => ({ ...point, snr_db: point.snr_db as number }));
+  const activeSinkMetrics = result?.sink_metrics || runOnceSinkMetrics;
+  const hasBerSink = nodes.some((node) => node.data.blockType === "ber");
+  const sinkNodes = nodes.filter((node) =>
+    [
+      "ber",
+      "power_meter",
+      "constellation",
+      "scope",
+      "source_analyzer",
+      "ser",
+      "evm_meter",
+      "spectrum_analyzer",
+      "waterfall_sink",
+    ].includes(node.data.blockType),
+  );
+  const hasVisibleSinkResults =
+    Object.keys(activeSinkMetrics).length > 0 ||
+    (hasBerSink && livePoints.length > 0);
+  const sourceFrames = runOnceMetrics.source_frame_count || 0;
+  const sourceSymbols = runOnceMetrics.source_symbol_count || 0;
+  const sourceTheoryMetrics =
+    activeSinkMetrics.source_entropy !== undefined
+      ? activeSinkMetrics
+      : sourceFrames
+        ? {
+            source_entropy: runOnceMetrics.source_entropy_sum / sourceFrames,
+            source_max_entropy:
+              runOnceMetrics.source_max_entropy_sum / sourceFrames,
+            source_efficiency_percent:
+              runOnceMetrics.source_efficiency_sum / sourceFrames,
+            source_average_information: sourceSymbols
+              ? runOnceMetrics.source_information_sum / sourceSymbols
+              : 0,
+            source_alphabet_size: runOnceMetrics.source_alphabet_size_peak,
+          }
+        : undefined;
+  const symbolMetrics =
+    activeSinkMetrics.ser !== undefined
+      ? activeSinkMetrics
+      : runOnceMetrics.total_symbols
+        ? {
+            ser: runOnceMetrics.symbol_errors / runOnceMetrics.total_symbols,
+            symbol_errors: runOnceMetrics.symbol_errors,
+            total_symbols: runOnceMetrics.total_symbols,
+          }
+        : undefined;
   const openExperimentConfig = () => {
-    setConfigDraft({ ...config })
-    setExperimentConfigOpen(true)
-  }
+    setConfigDraft({ ...config });
+    setExperimentConfigOpen(true);
+  };
   const applyExperimentConfig = () => {
-    if (configDraftIssue || executionActive) return
-    setConfig({ ...configDraft, trials: configDraft.max_frames })
-    setExperimentConfigOpen(false)
-    appendLog('success', 'Experiment configuration saved.')
-  }
+    if (configDraftIssue || executionActive) return;
+    setConfig({ ...configDraft, trials: configDraft.max_frames });
+    setExperimentConfigOpen(false);
+    appendLog("success", "Experiment configuration saved.");
+  };
 
   return (
-    <><div className={`startup-splash ${splashVisible ? '' : 'hidden'}`} aria-hidden={!splashVisible}><div className="startup-logo"><img src="/app-icon.svg" alt="" /></div><strong>SignalLab</strong><span>Digital Communications Studio</span><i /></div><div className={`app-shell ${isConnecting ? 'connecting' : ''}`} style={{ gridTemplateRows: `60px minmax(0, 1fr) ${consoleOpen ? consoleHeight : 0}px`, gridTemplateColumns: `minmax(0, 1fr) ${rightOpen ? rightWidth : 0}px` }}>
-      <header className="topbar">
-        <div className="brand"><div className="brand-mark"><img src="/app-icon.svg" alt="SignalLab logo" /></div><div><strong>SignalLab</strong><span>Communications Studio</span></div></div>
-        <div className={`project-name ${projectDirty ? 'dirty' : ''}`} title={projectDirty ? 'Unsaved changes' : 'All changes saved'}><span className="status-dot" /><span>{projectName}</span>{projectDirty && <small>Unsaved</small>}</div>
-        <div className="top-actions">
-          <button className="ghost labeled compact-label" onClick={newSimulation} disabled={executionActive} title="Create a blank simulation"><FilePlus2 size={15} /><span>New</span></button>
-          <button className="ghost labeled compact-label" onClick={() => void openProject()} title="Open a SignalLab simulation"><FolderOpen size={15} /><span>Open</span></button>
-          <button className="ghost labeled samples-action" onClick={() => setSamplesOpen(true)} title="Open a complete learning sample"><LibraryBig size={15} /><span>Open Samples</span></button>
-          <input ref={fileRef} type="file" accept=".slab.json,.json,application/json" hidden onChange={e => { void importProject(e.target.files?.[0]); e.target.value = '' }} />
-          <button className="ghost labeled save-action compact-label" onClick={() => void saveProject(false)} disabled={savingProject} title="Save simulation (Ctrl+S)"><Save size={15} /><span>{savingProject ? 'Saving…' : 'Save'}</span></button>
-          <button className="ghost labeled compact-label" onClick={() => void saveProject(true)} disabled={savingProject} title="Save simulation as a new file (Ctrl+Shift+S)"><SaveAll size={15} /><span>Save As</span></button>
-          <button className="ghost labeled documents-action" onClick={openDocuments} title="Open SignalLab documentation in a separate window"><BookOpen size={15} /><span>Documents</span></button>
+    <>
+      <div
+        className={`startup-splash ${splashVisible ? "" : "hidden"}`}
+        aria-hidden={!splashVisible}
+      >
+        <div className="startup-logo">
+          <img src="/app-icon.svg" alt="" />
         </div>
-      </header>
-      <SampleLibraryModal open={samplesOpen} onClose={() => setSamplesOpen(false)} onOpenSample={openCatalogSample} />
-      {blockPickerOpen && <BlockPickerModal specs={specs} onClose={() => setBlockPickerOpen(false)} onAdd={spec => { addBlock(spec); setBlockPickerOpen(false) }} />}
-      {experimentConfigOpen && <div className="experiment-config-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setExperimentConfigOpen(false) }}>
-        <section className="experiment-config-modal config-only" role="dialog" aria-modal="true" aria-labelledby="experiment-config-title">
-          <header className="experiment-config-header"><div><span>SIMULATION SETTINGS</span><h2 id="experiment-config-title">Experiment config</h2><p>Configure the experiment mode and runtime settings.</p></div><button type="button" onClick={() => setExperimentConfigOpen(false)} title="Close experiment config"><X size={18} /></button></header>
-          <div className="experiment-config-body config-only">
-            <div className="experiment-config-form">
-              <div className="section-rule"><span>EXPERIMENT MODE</span></div>
-              <label>Mode<select disabled={executionActive} value={configDraft.mode} onChange={e => setConfigDraft(current => ({ ...current, mode: e.target.value as SimulationConfig['mode'] }))}><option value="specific_steps">Specific steps · fixed count</option><option value="ber_benchmark">BER benchmark · SNR sweep</option></select><small>{configDraft.mode === 'specific_steps' ? 'Run fixed steps at one SNR; channels use it unless set to Fixed block value.' : 'Sweep SNR and stop each point after enough errors or the frame limit.'}</small></label>
-              <div className="section-rule"><span>{configDraft.mode === 'specific_steps' ? 'FIXED STEPS' : 'SNR SWEEP (dB)'}</span></div>
-              {configDraft.mode === 'specific_steps' ? <><div className="form-grid"><label>SNR (dB)<NumericInput disabled={executionActive} value={configDraft.snr_db_start} onValueChange={value => setConfigDraft(current => ({ ...current, snr_db_start: value }))} /></label><label>Frames<NumericInput disabled={executionActive} integer value={configDraft.max_frames} onValueChange={value => setConfigDraft(current => ({ ...current, max_frames: value, trials: value, min_frames: value }))} /></label></div><small>A frame is one execution of the graph; its bit count is defined by the source block. Scientific notation is supported.</small></> : <><div className="form-grid"><label>Start<NumericInput disabled={executionActive} value={configDraft.snr_db_start} onValueChange={value => setConfigDraft(current => ({ ...current, snr_db_start: value }))} /></label><label>Stop<NumericInput disabled={executionActive} value={configDraft.snr_db_stop} onValueChange={value => setConfigDraft(current => ({ ...current, snr_db_stop: value }))} /></label></div><label>Step<NumericInput disabled={executionActive} value={configDraft.snr_db_step} onValueChange={value => setConfigDraft(current => ({ ...current, snr_db_step: value }))} /></label><div className="form-grid"><label>Max frames / SNR<NumericInput disabled={executionActive} integer value={configDraft.max_frames} onValueChange={value => setConfigDraft(current => ({ ...current, max_frames: value, trials: value }))} /></label><label>Min frames / SNR<NumericInput disabled={executionActive} integer value={configDraft.min_frames} onValueChange={value => setConfigDraft(current => ({ ...current, min_frames: value }))} /></label></div><label>Min errors / SNR<NumericInput disabled={executionActive} integer value={configDraft.min_errors} onValueChange={value => setConfigDraft(current => ({ ...current, min_errors: value }))} /><small>No one-million-frame cap. Frames are streamed in bounded internal batches.</small></label></>}
-              <div className="section-rule"><span>RUNTIME</span></div>
-              <label>Execution engine<select disabled={executionActive} value={configDraft.engine} onChange={e => setConfigDraft(current => ({ ...current, engine: e.target.value as SimulationConfig['engine'] }))}><option value="auto">Auto · native when supported</option><option value="native">Native · C++/oneTBB only</option><option value="python">Python · compatibility engine</option></select><small>Auto uses the fused native engine for supported benchmark graphs and falls back safely.</small></label>
-              <div className="form-grid"><label>Workers<NumericInput disabled={executionActive} integer value={configDraft.workers} onValueChange={value => setConfigDraft(current => ({ ...current, workers: value }))} /><small>0 = auto</small></label><label>Seed<NumericInput disabled={executionActive} integer value={configDraft.seed} onValueChange={value => setConfigDraft(current => ({ ...current, seed: value }))} /></label></div>
-              <label>Chunk size<NumericInput disabled={executionActive} integer value={configDraft.chunk_size} onValueChange={value => setConfigDraft(current => ({ ...current, chunk_size: value }))} /></label>
-              <label>Compute device<select disabled={executionActive} value={configDraft.device} onChange={e => setConfigDraft(current => ({ ...current, device: e.target.value as SimulationConfig['device'] }))}><option value="auto">Auto · best available</option><option value="cpu">CPU · native or NumPy</option><option value="gpu">GPU · CUDA/CuPy</option></select></label>
-              {configDraftIssue && <div className="config-issue" role="alert">{configDraftIssue}</div>}
+        <strong>SignalLab</strong>
+        <span>Digital Communications Studio</span>
+        <i />
+      </div>
+      <div
+        className={`app-shell ${isConnecting ? "connecting" : ""}`}
+        style={{
+          gridTemplateRows: `60px minmax(0, 1fr) ${consoleOpen ? consoleHeight : 0}px`,
+          gridTemplateColumns: `minmax(0, 1fr) ${rightOpen ? rightWidth : 0}px`,
+        }}
+      >
+        <header className="topbar">
+          <div className="brand">
+            <div className="brand-mark">
+              <img src="/app-icon.svg" alt="SignalLab logo" />
+            </div>
+            <div>
+              <strong>SignalLab</strong>
+              <span>Communications Studio</span>
             </div>
           </div>
-          <footer className="experiment-config-footer"><span>Changes apply only after Save.</span><div><button type="button" className="secondary" onClick={() => setExperimentConfigOpen(false)}>Cancel</button><button type="button" className="primary" disabled={executionActive || Boolean(configDraftIssue)} onClick={applyExperimentConfig}><Save size={15} /> Save</button></div></footer>
-        </section>
-      </div>}
-      {resultsOpen && <div className="experiment-config-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setResultsOpen(false) }}>
-        <section className="experiment-config-modal results-modal" role="dialog" aria-modal="true" aria-labelledby="results-title">
-          <header className="experiment-config-header"><div><span>SIMULATION OUTPUT</span><h2 id="results-title">Results</h2><p>Review execution progress and aggregate sink results.</p></div><button type="button" onClick={() => setResultsOpen(false)} title="Close results"><X size={18} /></button></header>
-          <div className="results-modal-body">
-            {job && <div className="job-card"><div className="job-line"><span><i className={`job-dot ${job.status}`} />{job.status}</span><b>{Math.round((job.progress || 0) * 100)}%</b></div><div className="progress"><span style={{ width: `${(job.progress || 0) * 100}%` }} /></div><div className="job-meta"><span>{job.completed_trials || 0} frames processed · {job.trials} max</span><span>{job.device || result?.device || 'preparing'}{(job.engine || result?.engine) ? ` · ${job.engine || result?.engine}` : ''}</span></div>{jobActive && <button className="cancel" onClick={() => void stopBenchmark()}><CircleStop size={14} /> Stop benchmark</button>}</div>}
-            {error && <div className="error-box">{error}</div>}
-            {(result || hasVisibleSinkResults) ? <div className="results" ref={resultsRef}>{result && <div className="metric-row results-runtime"><div className="metric"><span>Elapsed</span><strong>{result.elapsed_seconds.toFixed(2)} s</strong></div><div className="metric"><span>Throughput</span><strong>{formatNumber(result.throughput_bps / 1000)} kb/s</strong></div>{result.execution?.modulation && <div className="metric"><span>Native plan</span><strong>{result.execution.modulation.toUpperCase()} · {result.execution.coding}</strong></div>}{result.execution?.python_blocks ? <div className="metric"><span>Python runtime</span><strong>{result.execution.scheduler === 'persistent_process_pool' ? `${result.workers} processes` : 'inline'}{result.execution.python_batch_blocks ? ` · ${result.execution.python_batch_blocks} batch` : ''}</strong></div> : null}</div>}{result?.execution?.fallback_reason && <p className="warning">Auto used the compatibility engine: {result.execution.fallback_reason}</p>}<SinkResults nodes={sinkNodes} metrics={activeSinkMetrics} berPoints={livePoints} berLive={job?.status === 'running'} />{result?.warnings?.map(w => <p className="warning" key={w}>{w}</p>)}</div> : <div className="experiment-config-empty"><Activity size={28} /><strong>No runtime results</strong><span>Run once or Run Benchmark from the floating toolbar.</span></div>}
+          <div
+            className={`project-name ${projectDirty ? "dirty" : ""}`}
+            title={projectDirty ? "Unsaved changes" : "All changes saved"}
+          >
+            <span className="status-dot" />
+            <span>{projectName}</span>
+            {projectDirty && <small>Unsaved</small>}
           </div>
-        </section>
-      </div>}
-      {pythonEditorOpen && selected?.data.blockType === 'python' && <Suspense fallback={null}><PythonEditorModal
-        open={pythonEditorOpen && selected?.data.blockType === 'python'}
-        blockName={selected?.data.label || 'Python Block'}
-        value={selected?.data.code || pythonTemplate}
-        template={pythonTemplate}
-        onApply={updatePythonCode}
-        onClose={() => setPythonEditorOpen(false)}
-        onOpenDocs={openDocuments}
-      /></Suspense>}
+          <div className="top-actions">
+            <button
+              className="ghost labeled compact-label"
+              onClick={newSimulation}
+              disabled={executionActive}
+              title="Create a blank simulation"
+            >
+              <FilePlus2 size={15} />
+              <span>New</span>
+            </button>
+            <button
+              className="ghost labeled compact-label"
+              onClick={() => void openProject()}
+              title="Open a SignalLab simulation"
+            >
+              <FolderOpen size={15} />
+              <span>Open</span>
+            </button>
+            <button
+              className="ghost labeled samples-action"
+              onClick={() => setSamplesOpen(true)}
+              title="Open a complete learning sample"
+            >
+              <LibraryBig size={15} />
+              <span>Open Samples</span>
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".slab.json,.json,application/json"
+              hidden
+              onChange={(e) => {
+                void importProject(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            <button
+              className="ghost labeled save-action compact-label"
+              onClick={() => void saveProject(false)}
+              disabled={savingProject}
+              title="Save simulation (Ctrl+S)"
+            >
+              <Save size={15} />
+              <span>{savingProject ? "Saving…" : "Save"}</span>
+            </button>
+            <button
+              className="ghost labeled compact-label"
+              onClick={() => void saveProject(true)}
+              disabled={savingProject}
+              title="Save simulation as a new file (Ctrl+Shift+S)"
+            >
+              <SaveAll size={15} />
+              <span>Save As</span>
+            </button>
+            <button
+              className="ghost labeled documents-action"
+              onClick={openDocuments}
+              title="Open SignalLab documentation in a separate window"
+            >
+              <BookOpen size={15} />
+              <span>Documents</span>
+            </button>
+          </div>
+        </header>
+        <SampleLibraryModal
+          open={samplesOpen}
+          onClose={() => setSamplesOpen(false)}
+          onOpenSample={openCatalogSample}
+        />
+        {blockPickerOpen && (
+          <BlockPickerModal
+            specs={specs}
+            onClose={() => setBlockPickerOpen(false)}
+            onAdd={(spec) => {
+              addBlock(spec);
+              setBlockPickerOpen(false);
+            }}
+          />
+        )}
+        {experimentConfigOpen && (
+          <div
+            className="experiment-config-overlay"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget)
+                setExperimentConfigOpen(false);
+            }}
+          >
+            <section
+              className="experiment-config-modal config-only"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="experiment-config-title"
+            >
+              <header className="experiment-config-header">
+                <div>
+                  <span>SIMULATION SETTINGS</span>
+                  <h2 id="experiment-config-title">Experiment config</h2>
+                  <p>Configure the experiment mode and runtime settings.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExperimentConfigOpen(false)}
+                  title="Close experiment config"
+                >
+                  <X size={18} />
+                </button>
+              </header>
+              <div className="experiment-config-body config-only">
+                <div className="experiment-config-form">
+                  <div className="section-rule">
+                    <span>EXPERIMENT MODE</span>
+                  </div>
+                  <label>
+                    Mode
+                    <select
+                      disabled={executionActive}
+                      value={configDraft.mode}
+                      onChange={(e) =>
+                        setConfigDraft((current) => ({
+                          ...current,
+                          mode: e.target.value as SimulationConfig["mode"],
+                        }))
+                      }
+                    >
+                      <option value="specific_steps">
+                        Specific steps · fixed count
+                      </option>
+                      <option value="ber_benchmark">
+                        BER benchmark · SNR sweep
+                      </option>
+                    </select>
+                    <small>
+                      {configDraft.mode === "specific_steps"
+                        ? "Run fixed steps at one SNR; channels use it unless set to Fixed block value."
+                        : "Sweep SNR and stop each point after enough errors or the frame limit."}
+                    </small>
+                  </label>
+                  <div className="section-rule">
+                    <span>
+                      {configDraft.mode === "specific_steps"
+                        ? "FIXED STEPS"
+                        : "SNR SWEEP (dB)"}
+                    </span>
+                  </div>
+                  {configDraft.mode === "specific_steps" ? (
+                    <>
+                      <div className="form-grid">
+                        <label>
+                          SNR (dB)
+                          <NumericInput
+                            disabled={executionActive}
+                            value={configDraft.snr_db_start}
+                            onValueChange={(value) =>
+                              setConfigDraft((current) => ({
+                                ...current,
+                                snr_db_start: value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <label>
+                          Frames
+                          <NumericInput
+                            disabled={executionActive}
+                            integer
+                            value={configDraft.max_frames}
+                            onValueChange={(value) =>
+                              setConfigDraft((current) => ({
+                                ...current,
+                                max_frames: value,
+                                trials: value,
+                                min_frames: value,
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <small>
+                        A frame is one execution of the graph; its bit count is
+                        defined by the source block. Scientific notation is
+                        supported.
+                      </small>
+                    </>
+                  ) : (
+                    <>
+                      <div className="form-grid">
+                        <label>
+                          Start
+                          <NumericInput
+                            disabled={executionActive}
+                            value={configDraft.snr_db_start}
+                            onValueChange={(value) =>
+                              setConfigDraft((current) => ({
+                                ...current,
+                                snr_db_start: value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <label>
+                          Stop
+                          <NumericInput
+                            disabled={executionActive}
+                            value={configDraft.snr_db_stop}
+                            onValueChange={(value) =>
+                              setConfigDraft((current) => ({
+                                ...current,
+                                snr_db_stop: value,
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <label>
+                        Step
+                        <NumericInput
+                          disabled={executionActive}
+                          value={configDraft.snr_db_step}
+                          onValueChange={(value) =>
+                            setConfigDraft((current) => ({
+                              ...current,
+                              snr_db_step: value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <div className="form-grid">
+                        <label>
+                          Max frames / SNR
+                          <NumericInput
+                            disabled={executionActive}
+                            integer
+                            value={configDraft.max_frames}
+                            onValueChange={(value) =>
+                              setConfigDraft((current) => ({
+                                ...current,
+                                max_frames: value,
+                                trials: value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <label>
+                          Min frames / SNR
+                          <NumericInput
+                            disabled={executionActive}
+                            integer
+                            value={configDraft.min_frames}
+                            onValueChange={(value) =>
+                              setConfigDraft((current) => ({
+                                ...current,
+                                min_frames: value,
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <label>
+                        Min errors / SNR
+                        <NumericInput
+                          disabled={executionActive}
+                          integer
+                          value={configDraft.min_errors}
+                          onValueChange={(value) =>
+                            setConfigDraft((current) => ({
+                              ...current,
+                              min_errors: value,
+                            }))
+                          }
+                        />
+                        <small>
+                          No one-million-frame cap. Frames are streamed in
+                          bounded internal batches.
+                        </small>
+                      </label>
+                    </>
+                  )}
+                  <div className="section-rule">
+                    <span>RUNTIME</span>
+                  </div>
+                  <label>
+                    Execution engine
+                    <select
+                      disabled={executionActive}
+                      value={configDraft.engine}
+                      onChange={(e) =>
+                        setConfigDraft((current) => ({
+                          ...current,
+                          engine: e.target.value as SimulationConfig["engine"],
+                        }))
+                      }
+                    >
+                      <option value="auto">Auto · native when supported</option>
+                      <option value="native">Native · C++/oneTBB only</option>
+                      <option value="python">
+                        Python · compatibility engine
+                      </option>
+                    </select>
+                    <small>
+                      Auto uses the fused native engine for supported benchmark
+                      graphs and falls back safely.
+                    </small>
+                  </label>
+                  <div className="form-grid">
+                    <label>
+                      Workers
+                      <NumericInput
+                        disabled={executionActive}
+                        integer
+                        value={configDraft.workers}
+                        onValueChange={(value) =>
+                          setConfigDraft((current) => ({
+                            ...current,
+                            workers: value,
+                          }))
+                        }
+                      />
+                      <small>0 = auto</small>
+                    </label>
+                    <label>
+                      Seed
+                      <NumericInput
+                        disabled={executionActive}
+                        integer
+                        value={configDraft.seed}
+                        onValueChange={(value) =>
+                          setConfigDraft((current) => ({
+                            ...current,
+                            seed: value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <label>
+                    Chunk size
+                    <NumericInput
+                      disabled={executionActive}
+                      integer
+                      value={configDraft.chunk_size}
+                      onValueChange={(value) =>
+                        setConfigDraft((current) => ({
+                          ...current,
+                          chunk_size: value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Compute device
+                    <select
+                      disabled={executionActive}
+                      value={configDraft.device}
+                      onChange={(e) =>
+                        setConfigDraft((current) => ({
+                          ...current,
+                          device: e.target.value as SimulationConfig["device"],
+                        }))
+                      }
+                    >
+                      <option value="auto">Auto · best available</option>
+                      <option value="cpu">CPU · native or NumPy</option>
+                      <option value="gpu">GPU · CUDA/CuPy</option>
+                    </select>
+                  </label>
+                  {configDraftIssue && (
+                    <div className="config-issue" role="alert">
+                      {configDraftIssue}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <footer className="experiment-config-footer">
+                <span>Changes apply only after Save.</span>
+                <div>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => setExperimentConfigOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={executionActive || Boolean(configDraftIssue)}
+                    onClick={applyExperimentConfig}
+                  >
+                    <Save size={15} /> Save
+                  </button>
+                </div>
+              </footer>
+            </section>
+          </div>
+        )}
+        {resultsOpen && (
+          <div
+            className="experiment-config-overlay"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setResultsOpen(false);
+            }}
+          >
+            <section
+              className="experiment-config-modal results-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="results-title"
+            >
+              <header className="experiment-config-header">
+                <div>
+                  <span>SIMULATION OUTPUT</span>
+                  <h2 id="results-title">Results</h2>
+                  <p>Review execution progress and aggregate sink results.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setResultsOpen(false)}
+                  title="Close results"
+                >
+                  <X size={18} />
+                </button>
+              </header>
+              <div className="results-modal-body">
+                {job && (
+                  <div className="job-card">
+                    <div className="job-line">
+                      <span>
+                        <i className={`job-dot ${job.status}`} />
+                        {job.status}
+                      </span>
+                      <b>{Math.round((job.progress || 0) * 100)}%</b>
+                    </div>
+                    <div className="progress">
+                      <span
+                        style={{ width: `${(job.progress || 0) * 100}%` }}
+                      />
+                    </div>
+                    <div className="job-meta">
+                      <span>
+                        {job.completed_trials || 0} frames processed ·{" "}
+                        {job.trials} max
+                      </span>
+                      <span>
+                        {job.device || result?.device || "preparing"}
+                        {job.engine || result?.engine
+                          ? ` · ${job.engine || result?.engine}`
+                          : ""}
+                      </span>
+                    </div>
+                    {jobActive && (
+                      <button
+                        className="cancel"
+                        onClick={() => void stopBenchmark()}
+                      >
+                        <CircleStop size={14} /> Stop benchmark
+                      </button>
+                    )}
+                  </div>
+                )}
+                {error && <div className="error-box">{error}</div>}
+                {result || hasVisibleSinkResults ? (
+                  <div className="results" ref={resultsRef}>
+                    {result && (
+                      <div className="metric-row results-runtime">
+                        <div className="metric">
+                          <span>Elapsed</span>
+                          <strong>{result.elapsed_seconds.toFixed(2)} s</strong>
+                        </div>
+                        <div className="metric">
+                          <span>Throughput</span>
+                          <strong>
+                            {formatNumber(result.throughput_bps / 1000)} kb/s
+                          </strong>
+                        </div>
+                        {result.execution?.modulation && (
+                          <div className="metric">
+                            <span>Native plan</span>
+                            <strong>
+                              {result.execution.modulation.toUpperCase()} ·{" "}
+                              {result.execution.coding}
+                            </strong>
+                          </div>
+                        )}
+                        {result.execution?.python_blocks ? (
+                          <div className="metric">
+                            <span>Python runtime</span>
+                            <strong>
+                              {result.execution.scheduler ===
+                              "persistent_process_pool"
+                                ? `${result.workers} processes`
+                                : "inline"}
+                              {result.execution.python_batch_blocks
+                                ? ` · ${result.execution.python_batch_blocks} batch`
+                                : ""}
+                            </strong>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                    {result?.execution?.fallback_reason && (
+                      <p className="warning">
+                        Auto used the compatibility engine:{" "}
+                        {result.execution.fallback_reason}
+                      </p>
+                    )}
+                    <SinkResults
+                      nodes={sinkNodes}
+                      metrics={activeSinkMetrics}
+                      berPoints={livePoints}
+                      berLive={job?.status === "running"}
+                    />
+                    {result?.warnings?.map((w) => (
+                      <p className="warning" key={w}>
+                        {w}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="experiment-config-empty">
+                    <Activity size={28} />
+                    <strong>No runtime results</strong>
+                    <span>
+                      Run once or Run Benchmark from the floating toolbar.
+                    </span>
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+        {pythonEditorOpen && selected?.data.blockType === "python" && (
+          <Suspense fallback={null}>
+            <PythonEditorModal
+              open={pythonEditorOpen && selected?.data.blockType === "python"}
+              blockName={selected?.data.label || "Python Block"}
+              value={selected?.data.code || pythonTemplate}
+              template={pythonTemplate}
+              onApply={updatePythonCode}
+              onClose={() => setPythonEditorOpen(false)}
+              onOpenDocs={openDocuments}
+            />
+          </Suspense>
+        )}
 
-      <main className="canvas-wrap">
-        <div className="canvas-label"><span>FLOWGRAPH</span><span>{nodes.length} blocks · {edges.length} links</span></div>
-        {!rightOpen && <button className="layout-reveal layout-reveal-right" onClick={() => setRightOpen(true)} aria-label="Show inspector" title="Show inspector"><PanelRightOpen size={16} /></button>}
-        {!consoleOpen && <button className="layout-reveal layout-reveal-console" onClick={() => setConsoleOpen(true)} aria-label="Show console" title="Show console"><PanelBottomOpen size={16} /></button>}
-        <div className="simulation-toolbar" role="toolbar" aria-label="Simulation controls">
-          <button className="simulation-icon-button add-icon" onClick={() => setBlockPickerOpen(true)} aria-label="Add block" data-tooltip="Add block"><Plus size={17} /></button>
-          <span className="simulation-toolbar-divider" />
-          <button className="simulation-icon-button run-once-icon" onClick={runOnce} disabled={executionActive || Boolean(configIssue)} aria-label={runOnceActive ? 'Running one frame' : 'Run once'} data-tooltip={runOnceActive ? 'Running…' : 'Run once'}><Play size={17} fill="currentColor" /></button>
-          <button className={`simulation-icon-button benchmark-icon ${jobActive ? 'stop-active' : ''}`} onClick={() => jobActive ? void stopBenchmark() : void runBenchmark()} disabled={runOnceActive || (!jobActive && Boolean(configIssue))} aria-label={jobActive ? 'Stop benchmark' : 'Run Benchmark'} data-tooltip={configIssue || (jobActive ? 'Stop benchmark' : 'Run Benchmark')}>{jobActive ? <CircleStop size={17} /> : <Play size={17} fill="currentColor" />}</button>
-          <button className="simulation-icon-button config-icon" onClick={openExperimentConfig} aria-label="Experiment config" data-tooltip="Experiment config"><Settings2 size={18} /></button>
-          <span className="simulation-toolbar-divider" />
-          <span className="results-control">
-            <button className={`simulation-icon-button results-icon ${jobActive ? 'running' : job?.status === 'completed' ? 'completed' : job?.status === 'failed' ? 'failed' : ''}`} onClick={() => setResultsOpen(true)} aria-label="Results" data-tooltip="Results"><BarChart3 size={17} /></button>
-            {jobActive && job && <BenchmarkStatusBubble job={job} onOpenResults={() => setResultsOpen(true)} />}
-          </span>
-          <button className="simulation-icon-button reset-icon" onClick={resetPortData} disabled={executionActive || (!snapshotId && !hasVisibleSinkResults && !error)} aria-label="Reset port data" data-tooltip="Reset port data"><RotateCcw size={18} /></button>
-        </div>
-        <ReactFlow nodes={nodes} edges={edges.map(e => ({ ...e, selected: e.id === selectedEdgeId, markerEnd: { type: MarkerType.ArrowClosed }, animated: job?.status === 'running', style: e.id === selectedEdgeId ? { strokeWidth: 3, stroke: '#2563eb' } : undefined }))} nodeTypes={{ signal: SignalNode }} onInit={instance => { flowInstanceRef.current = instance; window.setTimeout(() => instance.fitView({ padding: 0.18, duration: 320 }), 100) }} onNodesChange={onNodesChange} onEdgesChange={onEdgesChangeWithPreview} onConnect={onConnect} onConnectStart={() => setIsConnecting(true)} onConnectEnd={() => setIsConnecting(false)} onNodeClick={onNodeClick} onNodeDragStart={onNodeDragStart} onEdgeClick={onEdgeClick} onPaneClick={() => { setSelectedId(null); setSelectedEdgeId(null) }} deleteKeyCode={null} fitView minZoom={0.2} maxZoom={2} defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#7d8998' } }}>
-          <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#ccd3dc" />
-          <Controls position="bottom-left" />
-          <MiniMap position="bottom-right" pannable zoomable offsetScale={4} nodeColor={node => miniMapColor(String((node.data as Record<string, unknown>)?.blockType || ''))} nodeStrokeColor="#ffffff" nodeStrokeWidth={1} nodeBorderRadius={3} nodeComponent={FlowMiniMapNode} bgColor="#f9fbfd" maskColor="rgba(226,233,242,.62)" maskStrokeColor="#8ea8ca" maskStrokeWidth={1} style={{ width: 150, height: 92, border: '1px solid #cbd6e3', borderRadius: 8, boxShadow: '0 3px 12px rgba(36,55,78,.14)' }} />
-        </ReactFlow>
-      </main>
+        <main className="canvas-wrap">
+          <div className="canvas-label">
+            <span>FLOWGRAPH</span>
+            <span>
+              {nodes.length} blocks · {edges.length} links
+            </span>
+          </div>
+          {!rightOpen && (
+            <button
+              className="layout-reveal layout-reveal-right"
+              onClick={() => setRightOpen(true)}
+              aria-label="Show inspector"
+              title="Show inspector"
+            >
+              <PanelRightOpen size={16} />
+            </button>
+          )}
+          {!consoleOpen && (
+            <button
+              className="layout-reveal layout-reveal-console"
+              onClick={() => setConsoleOpen(true)}
+              aria-label="Show console"
+              title="Show console"
+            >
+              <PanelBottomOpen size={16} />
+            </button>
+          )}
+          <div
+            className="simulation-toolbar"
+            role="toolbar"
+            aria-label="Simulation controls"
+          >
+            <button
+              className="simulation-icon-button add-icon"
+              onClick={() => setBlockPickerOpen(true)}
+              aria-label="Add block"
+              data-tooltip="Add block"
+            >
+              <Plus size={17} />
+            </button>
+            <span className="simulation-toolbar-divider" />
+            <button
+              className="simulation-icon-button run-once-icon"
+              onClick={runOnce}
+              disabled={executionActive || Boolean(configIssue)}
+              aria-label={runOnceActive ? "Running one frame" : "Run once"}
+              data-tooltip={runOnceActive ? "Running…" : "Run once"}
+            >
+              <Play size={17} fill="currentColor" />
+            </button>
+            <button
+              className={`simulation-icon-button benchmark-icon ${jobActive ? "stop-active" : ""}`}
+              onClick={() =>
+                jobActive ? void stopBenchmark() : void runBenchmark()
+              }
+              disabled={runOnceActive || (!jobActive && Boolean(configIssue))}
+              aria-label={jobActive ? "Stop benchmark" : "Run Benchmark"}
+              data-tooltip={
+                configIssue || (jobActive ? "Stop benchmark" : "Run Benchmark")
+              }
+            >
+              {jobActive ? (
+                <CircleStop size={17} />
+              ) : (
+                <Play size={17} fill="currentColor" />
+              )}
+            </button>
+            <button
+              className="simulation-icon-button config-icon"
+              onClick={openExperimentConfig}
+              aria-label="Experiment config"
+              data-tooltip="Experiment config"
+            >
+              <Settings2 size={18} />
+            </button>
+            <span className="simulation-toolbar-divider" />
+            <span className="results-control">
+              <button
+                className={`simulation-icon-button results-icon ${jobActive ? "running" : job?.status === "completed" ? "completed" : job?.status === "failed" ? "failed" : ""}`}
+                onClick={() => setResultsOpen(true)}
+                aria-label="Results"
+                data-tooltip="Results"
+              >
+                <BarChart3 size={17} />
+              </button>
+              {jobActive && job && (
+                <BenchmarkStatusBubble
+                  job={job}
+                  onOpenResults={() => setResultsOpen(true)}
+                />
+              )}
+            </span>
+            <button
+              className="simulation-icon-button reset-icon"
+              onClick={resetPortData}
+              disabled={
+                executionActive ||
+                (!snapshotId && !hasVisibleSinkResults && !error)
+              }
+              aria-label="Reset port data"
+              data-tooltip="Reset port data"
+            >
+              <RotateCcw size={18} />
+            </button>
+          </div>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges.map((e) => ({
+              ...e,
+              selected: e.id === selectedEdgeId,
+              markerEnd: { type: MarkerType.ArrowClosed },
+              animated: job?.status === "running",
+              style:
+                e.id === selectedEdgeId
+                  ? { strokeWidth: 3, stroke: "#2563eb" }
+                  : undefined,
+            }))}
+            nodeTypes={{ signal: SignalNode }}
+            onInit={(instance) => {
+              flowInstanceRef.current = instance;
+              window.setTimeout(
+                () => instance.fitView({ padding: 0.18, duration: 320 }),
+                100,
+              );
+            }}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChangeWithPreview}
+            onConnect={onConnect}
+            onConnectStart={() => setIsConnecting(true)}
+            onConnectEnd={() => setIsConnecting(false)}
+            onNodeClick={onNodeClick}
+            onNodeDragStart={onNodeDragStart}
+            onEdgeClick={onEdgeClick}
+            onPaneClick={() => {
+              setSelectedId(null);
+              setSelectedEdgeId(null);
+            }}
+            deleteKeyCode={null}
+            fitView
+            minZoom={0.2}
+            maxZoom={2}
+            defaultEdgeOptions={{
+              style: { strokeWidth: 2, stroke: "#7d8998" },
+            }}
+          >
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={22}
+              size={1.2}
+              color="#ccd3dc"
+            />
+            <Controls position="bottom-left" />
+            <MiniMap
+              position="bottom-right"
+              pannable
+              zoomable
+              offsetScale={4}
+              nodeColor={(node) =>
+                miniMapColor(
+                  String(
+                    (node.data as Record<string, unknown>)?.blockType || "",
+                  ),
+                )
+              }
+              nodeStrokeColor="#ffffff"
+              nodeStrokeWidth={1}
+              nodeBorderRadius={3}
+              nodeComponent={FlowMiniMapNode}
+              bgColor="#f9fbfd"
+              maskColor="rgba(226,233,242,.62)"
+              maskStrokeColor="#8ea8ca"
+              maskStrokeWidth={1}
+              style={{
+                width: 150,
+                height: 92,
+                border: "1px solid #cbd6e3",
+                borderRadius: 8,
+                boxShadow: "0 3px 12px rgba(36,55,78,.14)",
+              }}
+            />
+          </ReactFlow>
+        </main>
 
-      <aside className={`inspector ${rightOpen ? '' : 'collapsed'}`}>
-        <div className="panel-title"><Settings2 size={16} /><span>Properties</span><small>{selected ? 'Block' : selectedEdge ? 'Connection' : 'No selection'}</small><button className="panel-collapse" onClick={() => setRightOpen(false)} aria-label="Hide inspector" title="Hide inspector"><PanelRightClose size={15} /></button></div>
-        {selected ? <div className="inspector-content">
-          <div className="selection-heading"><span className="large-icon">{selected.data.blockType === 'python' ? <Braces /> : <Box />}</span><div><small>SELECTED BLOCK</small><h3>{selected.data.label}</h3></div><button className="icon-danger" onClick={() => { setNodes(ns => ns.filter(n => n.id !== selected.id).map(n => ({ ...n, data: { ...n.data, portPreviews: undefined, runtimeError: undefined } }))); setEdges(es => es.filter(e => e.source !== selected.id && e.target !== selected.id)); setSelectedId(null) }}><X size={16} /></button></div>
-          {selected.data.runtimeError && <div className="error-box"><strong>Signal size contract failed</strong><br />{selected.data.runtimeError}</div>}
-          {['ber', 'scope', 'constellation', 'spectrum_analyzer', 'waterfall_sink'].includes(selected.data.blockType) && <button className="inspector-detail-button inspector-detail-top" onClick={() => setInspectorDetailNode(selected)}>Open detailed report</button>}
-          {selectedSpec?.size_contract && <div className="signal-contract"><strong>Signal size contract</strong><span>{selectedSpec.size_contract}</span></div>}
-          <label>Display name<input value={selected.data.label} onChange={e => updateSelected({ label: e.target.value })} /></label>
-           <div className="port-layout-control"><div><span>Port layout</span><small>{selected.data.portOrientation === 'reversed' ? 'Input right · Output left' : 'Input left · Output right'}</small></div><button className={`port-toggle ${selected.data.portOrientation === 'reversed' ? 'active' : ''}`} onClick={() => updateSelected({ portOrientation: selected.data.portOrientation === 'reversed' ? 'standard' : 'reversed' })}><ArrowLeftRight size={15} /> {selected.data.portOrientation === 'reversed' ? 'Reversed' : 'Standard'}</button></div>
-           <div className="section-rule"><span>PARAMETERS</span></div>
-           {selectedIsFileSource && <label>Input file<input type="file" accept={selected.data.blockType === 'image_file_source' ? 'image/*' : '.txt,.csv,.log,text/plain'} onChange={loadSourceFile} /><small>{String(selected.data.params.file_name || 'No file selected')}</small></label>}
-           {selectedIsStochasticChannel && <label>SNR source<select value={String(selected.data.params.snr_mode || 'experiment')} onChange={e => updateSelected({ params: { ...selected.data.params, snr_mode: e.target.value } })}><option value="experiment">Experiment sweep</option><option value="fixed">Fixed block value</option></select></label>}
-           {selectedIsStochasticChannel && String(selected.data.params.snr_mode || 'experiment') === 'fixed' && <label>Fixed SNR dB<NumericInput value={Number(selected.data.params.ebn0_db ?? 4)} onValueChange={value => updateSelected({ params: { ...selected.data.params, ebn0_db: value } })} /></label>}
-           {selected.data.blockType === 'image_file_source' && <label>Pixel mode<select value={String(selected.data.params.mode || 'grayscale')} onChange={e => updateSelected({ params: { ...selected.data.params, mode: e.target.value } })}><option value="grayscale">Grayscale</option><option value="rgb">RGB</option></select></label>}
-           {visibleParams.length ? visibleParams.map(([key, value]) => typeof value === 'boolean' ? <label className="boolean-param" key={key}><span>{parameterLabel(key)}</span><input type="checkbox" checked={value} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: e.target.checked } })} />{key === 'include_header' && <small>Enable the same option on the matching decoder.</small>}</label> : <label key={key}>{parameterLabel(key)}{PARAMETER_OPTIONS[key] ? <select value={String(value)} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: e.target.value } })}>{PARAMETER_OPTIONS[key].map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : typeof value === 'number' ? <NumericInput value={value} integer={INTEGER_PARAMETER_KEYS.has(key)} onValueChange={numeric => updateSelected({ params: { ...selected.data.params, [key]: numeric } })} /> : <input type="text" value={String(value)} onChange={e => updateSelected({ params: { ...selected.data.params, [key]: e.target.value } })} />}{key === 'seed' && <small>-1 = random each run · 0+ = reproducible</small>}</label>) : !['variables', 'awgn', 'rayleigh', 'rician', 'text_file_source', 'image_file_source'].includes(selected.data.blockType) && <p className="muted">This block has no parameters.</p>}
-          {selected.data.blockType === 'variables' && <VariablesEditor definitions={String(selected.data.params.definitions || '')} onChange={definitions => updateSelected({ params: { ...selected.data.params, definitions } })} />}
-          {selected.data.blockType === 'symbol_huffman_encode' && <><div className="section-rule"><span>CURRENT HUFFMAN CODEBOOK</span><em>updates with P(x)</em></div><HuffmanCodebookTable params={selected.data.params} inputPreview={selected.data.portPreviews?.inputs.in} /></>}
-           {!isConnecting && <><div className="section-rule"><span>CURRENT PORT DATA</span><em>representative frame</em></div>
-           <PortDataInspector snapshotId={snapshotId} nodeId={selected.id} previews={selected.data.portPreviews} /></>}
-          {selected.data.blockType === 'ber' && livePoints.length ? <><div className="section-rule"><span>SINK PREVIEW</span><button className="inspector-detail-button" onClick={() => setInspectorDetailNode(selected)}>Details</button></div><BerChart points={livePoints} live={job?.status === 'running'} /></> : null}
-          {activeSinkMetrics.power_mean !== undefined && selected.data.blockType === 'power_meter' && <><div className="section-rule"><span>SINK RESULT</span></div><div className="sink-result"><Activity size={18} /><div><span>Mean power</span><strong>{activeSinkMetrics.power_mean.toExponential(3)}</strong></div></div></>}
-          {selected.data.blockType === 'scope' && <><div className="section-rule"><span>OSCILLOSCOPE</span><em>time-domain display</em><button className="inspector-detail-button" onClick={() => setInspectorDetailNode(selected)}>Details</button></div><div className="scope-inspector"><div className="scope-controls"><label>Channel<select value={scopeView} onChange={event => setScopeView(event.target.value as WaveformChannel | 'auto')}><option value="auto">Auto</option><option value="real">Real / I</option><option value="imaginary">Imaginary / Q</option><option value="magnitude">Magnitude</option><option value="iq">I + Q</option></select></label><label>Samples<input type="number" min="8" max="2048" step="8" value={scopeSamples} onChange={event => setScopeSamples(Math.max(8, Math.min(2048, Number(event.target.value) || 8)))} /></label><label>Y scale<input type="number" min="0" step="any" placeholder="Auto" value={scopeYLimit || ''} onChange={event => setScopeYLimit(Math.max(0, Number(event.target.value) || 0))} /></label><label className="scope-grid-toggle"><span>Grid</span><input type="checkbox" checked={scopeGrid} onChange={event => setScopeGrid(event.target.checked)} /></label></div><WaveformPreview values={scopePreview} channel={scopeChannel} yLimit={scopeYLimit || undefined} showGrid={scopeGrid} sampleLimit={scopeSamples} large />{activeSinkMetrics.scope_mean_amplitude !== undefined && <div className="sink-result"><Activity size={18} /><div><span>Mean amplitude</span><strong>{activeSinkMetrics.scope_mean_amplitude.toFixed(4)}</strong></div><div><span>Peak</span><strong>{activeSinkMetrics.scope_peak_amplitude?.toFixed(4) ?? '—'}</strong></div></div>}</div></>}
-          {selected.data.blockType === 'constellation' && <><div className="section-rule"><span>CONSTELLATION RESULT</span><em>captured signal samples</em><button className="inspector-detail-button" onClick={() => setInspectorDetailNode(selected)}>Details</button></div><ConstellationPreview values={selected.data.portPreviews?.inputs?.in?.sample || []} /><div className="sink-result"><Activity size={18} /><div><span>Mean I / Q</span><strong>{activeSinkMetrics.constellation_mean_i !== undefined ? `${activeSinkMetrics.constellation_mean_i.toFixed(3)} / ${activeSinkMetrics.constellation_mean_q.toFixed(3)}` : '—'}</strong></div><div><span>Mean |x|</span><strong>{activeSinkMetrics.constellation_mean_power?.toFixed(4) ?? '—'}</strong></div></div></>}
-          {sourceTheoryMetrics && selected.data.blockType === 'source_analyzer' && <><div className="section-rule"><span>SOURCE THEORY RESULTS</span></div><div className="source-theory-result"><div><span>Entropy H(X)</span><strong>{sourceTheoryMetrics.source_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Average information</span><strong>{sourceTheoryMetrics.source_average_information?.toFixed(4)} bit/symbol</strong></div><div><span>Maximum entropy</span><strong>{sourceTheoryMetrics.source_max_entropy?.toFixed(4)} bit/symbol</strong></div><div><span>Source efficiency</span><strong>{sourceTheoryMetrics.source_efficiency_percent?.toFixed(2)}%</strong></div><div><span>Alphabet size</span><strong>{sourceTheoryMetrics.source_alphabet_size}</strong></div></div></>}
-          {symbolMetrics && selected.data.blockType === 'ser' && <><div className="section-rule"><span>SYMBOL RESULT</span></div><div className="source-theory-result"><div><span>Symbol error rate</span><strong>{symbolMetrics.ser?.toExponential(3)}</strong></div><div><span>Symbol errors</span><strong>{symbolMetrics.symbol_errors} / {symbolMetrics.total_symbols}</strong></div></div></>}
-          {selected.data.blockType === 'evm_meter' && activeSinkMetrics.evm_rms_percent !== undefined && <><div className="section-rule"><span>MODULATION QUALITY</span></div><div className="source-theory-result"><div><span>RMS EVM</span><strong>{activeSinkMetrics.evm_rms_percent.toFixed(3)}%</strong></div><div><span>EVM level</span><strong>{activeSinkMetrics.evm_rms_db.toFixed(2)} dB</strong></div><div><span>Measured symbols</span><strong>{activeSinkMetrics.evm_symbol_count}</strong></div></div></>}
-          {selected.data.blockType === 'spectrum_analyzer' && <><div className="section-rule"><span>SPECTRUM RESULT</span><em>centered FFT · normalized frequency</em></div><SpectrumPreview values={selected.data.portPreviews?.inputs?.in?.sample || []} fftSize={Number(selected.data.params.fft_size) || 256} window={String(selected.data.params.window || 'hann')} />{activeSinkMetrics.spectrum_peak_db !== undefined && <div className="sink-result"><Activity size={18} /><div><span>Peak / floor</span><strong>{activeSinkMetrics.spectrum_peak_db.toFixed(1)} / {activeSinkMetrics.spectrum_floor_db.toFixed(1)} dB</strong></div><div><span>Peak frequency</span><strong>{activeSinkMetrics.spectrum_peak_normalized.toFixed(3)} fₛ</strong></div></div>}</>}
-          {selected.data.blockType === 'waterfall_sink' && <><div className="section-rule"><span>WATERFALL RESULT</span><em>successive short-time spectra</em></div><WaterfallPreview values={selected.data.portPreviews?.inputs?.in?.sample || []} fftSize={Number(selected.data.params.fft_size) || 64} window={String(selected.data.params.window || 'hann')} />{activeSinkMetrics.waterfall_peak_db !== undefined && <div className="sink-result"><Activity size={18} /><div><span>Peak / floor</span><strong>{activeSinkMetrics.waterfall_peak_db.toFixed(1)} / {activeSinkMetrics.waterfall_floor_db.toFixed(1)} dB</strong></div><div><span>Time slices</span><strong>{Math.round(activeSinkMetrics.waterfall_rows)}</strong></div></div>}</>}
-          {selected.data.blockType === 'python' && <><div className="section-rule"><span>PYTHON PROCESSOR</span><em>trusted local code</em></div><div className="python-editor-inline-toolbar"><div><Braces size={14} /><span><b>process.py</b><small>Python 3 · UTF-8</small></span></div><button type="button" onClick={() => setPythonEditorOpen(true)}><Maximize2 size={14} /> Open editor</button></div><Suspense fallback={<div className="python-editor-loading">Loading Python editor…</div>}><PythonCodeEditor value={selected.data.code || pythonTemplate} onChange={updatePythonCode} /></Suspense><p className="code-hint">Read the current sweep point with <code>params["snr_db"]</code>. For flexible ports, declare <code>PORTS = {'{'}"inputs": ["signal", "noise"], "outputs": ["out", "residual"]{'}'}</code> and write <code>process(inputs, params)</code> returning a dictionary. <button type="button" onClick={openDocuments}>Read Python API</button></p></>}
-        </div> : selectedEdge ? <div className="inspector-content connection-properties">
-          <div className="selection-heading"><span className="large-icon"><ArrowLeftRight /></span><div><small>SELECTED CONNECTION</small><h3>{selectedEdgeSource?.data.label || selectedEdge.source} → {selectedEdgeTarget?.data.label || selectedEdge.target}</h3></div><button className="icon-danger" onClick={() => { setEdges(items => items.filter(edge => edge.id !== selectedEdge.id)); setSelectedEdgeId(null); clearDiagnostics() }} title="Delete connection"><X size={16} /></button></div>
-          <div className="section-rule"><span>CONNECTION PROPERTIES</span></div>
-          <dl><div><dt>Source block</dt><dd>{selectedEdgeSource?.data.label || selectedEdge.source}</dd></div><div><dt>Output port</dt><dd>{selectedEdge.sourceHandle || 'out'}</dd></div><div><dt>Target block</dt><dd>{selectedEdgeTarget?.data.label || selectedEdge.target}</dd></div><div><dt>Input port</dt><dd>{selectedEdge.targetHandle || 'in'}</dd></div></dl>
-          <p className="muted">Select either endpoint block to edit its parameters and inspect current port data.</p>
-        </div> : <div className="empty-state"><Settings2 size={32} /><h3>No object selected</h3><p>Select a block or connection on the canvas to view its properties.</p></div>}
-        {rightOpen && <div className="sidebar-resizer right-resizer" onPointerDown={startResize} title="Resize inspector" />}
-      </aside>
+        <aside className={`inspector ${rightOpen ? "" : "collapsed"}`}>
+          <div className="panel-title">
+            <Settings2 size={16} />
+            <span>Properties</span>
+            <small>
+              {selected
+                ? "Block"
+                : selectedEdge
+                  ? "Connection"
+                  : "No selection"}
+            </small>
+            <button
+              className="panel-collapse"
+              onClick={() => setRightOpen(false)}
+              aria-label="Hide inspector"
+              title="Hide inspector"
+            >
+              <PanelRightClose size={15} />
+            </button>
+          </div>
+          {selected ? (
+            <div className="inspector-content">
+              <div className="selection-heading">
+                <span className="large-icon">
+                  {selected.data.blockType === "python" ? <Braces /> : <Box />}
+                </span>
+                <div>
+                  <small>SELECTED BLOCK</small>
+                  <h3>{selected.data.label}</h3>
+                </div>
+                <button
+                  className="icon-danger"
+                  onClick={() => {
+                    setNodes((ns) =>
+                      ns
+                        .filter((n) => n.id !== selected.id)
+                        .map((n) => ({
+                          ...n,
+                          data: {
+                            ...n.data,
+                            portPreviews: undefined,
+                            runtimeError: undefined,
+                          },
+                        })),
+                    );
+                    setEdges((es) =>
+                      es.filter(
+                        (e) =>
+                          e.source !== selected.id && e.target !== selected.id,
+                      ),
+                    );
+                    setSelectedId(null);
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              {selected.data.runtimeError && (
+                <div className="error-box">
+                  <strong>Signal size contract failed</strong>
+                  <br />
+                  {selected.data.runtimeError}
+                </div>
+              )}
+              {[
+                "ber",
+                "scope",
+                "constellation",
+                "spectrum_analyzer",
+                "waterfall_sink",
+              ].includes(selected.data.blockType) && (
+                <button
+                  className="inspector-detail-button inspector-detail-top"
+                  onClick={() => setInspectorDetailNode(selected)}
+                >
+                  Open detailed report
+                </button>
+              )}
+              {selectedSpec?.size_contract && (
+                <div className="signal-contract">
+                  <strong>Signal size contract</strong>
+                  <span>{selectedSpec.size_contract}</span>
+                </div>
+              )}
+              <label>
+                Display name
+                <input
+                  value={selected.data.label}
+                  onChange={(e) => updateSelected({ label: e.target.value })}
+                />
+              </label>
+              <div className="port-layout-control">
+                <div>
+                  <span>Port layout</span>
+                  <small>
+                    {selected.data.portOrientation === "reversed"
+                      ? "Input right · Output left"
+                      : "Input left · Output right"}
+                  </small>
+                </div>
+                <button
+                  className={`port-toggle ${selected.data.portOrientation === "reversed" ? "active" : ""}`}
+                  onClick={() =>
+                    updateSelected({
+                      portOrientation:
+                        selected.data.portOrientation === "reversed"
+                          ? "standard"
+                          : "reversed",
+                    })
+                  }
+                >
+                  <ArrowLeftRight size={15} />{" "}
+                  {selected.data.portOrientation === "reversed"
+                    ? "Reversed"
+                    : "Standard"}
+                </button>
+              </div>
+              <div className="section-rule">
+                <span>PARAMETERS</span>
+              </div>
+              {selectedIsFileSource && (
+                <label>
+                  Input file
+                  <input
+                    type="file"
+                    accept={
+                      selected.data.blockType === "image_file_source"
+                        ? "image/*"
+                        : ".txt,.csv,.log,text/plain"
+                    }
+                    onChange={loadSourceFile}
+                  />
+                  <small>
+                    {String(
+                      selected.data.params.file_name || "No file selected",
+                    )}
+                  </small>
+                </label>
+              )}
+              {selectedIsStochasticChannel && (
+                <label>
+                  SNR source
+                  <select
+                    value={String(
+                      selected.data.params.snr_mode || "experiment",
+                    )}
+                    onChange={(e) =>
+                      updateSelected({
+                        params: {
+                          ...selected.data.params,
+                          snr_mode: e.target.value,
+                        },
+                      })
+                    }
+                  >
+                    <option value="experiment">Experiment sweep</option>
+                    <option value="fixed">Fixed block value</option>
+                  </select>
+                </label>
+              )}
+              {selectedIsStochasticChannel &&
+                String(selected.data.params.snr_mode || "experiment") ===
+                  "fixed" && (
+                  <label>
+                    Fixed SNR dB
+                    <NumericInput
+                      value={Number(selected.data.params.ebn0_db ?? 4)}
+                      onValueChange={(value) =>
+                        updateSelected({
+                          params: { ...selected.data.params, ebn0_db: value },
+                        })
+                      }
+                    />
+                  </label>
+                )}
+              {selected.data.blockType === "image_file_source" && (
+                <label>
+                  Pixel mode
+                  <select
+                    value={String(selected.data.params.mode || "grayscale")}
+                    onChange={(e) =>
+                      updateSelected({
+                        params: {
+                          ...selected.data.params,
+                          mode: e.target.value,
+                        },
+                      })
+                    }
+                  >
+                    <option value="grayscale">Grayscale</option>
+                    <option value="rgb">RGB</option>
+                  </select>
+                </label>
+              )}
+              {visibleParams.length
+                ? visibleParams.map(([key, value]) =>
+                    typeof value === "boolean" ? (
+                      <label className="boolean-param" key={key}>
+                        <span>{parameterLabel(key)}</span>
+                        <input
+                          type="checkbox"
+                          checked={value}
+                          onChange={(e) =>
+                            updateSelected({
+                              params: {
+                                ...selected.data.params,
+                                [key]: e.target.checked,
+                              },
+                            })
+                          }
+                        />
+                        {key === "include_header" && (
+                          <small>
+                            Enable the same option on the matching decoder.
+                          </small>
+                        )}
+                      </label>
+                    ) : (
+                      <label key={key}>
+                        {parameterLabel(key)}
+                        {PARAMETER_OPTIONS[key] ? (
+                          <select
+                            value={String(value)}
+                            onChange={(e) =>
+                              updateSelected({
+                                params: {
+                                  ...selected.data.params,
+                                  [key]: e.target.value,
+                                },
+                              })
+                            }
+                          >
+                            {PARAMETER_OPTIONS[key].map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : typeof value === "number" ? (
+                          <NumericInput
+                            value={value}
+                            integer={INTEGER_PARAMETER_KEYS.has(key)}
+                            onValueChange={(numeric) =>
+                              updateSelected({
+                                params: {
+                                  ...selected.data.params,
+                                  [key]: numeric,
+                                },
+                              })
+                            }
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            value={String(value)}
+                            onChange={(e) =>
+                              updateSelected({
+                                params: {
+                                  ...selected.data.params,
+                                  [key]: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                        )}
+                        {key === "seed" && (
+                          <small>
+                            -1 = random each run · 0+ = reproducible
+                          </small>
+                        )}
+                      </label>
+                    ),
+                  )
+                : ![
+                    "variables",
+                    "awgn",
+                    "rayleigh",
+                    "rician",
+                    "text_file_source",
+                    "image_file_source",
+                  ].includes(selected.data.blockType) && (
+                    <p className="muted">This block has no parameters.</p>
+                  )}
+              {selected.data.blockType === "variables" && (
+                <VariablesEditor
+                  definitions={String(selected.data.params.definitions || "")}
+                  onChange={(definitions) =>
+                    updateSelected({
+                      params: { ...selected.data.params, definitions },
+                    })
+                  }
+                />
+              )}
+              {selected.data.blockType === "symbol_huffman_encode" && (
+                <>
+                  <div className="section-rule">
+                    <span>CURRENT HUFFMAN CODEBOOK</span>
+                    <em>updates with P(x)</em>
+                  </div>
+                  <HuffmanCodebookTable
+                    params={selected.data.params}
+                    inputPreview={selected.data.portPreviews?.inputs.in}
+                  />
+                </>
+              )}
+              {!isConnecting && (
+                <>
+                  <div className="section-rule">
+                    <span>CURRENT PORT DATA</span>
+                    <em>representative frame</em>
+                  </div>
+                  <PortDataInspector
+                    snapshotId={snapshotId}
+                    nodeId={selected.id}
+                    previews={selected.data.portPreviews}
+                  />
+                </>
+              )}
+              {selected.data.blockType === "ber" && livePoints.length ? (
+                <>
+                  <div className="section-rule">
+                    <span>SINK PREVIEW</span>
+                    <button
+                      className="inspector-detail-button"
+                      onClick={() => setInspectorDetailNode(selected)}
+                    >
+                      Details
+                    </button>
+                  </div>
+                  <BerChart
+                    points={livePoints}
+                    live={job?.status === "running"}
+                  />
+                </>
+              ) : null}
+              {activeSinkMetrics.power_mean !== undefined &&
+                selected.data.blockType === "power_meter" && (
+                  <>
+                    <div className="section-rule">
+                      <span>SINK RESULT</span>
+                    </div>
+                    <div className="sink-result">
+                      <Activity size={18} />
+                      <div>
+                        <span>Mean power</span>
+                        <strong>
+                          {activeSinkMetrics.power_mean.toExponential(3)}
+                        </strong>
+                      </div>
+                    </div>
+                  </>
+                )}
+              {selected.data.blockType === "scope" && (
+                <>
+                  <div className="section-rule">
+                    <span>OSCILLOSCOPE</span>
+                    <em>time-domain display</em>
+                    <button
+                      className="inspector-detail-button"
+                      onClick={() => setInspectorDetailNode(selected)}
+                    >
+                      Details
+                    </button>
+                  </div>
+                  <div className="scope-inspector">
+                    <div className="scope-controls">
+                      <label>
+                        Channel
+                        <select
+                          value={scopeView}
+                          onChange={(event) =>
+                            setScopeView(
+                              event.target.value as WaveformChannel | "auto",
+                            )
+                          }
+                        >
+                          <option value="auto">Auto</option>
+                          <option value="real">Real / I</option>
+                          <option value="imaginary">Imaginary / Q</option>
+                          <option value="magnitude">Magnitude</option>
+                          <option value="iq">I + Q</option>
+                        </select>
+                      </label>
+                      <label>
+                        Samples
+                        <NumericInput
+                          integer
+                          value={scopeSamples}
+                          onValueChange={(value) =>
+                            setScopeSamples(
+                              Math.max(8, Math.min(2048, value || 8)),
+                            )
+                          }
+                        />
+                      </label>
+                      <label>
+                        Y scale
+                        <NumericInput
+                          allowEmpty
+                          value={scopeYLimit}
+                          onValueChange={(value) =>
+                            setScopeYLimit(Math.max(0, value || 0))
+                          }
+                          placeholder="Auto"
+                        />
+                      </label>
+                      <label className="scope-grid-toggle">
+                        <span>Grid</span>
+                        <input
+                          type="checkbox"
+                          checked={scopeGrid}
+                          onChange={(event) =>
+                            setScopeGrid(event.target.checked)
+                          }
+                        />
+                      </label>
+                    </div>
+                    <WaveformPreview
+                      values={scopePreview}
+                      channel={scopeChannel}
+                      yLimit={scopeYLimit || undefined}
+                      showGrid={scopeGrid}
+                      sampleLimit={scopeSamples}
+                      large
+                    />
+                    {activeSinkMetrics.scope_mean_amplitude !== undefined && (
+                      <div className="sink-result">
+                        <Activity size={18} />
+                        <div>
+                          <span>Mean amplitude</span>
+                          <strong>
+                            {activeSinkMetrics.scope_mean_amplitude.toFixed(4)}
+                          </strong>
+                        </div>
+                        <div>
+                          <span>Peak</span>
+                          <strong>
+                            {activeSinkMetrics.scope_peak_amplitude?.toFixed(
+                              4,
+                            ) ?? "—"}
+                          </strong>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+              {selected.data.blockType === "constellation" && (
+                <>
+                  <div className="section-rule">
+                    <span>CONSTELLATION RESULT</span>
+                    <em>captured signal samples</em>
+                    <button
+                      className="inspector-detail-button"
+                      onClick={() => setInspectorDetailNode(selected)}
+                    >
+                      Details
+                    </button>
+                  </div>
+                  <ConstellationPreview
+                    values={
+                      selected.data.portPreviews?.inputs?.in?.sample || []
+                    }
+                  />
+                  <div className="sink-result">
+                    <Activity size={18} />
+                    <div>
+                      <span>Mean I / Q</span>
+                      <strong>
+                        {activeSinkMetrics.constellation_mean_i !== undefined
+                          ? `${activeSinkMetrics.constellation_mean_i.toFixed(3)} / ${activeSinkMetrics.constellation_mean_q.toFixed(3)}`
+                          : "—"}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Mean |x|</span>
+                      <strong>
+                        {activeSinkMetrics.constellation_mean_power?.toFixed(
+                          4,
+                        ) ?? "—"}
+                      </strong>
+                    </div>
+                  </div>
+                </>
+              )}
+              {sourceTheoryMetrics &&
+                selected.data.blockType === "source_analyzer" && (
+                  <>
+                    <div className="section-rule">
+                      <span>SOURCE THEORY RESULTS</span>
+                    </div>
+                    <div className="source-theory-result">
+                      <div>
+                        <span>Entropy H(X)</span>
+                        <strong>
+                          {sourceTheoryMetrics.source_entropy?.toFixed(4)}{" "}
+                          bit/symbol
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Average information</span>
+                        <strong>
+                          {sourceTheoryMetrics.source_average_information?.toFixed(
+                            4,
+                          )}{" "}
+                          bit/symbol
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Maximum entropy</span>
+                        <strong>
+                          {sourceTheoryMetrics.source_max_entropy?.toFixed(4)}{" "}
+                          bit/symbol
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Source efficiency</span>
+                        <strong>
+                          {sourceTheoryMetrics.source_efficiency_percent?.toFixed(
+                            2,
+                          )}
+                          %
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Alphabet size</span>
+                        <strong>
+                          {sourceTheoryMetrics.source_alphabet_size}
+                        </strong>
+                      </div>
+                    </div>
+                  </>
+                )}
+              {symbolMetrics && selected.data.blockType === "ser" && (
+                <>
+                  <div className="section-rule">
+                    <span>SYMBOL RESULT</span>
+                  </div>
+                  <div className="source-theory-result">
+                    <div>
+                      <span>Symbol error rate</span>
+                      <strong>{symbolMetrics.ser?.toExponential(3)}</strong>
+                    </div>
+                    <div>
+                      <span>Symbol errors</span>
+                      <strong>
+                        {symbolMetrics.symbol_errors} /{" "}
+                        {symbolMetrics.total_symbols}
+                      </strong>
+                    </div>
+                  </div>
+                </>
+              )}
+              {selected.data.blockType === "evm_meter" &&
+                activeSinkMetrics.evm_rms_percent !== undefined && (
+                  <>
+                    <div className="section-rule">
+                      <span>MODULATION QUALITY</span>
+                    </div>
+                    <div className="source-theory-result">
+                      <div>
+                        <span>RMS EVM</span>
+                        <strong>
+                          {activeSinkMetrics.evm_rms_percent.toFixed(3)}%
+                        </strong>
+                      </div>
+                      <div>
+                        <span>EVM level</span>
+                        <strong>
+                          {activeSinkMetrics.evm_rms_db.toFixed(2)} dB
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Measured symbols</span>
+                        <strong>{activeSinkMetrics.evm_symbol_count}</strong>
+                      </div>
+                    </div>
+                  </>
+                )}
+              {selected.data.blockType === "spectrum_analyzer" && (
+                <>
+                  <div className="section-rule">
+                    <span>SPECTRUM RESULT</span>
+                    <em>centered FFT · normalized frequency</em>
+                    <button
+                      className="inspector-detail-button"
+                      onClick={() => setInspectorDetailNode(selected)}
+                    >
+                      Details
+                    </button>
+                  </div>
+                  <SpectrumPreview
+                    values={
+                      selected.data.portPreviews?.inputs?.in?.sample || []
+                    }
+                    fftSize={Number(selected.data.params.fft_size) || 256}
+                    window={String(selected.data.params.window || "hann")}
+                  />
+                  {activeSinkMetrics.spectrum_peak_db !== undefined && (
+                    <div className="sink-result">
+                      <Activity size={18} />
+                      <div>
+                        <span>Peak / floor</span>
+                        <strong>
+                          {activeSinkMetrics.spectrum_peak_db.toFixed(1)} /{" "}
+                          {activeSinkMetrics.spectrum_floor_db.toFixed(1)} dB
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Peak frequency</span>
+                        <strong>
+                          {activeSinkMetrics.spectrum_peak_normalized.toFixed(
+                            3,
+                          )}{" "}
+                          fₛ
+                        </strong>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              {selected.data.blockType === "waterfall_sink" && (
+                <>
+                  <div className="section-rule">
+                    <span>WATERFALL RESULT</span>
+                    <em>successive short-time spectra</em>
+                  </div>
+                  <WaterfallPreview
+                    values={
+                      selected.data.portPreviews?.inputs?.in?.sample || []
+                    }
+                    fftSize={Number(selected.data.params.fft_size) || 64}
+                    window={String(selected.data.params.window || "hann")}
+                  />
+                  {activeSinkMetrics.waterfall_peak_db !== undefined && (
+                    <div className="sink-result">
+                      <Activity size={18} />
+                      <div>
+                        <span>Peak / floor</span>
+                        <strong>
+                          {activeSinkMetrics.waterfall_peak_db.toFixed(1)} /{" "}
+                          {activeSinkMetrics.waterfall_floor_db.toFixed(1)} dB
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Time slices</span>
+                        <strong>
+                          {Math.round(activeSinkMetrics.waterfall_rows)}
+                        </strong>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              {selected.data.blockType === "python" && (
+                <>
+                  <div className="section-rule">
+                    <span>PYTHON PROCESSOR</span>
+                    <em>trusted local code</em>
+                  </div>
+                  <div className="python-editor-inline-toolbar">
+                    <div>
+                      <Braces size={14} />
+                      <span>
+                        <b>process.py</b>
+                        <small>Python 3 · UTF-8</small>
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPythonEditorOpen(true)}
+                    >
+                      <Maximize2 size={14} /> Open editor
+                    </button>
+                  </div>
+                  <Suspense
+                    fallback={
+                      <div className="python-editor-loading">
+                        Loading Python editor…
+                      </div>
+                    }
+                  >
+                    <PythonCodeEditor
+                      value={selected.data.code || pythonTemplate}
+                      onChange={updatePythonCode}
+                    />
+                  </Suspense>
+                  <p className="code-hint">
+                    Read the current sweep point with{" "}
+                    <code>params["snr_db"]</code>. For flexible ports, declare{" "}
+                    <code>
+                      PORTS = {"{"}"inputs": ["signal", "noise"], "outputs":
+                      ["out", "residual"]{"}"}
+                    </code>{" "}
+                    and write <code>process(inputs, params)</code> returning a
+                    dictionary.{" "}
+                    <button type="button" onClick={openDocuments}>
+                      Read Python API
+                    </button>
+                  </p>
+                </>
+              )}
+            </div>
+          ) : selectedEdge ? (
+            <div className="inspector-content connection-properties">
+              <div className="selection-heading">
+                <span className="large-icon">
+                  <ArrowLeftRight />
+                </span>
+                <div>
+                  <small>SELECTED CONNECTION</small>
+                  <h3>
+                    {selectedEdgeSource?.data.label || selectedEdge.source} →{" "}
+                    {selectedEdgeTarget?.data.label || selectedEdge.target}
+                  </h3>
+                </div>
+                <button
+                  className="icon-danger"
+                  onClick={() => {
+                    setEdges((items) =>
+                      items.filter((edge) => edge.id !== selectedEdge.id),
+                    );
+                    setSelectedEdgeId(null);
+                    clearDiagnostics();
+                  }}
+                  title="Delete connection"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="section-rule">
+                <span>CONNECTION PROPERTIES</span>
+              </div>
+              <dl>
+                <div>
+                  <dt>Source block</dt>
+                  <dd>
+                    {selectedEdgeSource?.data.label || selectedEdge.source}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Output port</dt>
+                  <dd>{selectedEdge.sourceHandle || "out"}</dd>
+                </div>
+                <div>
+                  <dt>Target block</dt>
+                  <dd>
+                    {selectedEdgeTarget?.data.label || selectedEdge.target}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Input port</dt>
+                  <dd>{selectedEdge.targetHandle || "in"}</dd>
+                </div>
+              </dl>
+              <p className="muted">
+                Select either endpoint block to edit its parameters and inspect
+                current port data.
+              </p>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <Settings2 size={32} />
+              <h3>No object selected</h3>
+              <p>
+                Select a block or connection on the canvas to view its
+                properties.
+              </p>
+            </div>
+          )}
+          {rightOpen && (
+            <div
+              className="sidebar-resizer right-resizer"
+              onPointerDown={startResize}
+              title="Resize inspector"
+            />
+          )}
+        </aside>
 
-      {inspectorDetailNode && <SinkDetail node={inspectorDetailNode} metrics={activeSinkMetrics} onClose={() => setInspectorDetailNode(null)} />}
-      {consoleOpen && <section className="console-dock">
-        <div className="console-resizer" onPointerDown={startConsoleResize} title="Resize console" />
-        <div className="console-header"><div><Terminal size={15} /><strong>Console</strong><span>{consoleEntries.length} events</span></div><div className="console-actions"><button className="console-copy" onClick={() => void copyConsole()} disabled={!consoleEntries.length} title="Copy all console text"><Copy size={13} />{consoleCopied ? 'Copied' : 'Copy'}</button><button className="console-clear" onClick={() => setConsoleEntries([])} title="Clear console"><Trash2 size={14} /></button><button className="panel-collapse" onClick={() => setConsoleOpen(false)} aria-label="Hide console" title="Hide console"><PanelBottomClose size={15} /></button></div></div>
-        <div className="console-body" ref={consoleBodyRef} onScroll={onConsoleScroll}>
-          {consoleEntries.length ? consoleEntries.map(entry => <div className={`console-line ${entry.level}`} key={entry.id}><time>{entry.time}</time><b>{entry.level}</b><span>{entry.message}</span></div>) : <div className="console-empty">No messages yet.</div>}
-        </div>
-      </section>}
-    </div></>
-  )
+        {inspectorDetailNode && (
+          <SinkDetail
+            node={inspectorDetailNode}
+            metrics={activeSinkMetrics}
+            onClose={() => setInspectorDetailNode(null)}
+          />
+        )}
+        {consoleOpen && (
+          <section className="console-dock">
+            <div
+              className="console-resizer"
+              onPointerDown={startConsoleResize}
+              title="Resize console"
+            />
+            <div className="console-header">
+              <div>
+                <Terminal size={15} />
+                <strong>Console</strong>
+                <span>{consoleEntries.length} events</span>
+              </div>
+              <div className="console-actions">
+                <button
+                  className="console-copy"
+                  onClick={() => void copyConsole()}
+                  disabled={!consoleEntries.length}
+                  title="Copy all console text"
+                >
+                  <Copy size={13} />
+                  {consoleCopied ? "Copied" : "Copy"}
+                </button>
+                <button
+                  className="console-clear"
+                  onClick={() => setConsoleEntries([])}
+                  title="Clear console"
+                >
+                  <Trash2 size={14} />
+                </button>
+                <button
+                  className="panel-collapse"
+                  onClick={() => setConsoleOpen(false)}
+                  aria-label="Hide console"
+                  title="Hide console"
+                >
+                  <PanelBottomClose size={15} />
+                </button>
+              </div>
+            </div>
+            <div
+              className="console-body"
+              ref={consoleBodyRef}
+              onScroll={onConsoleScroll}
+            >
+              {consoleEntries.length ? (
+                consoleEntries.map((entry) => (
+                  <div className={`console-line ${entry.level}`} key={entry.id}>
+                    <time>{entry.time}</time>
+                    <b>{entry.level}</b>
+                    <span>{entry.message}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="console-empty">No messages yet.</div>
+              )}
+            </div>
+          </section>
+        )}
+      </div>
+    </>
+  );
 }
 
-export default App
+export default App;

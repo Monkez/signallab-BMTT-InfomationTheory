@@ -1,141 +1,1444 @@
-import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { Activity, Gauge, Radio, Waves, X } from 'lucide-react'
-import type { FlowNode } from './types'
-import type { SinkPoint } from './features/ber/types'
-import { BerChart } from './SinkChart'
-import { ResultsTable } from './ResultsTable'
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { Activity, Gauge, Radio, Waves, X } from "lucide-react";
+import type { FlowNode } from "./types";
+import type { SinkPoint } from "./features/ber/types";
+import { BerChart } from "./SinkChart";
+import { ResultsTable } from "./ResultsTable";
+import { NumericInput } from "./components/NumericInput";
 
-type SinkKind = 'ber' | 'power_meter' | 'constellation' | 'scope' | 'source_analyzer' | 'ser' | 'evm_meter' | 'spectrum_analyzer' | 'waterfall_sink'
-type SinkReference = { id: string; name: string; kind: SinkKind; color: string; style: 'bars' | 'line' | 'dots'; metrics: Record<string, number>; samples: string[]; createdAt: string; xLimit?: number; yLimit?: number }
-type Props = { nodes: FlowNode[]; metrics: Record<string, number>; berPoints?: SinkPoint[]; berLive?: boolean }
-const referenceKey = (nodeId: string) => `signallab:sink-references:${nodeId}`
-const readReferences = (nodeId: string): SinkReference[] => { try { const value = JSON.parse(localStorage.getItem(referenceKey(nodeId)) || '[]'); return Array.isArray(value) ? value : [] } catch { return [] } }
-const saveReferences = (nodeId: string, references: SinkReference[]) => localStorage.setItem(referenceKey(nodeId), JSON.stringify(references))
-function complexValue(value: string): [number, number] | null { const text = value.trim().replaceAll(' ', '').replace(/j$/i, ''); const match = text.match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)([+-](?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)$/i); if (match) return [Number(match[1]), Number(match[2])]; const scalar = Number(text); return Number.isFinite(scalar) ? [scalar, 0] : null }
-
-export type WaveformChannel = 'real' | 'imaginary' | 'magnitude' | 'iq'
-export function WaveformPreview({ values, large = false, color = '#2563eb', channel = 'real', yLimit, showGrid = true, sampleLimit = 1024 }: { values: string[]; large?: boolean; color?: string; channel?: WaveformChannel; yLimit?: number; showGrid?: boolean; sampleLimit?: number }) {
-  const points = values.map(complexValue).filter((point): point is [number, number] => Boolean(point)).slice(0, Math.max(8, Math.min(2048, sampleLimit)))
-  if (!points.length) return <div className="sink-visual-empty">No signal samples captured.</div>
-  const width = 310; const height = large ? 210 : 145; const left = 28; const right = width - 10; const top = 12; const bottom = height - 25
-  const valuesFor = (point: [number, number]) => channel === 'imaginary' ? point[1] : channel === 'magnitude' ? Math.hypot(point[0], point[1]) : point[0]
-  const extent = yLimit && yLimit > 0 ? yLimit : Math.max(1e-9, ...points.map(point => Math.abs(valuesFor(point))))
-  const x = (index: number) => left + index * (right - left) / Math.max(1, points.length - 1)
-  const y = (value: number) => top + (extent - value) * (bottom - top) / (2 * extent)
-  const path = (selector: (point: [number, number]) => number) => points.map((point, index) => `${index ? 'L' : 'M'}${x(index).toFixed(2)} ${y(selector(point)).toFixed(2)}`).join(' ')
-  const hasImaginary = points.some(([, imag]) => Math.abs(imag) > 1e-7)
-  const drawIq = channel === 'iq' && hasImaginary
-  return <svg className={`waveform-preview ${large ? 'large' : ''}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Oscilloscope time-domain waveform"><g className="waveform-grid">{showGrid && <><line x1={left} y1={y(0)} x2={right} y2={y(0)} /><line x1={left} y1={top} x2={left} y2={bottom} />{[0, .25, .5, .75, 1].map(value => <line key={`v${value}`} x1={left + value * (right - left)} y1={top} x2={left + value * (right - left)} y2={bottom} />)}</>}</g>{drawIq ? <><path className="waveform-line" style={{ stroke: color }} d={path(([real]) => real)} /><path className="waveform-line waveform-imaginary" d={path(([, imag]) => imag)} /></> : <path className="waveform-line" style={{ stroke: color }} d={path(valuesFor)} /> }<text x={left} y={height - 7}>0</text><text x={right} y={height - 7} textAnchor="end">samples</text><text x={left - 4} y={top + 4} textAnchor="end">+{extent.toFixed(1)}</text><text x={left - 4} y={y(0) + 3} textAnchor="end">0</text><text x={left - 4} y={bottom} textAnchor="end">−{extent.toFixed(1)}</text>{drawIq && <text className="waveform-legend" x={right - 2} y={top + 9} textAnchor="end">I / Q</text>}</svg>
+type SinkKind =
+  | "ber"
+  | "power_meter"
+  | "constellation"
+  | "scope"
+  | "source_analyzer"
+  | "ser"
+  | "evm_meter"
+  | "spectrum_analyzer"
+  | "waterfall_sink";
+type SinkReference = {
+  id: string;
+  name: string;
+  kind: SinkKind;
+  color: string;
+  style: "bars" | "line" | "dots";
+  metrics: Record<string, number>;
+  samples: string[];
+  createdAt: string;
+  xLimit?: number;
+  yLimit?: number;
+};
+type Props = {
+  nodes: FlowNode[];
+  metrics: Record<string, number>;
+  berPoints?: SinkPoint[];
+  berLive?: boolean;
+};
+const referenceKey = (nodeId: string) => `signallab:sink-references:${nodeId}`;
+const readReferences = (nodeId: string): SinkReference[] => {
+  try {
+    const value = JSON.parse(
+      localStorage.getItem(referenceKey(nodeId)) || "[]",
+    );
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+};
+const saveReferences = (nodeId: string, references: SinkReference[]) =>
+  localStorage.setItem(referenceKey(nodeId), JSON.stringify(references));
+function complexValue(value: string): [number, number] | null {
+  const text = value.trim().replaceAll(" ", "").replace(/j$/i, "");
+  const match = text.match(
+    /^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)([+-](?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)$/i,
+  );
+  if (match) return [Number(match[1]), Number(match[2])];
+  const scalar = Number(text);
+  return Number.isFinite(scalar) ? [scalar, 0] : null;
 }
 
-export function ConstellationPreview({ values, large = false, color = '#2d6be4', xLimit, yLimit }: { values: string[]; large?: boolean; color?: string; xLimit?: number; yLimit?: number }) {
-  const points = values.map(complexValue).filter((point): point is [number, number] => Boolean(point)).slice(0, 512)
-  if (!points.length) return <div className="sink-visual-empty">No complex samples captured.</div>
-  const extent = Math.max(1, ...points.flatMap(([i, q]) => [Math.abs(i), Math.abs(q)])); const xr = Number.isFinite(xLimit) && (xLimit || 0) > 0 ? xLimit as number : extent; const yr = Number.isFinite(yLimit) && (yLimit || 0) > 0 ? yLimit as number : extent
-  const left = 34; const right = 276; const top = 16; const bottom = 164; const x0 = 155; const y0 = 90; const x = (i: number) => x0 + (i / xr) * ((right - left) / 2); const y = (q: number) => y0 - (q / yr) * ((bottom - top) / 2); const ticks = (limit: number) => [-limit, -limit / 2, 0, limit / 2, limit]; const fmt = (value: number) => Math.abs(value) >= 10 ? value.toFixed(0) : value.toFixed(2).replace(/\.00$/, '')
-  return <svg className={`constellation-preview ${large ? 'large' : ''}`} viewBox="0 0 310 180" role="img" aria-label="Constellation preview with I/Q axes"><g className="constellation-grid">{ticks(xr).map((value, index) => { const px = x0 + (value / xr) * ((right - left) / 2); return <line key={`x-${index}`} x1={px} y1={top} x2={px} y2={bottom} /> })}{ticks(yr).map((value, index) => { const py = y0 - (value / yr) * ((bottom - top) / 2); return <line key={`y-${index}`} x1={left} y1={py} x2={right} y2={py} /> })}</g><path className="constellation-axis" d={`M${x0} ${top}V${bottom}M${left} ${y0}H${right}`} />{ticks(xr).map((value, index) => { const px = x0 + (value / xr) * ((right - left) / 2); return <text className="constellation-tick" key={`xt-${index}`} x={px} y={bottom + 13} textAnchor="middle">{fmt(value)}</text> })}{ticks(yr).map((value, index) => { const py = y0 - (value / yr) * ((bottom - top) / 2); return <text className="constellation-tick" key={`yt-${index}`} x={left - 5} y={py + 3} textAnchor="end">{fmt(value)}</text> })}<text className="constellation-label" x={right + 9} y={y0 + 4}>I</text><text className="constellation-label" x={x0 + 5} y={top - 4}>Q</text>{points.map(([i, q], index) => <circle key={index} cx={x(i)} cy={y(q)} r={large ? 3 : 2.7} style={{ fill: color }} />)}</svg>
+export type WaveformChannel = "real" | "imaginary" | "magnitude" | "iq";
+export function WaveformPreview({
+  values,
+  large = false,
+  color = "#2563eb",
+  channel = "real",
+  yLimit,
+  showGrid = true,
+  sampleLimit = 1024,
+}: {
+  values: string[];
+  large?: boolean;
+  color?: string;
+  channel?: WaveformChannel;
+  yLimit?: number;
+  showGrid?: boolean;
+  sampleLimit?: number;
+}) {
+  const points = values
+    .map(complexValue)
+    .filter((point): point is [number, number] => Boolean(point))
+    .slice(0, Math.max(8, Math.min(2048, sampleLimit)));
+  if (!points.length)
+    return <div className="sink-visual-empty">No signal samples captured.</div>;
+  const width = 310;
+  const height = large ? 210 : 145;
+  const left = 28;
+  const right = width - 10;
+  const top = 12;
+  const bottom = height - 25;
+  const valuesFor = (point: [number, number]) =>
+    channel === "imaginary"
+      ? point[1]
+      : channel === "magnitude"
+        ? Math.hypot(point[0], point[1])
+        : point[0];
+  const extent =
+    yLimit && yLimit > 0
+      ? yLimit
+      : Math.max(1e-9, ...points.map((point) => Math.abs(valuesFor(point))));
+  const x = (index: number) =>
+    left + (index * (right - left)) / Math.max(1, points.length - 1);
+  const y = (value: number) =>
+    top + ((extent - value) * (bottom - top)) / (2 * extent);
+  const path = (selector: (point: [number, number]) => number) =>
+    points
+      .map(
+        (point, index) =>
+          `${index ? "L" : "M"}${x(index).toFixed(2)} ${y(selector(point)).toFixed(2)}`,
+      )
+      .join(" ");
+  const hasImaginary = points.some(([, imag]) => Math.abs(imag) > 1e-7);
+  const drawIq = channel === "iq" && hasImaginary;
+  return (
+    <svg
+      className={`waveform-preview ${large ? "large" : ""}`}
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label="Oscilloscope time-domain waveform"
+    >
+      <g className="waveform-grid">
+        {showGrid && (
+          <>
+            <line x1={left} y1={y(0)} x2={right} y2={y(0)} />
+            <line x1={left} y1={top} x2={left} y2={bottom} />
+            {[0, 0.25, 0.5, 0.75, 1].map((value) => (
+              <line
+                key={`v${value}`}
+                x1={left + value * (right - left)}
+                y1={top}
+                x2={left + value * (right - left)}
+                y2={bottom}
+              />
+            ))}
+          </>
+        )}
+      </g>
+      {drawIq ? (
+        <>
+          <path
+            className="waveform-line"
+            style={{ stroke: color }}
+            d={path(([real]) => real)}
+          />
+          <path
+            className="waveform-line waveform-imaginary"
+            d={path(([, imag]) => imag)}
+          />
+        </>
+      ) : (
+        <path
+          className="waveform-line"
+          style={{ stroke: color }}
+          d={path(valuesFor)}
+        />
+      )}
+      <text x={left} y={height - 7}>
+        0
+      </text>
+      <text x={right} y={height - 7} textAnchor="end">
+        samples
+      </text>
+      <text x={left - 4} y={top + 4} textAnchor="end">
+        +{extent.toFixed(1)}
+      </text>
+      <text x={left - 4} y={y(0) + 3} textAnchor="end">
+        0
+      </text>
+      <text x={left - 4} y={bottom} textAnchor="end">
+        −{extent.toFixed(1)}
+      </text>
+      {drawIq && (
+        <text
+          className="waveform-legend"
+          x={right - 2}
+          y={top + 9}
+          textAnchor="end"
+        >
+          I / Q
+        </text>
+      )}
+    </svg>
+  );
+}
+
+export function ConstellationPreview({
+  values,
+  large = false,
+  color = "#2d6be4",
+  xLimit,
+  yLimit,
+}: {
+  values: string[];
+  large?: boolean;
+  color?: string;
+  xLimit?: number;
+  yLimit?: number;
+}) {
+  const points = values
+    .map(complexValue)
+    .filter((point): point is [number, number] => Boolean(point))
+    .slice(0, 512);
+  if (!points.length)
+    return (
+      <div className="sink-visual-empty">No complex samples captured.</div>
+    );
+  const extent = Math.max(
+    1,
+    ...points.flatMap(([i, q]) => [Math.abs(i), Math.abs(q)]),
+  );
+  const xr =
+    Number.isFinite(xLimit) && (xLimit || 0) > 0 ? (xLimit as number) : extent;
+  const yr =
+    Number.isFinite(yLimit) && (yLimit || 0) > 0 ? (yLimit as number) : extent;
+  const left = 34;
+  const right = 276;
+  const top = 16;
+  const bottom = 164;
+  const x0 = 155;
+  const y0 = 90;
+  const x = (i: number) => x0 + (i / xr) * ((right - left) / 2);
+  const y = (q: number) => y0 - (q / yr) * ((bottom - top) / 2);
+  const ticks = (limit: number) => [-limit, -limit / 2, 0, limit / 2, limit];
+  const fmt = (value: number) =>
+    Math.abs(value) >= 10
+      ? value.toFixed(0)
+      : value.toFixed(2).replace(/\.00$/, "");
+  return (
+    <svg
+      className={`constellation-preview ${large ? "large" : ""}`}
+      viewBox="0 0 310 180"
+      role="img"
+      aria-label="Constellation preview with I/Q axes"
+    >
+      <g className="constellation-grid">
+        {ticks(xr).map((value, index) => {
+          const px = x0 + (value / xr) * ((right - left) / 2);
+          return (
+            <line key={`x-${index}`} x1={px} y1={top} x2={px} y2={bottom} />
+          );
+        })}
+        {ticks(yr).map((value, index) => {
+          const py = y0 - (value / yr) * ((bottom - top) / 2);
+          return (
+            <line key={`y-${index}`} x1={left} y1={py} x2={right} y2={py} />
+          );
+        })}
+      </g>
+      <path
+        className="constellation-axis"
+        d={`M${x0} ${top}V${bottom}M${left} ${y0}H${right}`}
+      />
+      {ticks(xr).map((value, index) => {
+        const px = x0 + (value / xr) * ((right - left) / 2);
+        return (
+          <text
+            className="constellation-tick"
+            key={`xt-${index}`}
+            x={px}
+            y={bottom + 13}
+            textAnchor="middle"
+          >
+            {fmt(value)}
+          </text>
+        );
+      })}
+      {ticks(yr).map((value, index) => {
+        const py = y0 - (value / yr) * ((bottom - top) / 2);
+        return (
+          <text
+            className="constellation-tick"
+            key={`yt-${index}`}
+            x={left - 5}
+            y={py + 3}
+            textAnchor="end"
+          >
+            {fmt(value)}
+          </text>
+        );
+      })}
+      <text className="constellation-label" x={right + 9} y={y0 + 4}>
+        I
+      </text>
+      <text className="constellation-label" x={x0 + 5} y={top - 4}>
+        Q
+      </text>
+      {points.map(([i, q], index) => (
+        <circle
+          key={index}
+          cx={x(i)}
+          cy={y(q)}
+          r={large ? 3 : 2.7}
+          style={{ fill: color }}
+        />
+      ))}
+    </svg>
+  );
 }
 
 function windowCoefficient(index: number, size: number, kind: string) {
-  if (kind === 'rectangular' || size <= 1) return 1
-  const phase = 2 * Math.PI * index / (size - 1)
-  if (kind === 'hamming') return 0.54 - 0.46 * Math.cos(phase)
-  if (kind === 'blackman') return 0.42 - 0.5 * Math.cos(phase) + 0.08 * Math.cos(2 * phase)
-  return 0.5 - 0.5 * Math.cos(phase)
+  if (kind === "rectangular" || size <= 1) return 1;
+  const phase = (2 * Math.PI * index) / (size - 1);
+  if (kind === "hamming") return 0.54 - 0.46 * Math.cos(phase);
+  if (kind === "blackman")
+    return 0.42 - 0.5 * Math.cos(phase) + 0.08 * Math.cos(2 * phase);
+  return 0.5 - 0.5 * Math.cos(phase);
 }
 
-function calculateSpectrum(values: string[], requestedSize: number, windowKind = 'hann') {
-  const samples = values.map(complexValue).filter((value): value is [number, number] => Boolean(value))
-  const size = Math.max(8, Math.min(256, requestedSize, samples.length || 8))
+function calculateSpectrum(
+  values: string[],
+  requestedSize: number,
+  windowKind = "hann",
+) {
+  const samples = values
+    .map(complexValue)
+    .filter((value): value is [number, number] => Boolean(value));
+  const size = Math.max(8, Math.min(256, requestedSize, samples.length || 8));
   const bins = Array.from({ length: size }, (_, shiftedIndex) => {
-    const frequencyIndex = shiftedIndex - Math.floor(size / 2)
-    let real = 0; let imaginary = 0
+    const frequencyIndex = shiftedIndex - Math.floor(size / 2);
+    let real = 0;
+    let imaginary = 0;
     for (let sampleIndex = 0; sampleIndex < size; sampleIndex += 1) {
-      const [sampleReal, sampleImaginary] = samples[sampleIndex] || [0, 0]
-      const window = windowCoefficient(sampleIndex, size, windowKind)
-      const phase = -2 * Math.PI * frequencyIndex * sampleIndex / size
-      real += window * (sampleReal * Math.cos(phase) - sampleImaginary * Math.sin(phase))
-      imaginary += window * (sampleReal * Math.sin(phase) + sampleImaginary * Math.cos(phase))
+      const [sampleReal, sampleImaginary] = samples[sampleIndex] || [0, 0];
+      const window = windowCoefficient(sampleIndex, size, windowKind);
+      const phase = (-2 * Math.PI * frequencyIndex * sampleIndex) / size;
+      real +=
+        window *
+        (sampleReal * Math.cos(phase) - sampleImaginary * Math.sin(phase));
+      imaginary +=
+        window *
+        (sampleReal * Math.sin(phase) + sampleImaginary * Math.cos(phase));
     }
-    return 20 * Math.log10(Math.max(1e-12, Math.hypot(real, imaginary) / size))
-  })
-  return bins
+    return 20 * Math.log10(Math.max(1e-12, Math.hypot(real, imaginary) / size));
+  });
+  return bins;
 }
 
-export function SpectrumPreview({ values, fftSize = 128, window = 'hann', large = false, floorDb, showGrid = true }: { values: string[]; fftSize?: number; window?: string; large?: boolean; floorDb?: number; showGrid?: boolean }) {
-  const bins = useMemo(() => calculateSpectrum(values, fftSize, window), [fftSize, values, window])
-  if (!values.length) return <div className="sink-visual-empty">No signal samples captured.</div>
-  const width = 310; const height = large ? 210 : 145; const left = 32; const right = width - 10; const top = 10; const bottom = height - 23
-  const peak = Math.max(...bins); const floor = floorDb !== undefined && Number.isFinite(floorDb) ? Math.min(peak - 1, Math.max(-160, floorDb)) : Math.min(peak - 20, Math.max(-140, Math.min(...bins)))
-  const x = (index: number) => left + index * (right - left) / Math.max(1, bins.length - 1)
-  const y = (value: number) => top + (peak - value) * (bottom - top) / Math.max(1, peak - floor)
-  const path = bins.map((value, index) => `${index ? 'L' : 'M'}${x(index).toFixed(2)} ${y(Math.max(floor, value)).toFixed(2)}`).join(' ')
-  return <svg className={`spectrum-preview ${large ? 'large' : ''}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Centered magnitude spectrum">{showGrid && <g className="spectrum-grid">{[0, .25, .5, .75, 1].map(value => <line key={`v${value}`} x1={left + value * (right - left)} y1={top} x2={left + value * (right - left)} y2={bottom} />)}{[0, .5, 1].map(value => <line key={`h${value}`} x1={left} y1={top + value * (bottom - top)} x2={right} y2={top + value * (bottom - top)} />)}</g>}<path className="spectrum-fill" d={`${path}L${right} ${bottom}L${left} ${bottom}Z`} /><path className="spectrum-line" d={path} /><text x={left} y={height - 7}>−0.5</text><text x={(left + right) / 2} y={height - 7} textAnchor="middle">0</text><text x={right} y={height - 7} textAnchor="end">+0.5 fₛ</text><text x={left - 4} y={top + 4} textAnchor="end">{peak.toFixed(0)}</text><text x={left - 4} y={bottom} textAnchor="end">{floor.toFixed(0)}</text></svg>
+export function SpectrumPreview({
+  values,
+  fftSize = 128,
+  window = "hann",
+  large = false,
+  floorDb,
+  showGrid = true,
+}: {
+  values: string[];
+  fftSize?: number;
+  window?: string;
+  large?: boolean;
+  floorDb?: number;
+  showGrid?: boolean;
+}) {
+  const bins = useMemo(
+    () => calculateSpectrum(values, fftSize, window),
+    [fftSize, values, window],
+  );
+  if (!values.length)
+    return <div className="sink-visual-empty">No signal samples captured.</div>;
+  const width = 310;
+  const height = large ? 210 : 145;
+  const left = 32;
+  const right = width - 10;
+  const top = 10;
+  const bottom = height - 23;
+  const peak = Math.max(...bins);
+  const floor =
+    floorDb !== undefined && Number.isFinite(floorDb)
+      ? Math.min(peak - 1, Math.max(-160, floorDb))
+      : Math.min(peak - 20, Math.max(-140, Math.min(...bins)));
+  const x = (index: number) =>
+    left + (index * (right - left)) / Math.max(1, bins.length - 1);
+  const y = (value: number) =>
+    top + ((peak - value) * (bottom - top)) / Math.max(1, peak - floor);
+  const path = bins
+    .map(
+      (value, index) =>
+        `${index ? "L" : "M"}${x(index).toFixed(2)} ${y(Math.max(floor, value)).toFixed(2)}`,
+    )
+    .join(" ");
+  return (
+    <svg
+      className={`spectrum-preview ${large ? "large" : ""}`}
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label="Centered magnitude spectrum"
+    >
+      {showGrid && (
+        <g className="spectrum-grid">
+          {[0, 0.25, 0.5, 0.75, 1].map((value) => (
+            <line
+              key={`v${value}`}
+              x1={left + value * (right - left)}
+              y1={top}
+              x2={left + value * (right - left)}
+              y2={bottom}
+            />
+          ))}
+          {[0, 0.5, 1].map((value) => (
+            <line
+              key={`h${value}`}
+              x1={left}
+              y1={top + value * (bottom - top)}
+              x2={right}
+              y2={top + value * (bottom - top)}
+            />
+          ))}
+        </g>
+      )}
+      <path
+        className="spectrum-fill"
+        d={`${path}L${right} ${bottom}L${left} ${bottom}Z`}
+      />
+      <path className="spectrum-line" d={path} />
+      <text x={left} y={height - 7}>
+        −0.5
+      </text>
+      <text x={(left + right) / 2} y={height - 7} textAnchor="middle">
+        0
+      </text>
+      <text x={right} y={height - 7} textAnchor="end">
+        +0.5 fₛ
+      </text>
+      <text x={left - 4} y={top + 4} textAnchor="end">
+        {peak.toFixed(0)}
+      </text>
+      <text x={left - 4} y={bottom} textAnchor="end">
+        {floor.toFixed(0)}
+      </text>
+    </svg>
+  );
 }
 
-export function WaterfallPreview({ values, fftSize = 64, window = 'hann', large = false, dynamicRange = 70 }: { values: string[]; fftSize?: number; window?: string; large?: boolean; dynamicRange?: number }) {
+export function WaterfallPreview({
+  values,
+  fftSize = 64,
+  window = "hann",
+  large = false,
+  dynamicRange = 70,
+}: {
+  values: string[];
+  fftSize?: number;
+  window?: string;
+  large?: boolean;
+  dynamicRange?: number;
+}) {
   const rows = useMemo(() => {
-    const size = Math.max(8, Math.min(128, fftSize)); const count = Math.max(1, Math.min(16, Math.floor(values.length / size)))
-    return Array.from({ length: count }, (_, index) => calculateSpectrum(values.slice(index * size, (index + 1) * size), size, window))
-  }, [fftSize, values, window])
-  if (!values.length) return <div className="sink-visual-empty">No signal samples captured.</div>
-  const width = 310; const height = large ? 220 : 150; const left = 30; const right = width - 10; const top = 10; const bottom = height - 22
-  const all = rows.flat(); const high = Math.max(...all); const low = Math.max(-160, high - Math.max(10, Math.min(140, dynamicRange))); const columns = rows[0].length
-  const color = (value: number) => { const t = Math.max(0, Math.min(1, (value - low) / Math.max(1, high - low))); const hue = 238 - t * 210; return `hsl(${hue} 82% ${22 + t * 43}%)` }
-  return <svg className={`waterfall-preview ${large ? 'large' : ''}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Waterfall spectrum heatmap">{rows.map((row, rowIndex) => row.map((value, column) => <rect key={`${rowIndex}-${column}`} x={left + column * (right - left) / columns} y={top + rowIndex * (bottom - top) / rows.length} width={(right - left) / columns + .4} height={(bottom - top) / rows.length + .4} fill={color(value)} />))}<text x={left} y={height - 7}>−0.5</text><text x={(left + right) / 2} y={height - 7} textAnchor="middle">0</text><text x={right} y={height - 7} textAnchor="end">+0.5 fₛ</text><text x={left - 4} y={top + 7} textAnchor="end">t₀</text><text x={left - 4} y={bottom} textAnchor="end">t+</text></svg>
+    const size = Math.max(8, Math.min(128, fftSize));
+    const count = Math.max(1, Math.min(16, Math.floor(values.length / size)));
+    return Array.from({ length: count }, (_, index) =>
+      calculateSpectrum(
+        values.slice(index * size, (index + 1) * size),
+        size,
+        window,
+      ),
+    );
+  }, [fftSize, values, window]);
+  if (!values.length)
+    return <div className="sink-visual-empty">No signal samples captured.</div>;
+  const width = 310;
+  const height = large ? 220 : 150;
+  const left = 30;
+  const right = width - 10;
+  const top = 10;
+  const bottom = height - 22;
+  const all = rows.flat();
+  const high = Math.max(...all);
+  const low = Math.max(-160, high - Math.max(10, Math.min(140, dynamicRange)));
+  const columns = rows[0].length;
+  const color = (value: number) => {
+    const t = Math.max(0, Math.min(1, (value - low) / Math.max(1, high - low)));
+    const hue = 238 - t * 210;
+    return `hsl(${hue} 82% ${22 + t * 43}%)`;
+  };
+  return (
+    <svg
+      className={`waterfall-preview ${large ? "large" : ""}`}
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label="Waterfall spectrum heatmap"
+    >
+      {rows.map((row, rowIndex) =>
+        row.map((value, column) => (
+          <rect
+            key={`${rowIndex}-${column}`}
+            x={left + (column * (right - left)) / columns}
+            y={top + (rowIndex * (bottom - top)) / rows.length}
+            width={(right - left) / columns + 0.4}
+            height={(bottom - top) / rows.length + 0.4}
+            fill={color(value)}
+          />
+        )),
+      )}
+      <text x={left} y={height - 7}>
+        −0.5
+      </text>
+      <text x={(left + right) / 2} y={height - 7} textAnchor="middle">
+        0
+      </text>
+      <text x={right} y={height - 7} textAnchor="end">
+        +0.5 fₛ
+      </text>
+      <text x={left - 4} y={top + 7} textAnchor="end">
+        t₀
+      </text>
+      <text x={left - 4} y={bottom} textAnchor="end">
+        t+
+      </text>
+    </svg>
+  );
 }
 
-const iconFor = (kind: SinkKind) => kind === 'constellation' ? Radio : kind === 'scope' || kind === 'spectrum_analyzer' || kind === 'waterfall_sink' ? Waves : kind === 'ser' ? Gauge : Activity
-const titleFor = (kind: SinkKind) => ({ ber: 'Bit error rate', power_meter: 'TX Power', constellation: 'Constellation', scope: 'Scope', source_analyzer: 'Source theory', ser: 'Symbol error rate', evm_meter: 'Error vector magnitude', spectrum_analyzer: 'Spectrum analyzer', waterfall_sink: 'Spectrum waterfall' })[kind]
+const iconFor = (kind: SinkKind) =>
+  kind === "constellation"
+    ? Radio
+    : kind === "scope" ||
+        kind === "spectrum_analyzer" ||
+        kind === "waterfall_sink"
+      ? Waves
+      : kind === "ser"
+        ? Gauge
+        : Activity;
+const titleFor = (kind: SinkKind) =>
+  ({
+    ber: "Bit error rate",
+    power_meter: "TX Power",
+    constellation: "Constellation",
+    scope: "Scope",
+    source_analyzer: "Source theory",
+    ser: "Symbol error rate",
+    evm_meter: "Error vector magnitude",
+    spectrum_analyzer: "Spectrum analyzer",
+    waterfall_sink: "Spectrum waterfall",
+  })[kind];
 
-export function SinkResults({ nodes, metrics, berPoints = [], berLive = false }: Props) {
-  const hasBer = nodes.some(node => node.data.blockType === 'ber') && berPoints.length > 0 && berPoints.every(point => Number.isFinite(point.snr_db)); const sinks = nodes.filter(node => ['ber', 'power_meter', 'constellation', 'scope', 'source_analyzer', 'ser', 'evm_meter', 'spectrum_analyzer', 'waterfall_sink'].includes(node.data.blockType)) as FlowNode[]; const [detailNodeId, setDetailNodeId] = useState<string | null>(null); const activeNode = sinks.find(node => node.id === detailNodeId) || null
-  if (!sinks.length) return null
-  const cards = sinks.map(node => {
-    const type = node.data.blockType as SinkKind; const preview = node.data.portPreviews?.inputs?.in; const Icon = iconFor(type); const detail = <button type="button" className="sink-detail-button" onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); setDetailNodeId(node.id) }}>Details</button>
-    if (type === 'power_meter' && metrics.power_mean !== undefined) return <div className="sink-result-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>TX power</span></div><div className="sink-result-value">{metrics.power_mean.toExponential(4)}<small>mean power</small></div>{detail}</div>
-    if (type === 'scope' && metrics.scope_mean_amplitude !== undefined) return <div className="sink-result-card scope-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>Oscilloscope</span></div><WaveformPreview values={preview?.sample || []} /><div className="sink-result-stats"><b>{metrics.scope_mean_amplitude.toFixed(4)}<small>mean amplitude</small></b><b>{metrics.scope_peak_amplitude?.toFixed(4) ?? '—'}<small>peak</small></b></div>{detail}</div>
-    if (type === 'constellation' && metrics.constellation_mean_i !== undefined) return <div className="sink-result-card constellation-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>Constellation</span></div><ConstellationPreview values={preview?.sample || []} /><div className="sink-result-stats"><b>{metrics.constellation_mean_i.toFixed(3)}<small>mean I</small></b><b>{metrics.constellation_mean_q.toFixed(3)}<small>mean Q</small></b><b>{metrics.constellation_mean_power.toFixed(4)}<small>mean |x|</small></b></div>{detail}</div>
-    if (type === 'source_analyzer' && metrics.source_entropy !== undefined) return <div className="sink-result-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>Source theory</span></div><div className="sink-result-stats"><b>{metrics.source_entropy.toFixed(4)}<small>H(X)</small></b><b>{metrics.source_efficiency_percent.toFixed(2)}%<small>efficiency</small></b></div>{detail}</div>
-    if (type === 'ser' && metrics.ser !== undefined) return <div className="sink-result-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>Symbol error rate</span></div><div className="sink-result-value">{metrics.ser.toExponential(4)}<small>{metrics.symbol_errors} / {metrics.total_symbols} errors</small></div>{detail}</div>
-    if (type === 'evm_meter' && metrics.evm_rms_percent !== undefined) return <div className="sink-result-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>EVM</span></div><div className="sink-result-stats"><b>{metrics.evm_rms_percent.toFixed(3)}%<small>RMS EVM</small></b><b>{metrics.evm_rms_db.toFixed(2)} dB<small>{metrics.evm_symbol_count} symbols</small></b></div>{detail}</div>
-    if (type === 'spectrum_analyzer' && metrics.spectrum_peak_db !== undefined) return <div className="sink-result-card spectrum-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>Spectrum</span></div><SpectrumPreview values={preview?.sample || []} fftSize={Number(node.data.params.fft_size) || 256} window={String(node.data.params.window || 'hann')} /><div className="sink-result-stats"><b>{metrics.spectrum_peak_db.toFixed(1)} dB<small>peak</small></b><b>{metrics.spectrum_peak_normalized.toFixed(3)} fₛ<small>frequency</small></b></div>{detail}</div>
-    if (type === 'waterfall_sink' && metrics.waterfall_peak_db !== undefined) return <div className="sink-result-card spectrum-card" key={node.id}><div className="sink-result-heading"><Icon size={15} /><strong>{node.data.label}</strong><span>Waterfall</span></div><WaterfallPreview values={preview?.sample || []} fftSize={Number(node.data.params.fft_size) || 64} window={String(node.data.params.window || 'hann')} /><div className="sink-result-stats"><b>{metrics.waterfall_peak_db.toFixed(1)} dB<small>peak</small></b><b>{Math.round(metrics.waterfall_rows)}<small>time slices</small></b></div>{detail}</div>
-    return null
-  }).filter(Boolean)
-  return <>{(cards.length || hasBer) ? <div className="sink-results"><div className="sink-results-title">SINK RESULTS <span>{cards.length + (hasBer ? 1 : 0)} active</span></div>{hasBer && <div className="sink-ber-card"><BerChart points={berPoints} live={berLive} wide /><ResultsTable points={berPoints} /></div>}<div className="sink-results-grid">{cards}</div></div> : null}{activeNode && <SinkDetail node={activeNode} metrics={metrics} onClose={() => setDetailNodeId(null)} />}</>
+export function SinkResults({
+  nodes,
+  metrics,
+  berPoints = [],
+  berLive = false,
+}: Props) {
+  const hasBer =
+    nodes.some((node) => node.data.blockType === "ber") &&
+    berPoints.length > 0 &&
+    berPoints.every((point) => Number.isFinite(point.snr_db));
+  const sinks = nodes.filter((node) =>
+    [
+      "ber",
+      "power_meter",
+      "constellation",
+      "scope",
+      "source_analyzer",
+      "ser",
+      "evm_meter",
+      "spectrum_analyzer",
+      "waterfall_sink",
+    ].includes(node.data.blockType),
+  ) as FlowNode[];
+  const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
+  const activeNode = sinks.find((node) => node.id === detailNodeId) || null;
+  if (!sinks.length) return null;
+  const cards = sinks
+    .map((node) => {
+      const type = node.data.blockType as SinkKind;
+      const preview = node.data.portPreviews?.inputs?.in;
+      const Icon = iconFor(type);
+      const detail = (
+        <button
+          type="button"
+          className="sink-detail-button"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            setDetailNodeId(node.id);
+          }}
+        >
+          Details
+        </button>
+      );
+      if (type === "power_meter" && metrics.power_mean !== undefined)
+        return (
+          <div className="sink-result-card" key={node.id}>
+            <div className="sink-result-heading">
+              <Icon size={15} />
+              <strong>{node.data.label}</strong>
+              <span>TX power</span>
+            </div>
+            <div className="sink-result-value">
+              {metrics.power_mean.toExponential(4)}
+              <small>mean power</small>
+            </div>
+            {detail}
+          </div>
+        );
+      if (type === "scope" && metrics.scope_mean_amplitude !== undefined)
+        return (
+          <div className="sink-result-card scope-card" key={node.id}>
+            <div className="sink-result-heading">
+              <Icon size={15} />
+              <strong>{node.data.label}</strong>
+              <span>Oscilloscope</span>
+            </div>
+            <WaveformPreview values={preview?.sample || []} />
+            <div className="sink-result-stats">
+              <b>
+                {metrics.scope_mean_amplitude.toFixed(4)}
+                <small>mean amplitude</small>
+              </b>
+              <b>
+                {metrics.scope_peak_amplitude?.toFixed(4) ?? "—"}
+                <small>peak</small>
+              </b>
+            </div>
+            {detail}
+          </div>
+        );
+      if (
+        type === "constellation" &&
+        metrics.constellation_mean_i !== undefined
+      )
+        return (
+          <div className="sink-result-card constellation-card" key={node.id}>
+            <div className="sink-result-heading">
+              <Icon size={15} />
+              <strong>{node.data.label}</strong>
+              <span>Constellation</span>
+            </div>
+            <ConstellationPreview values={preview?.sample || []} />
+            <div className="sink-result-stats">
+              <b>
+                {metrics.constellation_mean_i.toFixed(3)}
+                <small>mean I</small>
+              </b>
+              <b>
+                {metrics.constellation_mean_q.toFixed(3)}
+                <small>mean Q</small>
+              </b>
+              <b>
+                {metrics.constellation_mean_power.toFixed(4)}
+                <small>mean |x|</small>
+              </b>
+            </div>
+            {detail}
+          </div>
+        );
+      if (type === "source_analyzer" && metrics.source_entropy !== undefined)
+        return (
+          <div className="sink-result-card" key={node.id}>
+            <div className="sink-result-heading">
+              <Icon size={15} />
+              <strong>{node.data.label}</strong>
+              <span>Source theory</span>
+            </div>
+            <div className="sink-result-stats">
+              <b>
+                {metrics.source_entropy.toFixed(4)}
+                <small>H(X)</small>
+              </b>
+              <b>
+                {metrics.source_efficiency_percent.toFixed(2)}%
+                <small>efficiency</small>
+              </b>
+            </div>
+            {detail}
+          </div>
+        );
+      if (type === "ser" && metrics.ser !== undefined)
+        return (
+          <div className="sink-result-card" key={node.id}>
+            <div className="sink-result-heading">
+              <Icon size={15} />
+              <strong>{node.data.label}</strong>
+              <span>Symbol error rate</span>
+            </div>
+            <div className="sink-result-value">
+              {metrics.ser.toExponential(4)}
+              <small>
+                {metrics.symbol_errors} / {metrics.total_symbols} errors
+              </small>
+            </div>
+            {detail}
+          </div>
+        );
+      if (type === "evm_meter" && metrics.evm_rms_percent !== undefined)
+        return (
+          <div className="sink-result-card" key={node.id}>
+            <div className="sink-result-heading">
+              <Icon size={15} />
+              <strong>{node.data.label}</strong>
+              <span>EVM</span>
+            </div>
+            <div className="sink-result-stats">
+              <b>
+                {metrics.evm_rms_percent.toFixed(3)}%<small>RMS EVM</small>
+              </b>
+              <b>
+                {metrics.evm_rms_db.toFixed(2)} dB
+                <small>{metrics.evm_symbol_count} symbols</small>
+              </b>
+            </div>
+            {detail}
+          </div>
+        );
+      if (
+        type === "spectrum_analyzer" &&
+        metrics.spectrum_peak_db !== undefined
+      )
+        return (
+          <div className="sink-result-card spectrum-card" key={node.id}>
+            <div className="sink-result-heading">
+              <Icon size={15} />
+              <strong>{node.data.label}</strong>
+              <span>Spectrum</span>
+            </div>
+            <SpectrumPreview
+              values={preview?.sample || []}
+              fftSize={Number(node.data.params.fft_size) || 256}
+              window={String(node.data.params.window || "hann")}
+            />
+            <div className="sink-result-stats">
+              <b>
+                {metrics.spectrum_peak_db.toFixed(1)} dB<small>peak</small>
+              </b>
+              <b>
+                {metrics.spectrum_peak_normalized.toFixed(3)} fₛ
+                <small>frequency</small>
+              </b>
+            </div>
+            {detail}
+          </div>
+        );
+      if (type === "waterfall_sink" && metrics.waterfall_peak_db !== undefined)
+        return (
+          <div className="sink-result-card spectrum-card" key={node.id}>
+            <div className="sink-result-heading">
+              <Icon size={15} />
+              <strong>{node.data.label}</strong>
+              <span>Waterfall</span>
+            </div>
+            <WaterfallPreview
+              values={preview?.sample || []}
+              fftSize={Number(node.data.params.fft_size) || 64}
+              window={String(node.data.params.window || "hann")}
+            />
+            <div className="sink-result-stats">
+              <b>
+                {metrics.waterfall_peak_db.toFixed(1)} dB<small>peak</small>
+              </b>
+              <b>
+                {Math.round(metrics.waterfall_rows)}
+                <small>time slices</small>
+              </b>
+            </div>
+            {detail}
+          </div>
+        );
+      return null;
+    })
+    .filter(Boolean);
+  return (
+    <>
+      {cards.length || hasBer ? (
+        <div className="sink-results">
+          <div className="sink-results-title">
+            SINK RESULTS <span>{cards.length + (hasBer ? 1 : 0)} active</span>
+          </div>
+          {hasBer && (
+            <div className="sink-ber-card">
+              <BerChart points={berPoints} live={berLive} wide />
+              <ResultsTable points={berPoints} />
+            </div>
+          )}
+          <div className="sink-results-grid">{cards}</div>
+        </div>
+      ) : null}
+      {activeNode && (
+        <SinkDetail
+          node={activeNode}
+          metrics={metrics}
+          onClose={() => setDetailNodeId(null)}
+        />
+      )}
+    </>
+  );
 }
 
-function SpectrumDetailChart({ samples, fftSize: initialFft, window: initialWindow }: { samples: string[]; fftSize: number; window: string }) {
-  const [fftSize, setFftSize] = useState(initialFft); const [window, setWindow] = useState(initialWindow); const [floorDb, setFloorDb] = useState(0); const [grid, setGrid] = useState(true)
-  return <div className="sink-advanced-view"><div className="sink-advanced-controls"><label>FFT size<select value={fftSize} onChange={event => setFftSize(Number(event.target.value))}><option value={64}>64</option><option value={128}>128</option><option value={256}>256</option><option value={512}>512</option><option value={1024}>1024</option></select></label><label>Window<select value={window} onChange={event => setWindow(event.target.value)}><option value="hann">Hann</option><option value="hamming">Hamming</option><option value="blackman">Blackman</option><option value="rectangular">Rectangular</option></select></label><label>Floor (dB)<input type="number" step="1" placeholder="Auto" value={floorDb || ''} onChange={event => setFloorDb(Number(event.target.value) || 0)} /></label><label className="sink-toggle"><span>Grid</span><input type="checkbox" checked={grid} onChange={event => setGrid(event.target.checked)} /></label></div><SpectrumPreview values={samples} fftSize={fftSize} window={window} large floorDb={floorDb || undefined} showGrid={grid} /></div>
+function SpectrumDetailChart({
+  samples,
+  fftSize: initialFft,
+  window: initialWindow,
+}: {
+  samples: string[];
+  fftSize: number;
+  window: string;
+}) {
+  const [fftSize, setFftSize] = useState(initialFft);
+  const [window, setWindow] = useState(initialWindow);
+  const [floorDb, setFloorDb] = useState(0);
+  const [grid, setGrid] = useState(true);
+  return (
+    <div className="sink-advanced-view">
+      <div className="sink-advanced-controls">
+        <label>
+          FFT size
+          <select
+            value={fftSize}
+            onChange={(event) => setFftSize(Number(event.target.value))}
+          >
+            <option value={64}>64</option>
+            <option value={128}>128</option>
+            <option value={256}>256</option>
+            <option value={512}>512</option>
+            <option value={1024}>1024</option>
+          </select>
+        </label>
+        <label>
+          Window
+          <select
+            value={window}
+            onChange={(event) => setWindow(event.target.value)}
+          >
+            <option value="hann">Hann</option>
+            <option value="hamming">Hamming</option>
+            <option value="blackman">Blackman</option>
+            <option value="rectangular">Rectangular</option>
+          </select>
+        </label>
+        <label>
+          Floor (dB)
+          <NumericInput
+            value={floorDb}
+            onValueChange={(value) => setFloorDb(value || 0)}
+          />
+        </label>
+        <label className="sink-toggle">
+          <span>Grid</span>
+          <input
+            type="checkbox"
+            checked={grid}
+            onChange={(event) => setGrid(event.target.checked)}
+          />
+        </label>
+      </div>
+      <SpectrumPreview
+        values={samples}
+        fftSize={fftSize}
+        window={window}
+        large
+        floorDb={floorDb || undefined}
+        showGrid={grid}
+      />
+    </div>
+  );
 }
 
-function WaterfallDetailChart({ samples, fftSize: initialFft, window: initialWindow }: { samples: string[]; fftSize: number; window: string }) {
-  const [fftSize, setFftSize] = useState(initialFft); const [window, setWindow] = useState(initialWindow); const [range, setRange] = useState(70)
-  return <div className="sink-advanced-view"><div className="sink-advanced-controls"><label>FFT size<select value={fftSize} onChange={event => setFftSize(Number(event.target.value))}><option value={16}>16</option><option value={32}>32</option><option value={64}>64</option><option value={128}>128</option></select></label><label>Window<select value={window} onChange={event => setWindow(event.target.value)}><option value="hann">Hann</option><option value="hamming">Hamming</option><option value="blackman">Blackman</option><option value="rectangular">Rectangular</option></select></label><label>Dynamic range<input type="number" min="10" max="140" step="5" value={range} onChange={event => setRange(Math.max(10, Math.min(140, Number(event.target.value) || 70)))} /></label></div><WaterfallPreview values={samples} fftSize={fftSize} window={window} large dynamicRange={range} /></div>
+function WaterfallDetailChart({
+  samples,
+  fftSize: initialFft,
+  window: initialWindow,
+}: {
+  samples: string[];
+  fftSize: number;
+  window: string;
+}) {
+  const [fftSize, setFftSize] = useState(initialFft);
+  const [window, setWindow] = useState(initialWindow);
+  const [range, setRange] = useState(70);
+  return (
+    <div className="sink-advanced-view">
+      <div className="sink-advanced-controls">
+        <label>
+          FFT size
+          <select
+            value={fftSize}
+            onChange={(event) => setFftSize(Number(event.target.value))}
+          >
+            <option value={16}>16</option>
+            <option value={32}>32</option>
+            <option value={64}>64</option>
+            <option value={128}>128</option>
+          </select>
+        </label>
+        <label>
+          Window
+          <select
+            value={window}
+            onChange={(event) => setWindow(event.target.value)}
+          >
+            <option value="hann">Hann</option>
+            <option value="hamming">Hamming</option>
+            <option value="blackman">Blackman</option>
+            <option value="rectangular">Rectangular</option>
+          </select>
+        </label>
+        <label>
+          Dynamic range
+          <NumericInput
+            integer
+            value={range}
+            onValueChange={(value) =>
+              setRange(Math.max(10, Math.min(140, value || 70)))
+            }
+          />
+        </label>
+      </div>
+      <WaterfallPreview
+        values={samples}
+        fftSize={fftSize}
+        window={window}
+        large
+        dynamicRange={range}
+      />
+    </div>
+  );
 }
 
-function SinkChartContent({ kind, samples, color, xLimit, yLimit, metrics, fftSize, window = 'hann' }: { kind: SinkKind; samples: string[]; color: string; xLimit: number; yLimit: number; metrics: Record<string, number>; fftSize: number; window?: string }) {
-  if (kind === 'scope') return <ScopeDetailChart samples={samples} color={color} />
-  if (kind === 'constellation') return <ConstellationPreview values={samples} large color={color} xLimit={xLimit} yLimit={yLimit} />
-  if (kind === 'spectrum_analyzer') return <SpectrumDetailChart samples={samples} fftSize={fftSize} window={window} />
-  if (kind === 'waterfall_sink') return <WaterfallDetailChart samples={samples} fftSize={fftSize} window={window} />
-  return <div className="sink-detail-metric-grid">{Object.entries(metrics).map(([key, value]) => <div key={key}><span>{key.replaceAll('_', ' ')}</span><strong>{value.toExponential(6)}</strong></div>)}</div>
+function SinkChartContent({
+  kind,
+  samples,
+  color,
+  xLimit,
+  yLimit,
+  metrics,
+  fftSize,
+  window = "hann",
+}: {
+  kind: SinkKind;
+  samples: string[];
+  color: string;
+  xLimit: number;
+  yLimit: number;
+  metrics: Record<string, number>;
+  fftSize: number;
+  window?: string;
+}) {
+  if (kind === "scope")
+    return <ScopeDetailChart samples={samples} color={color} />;
+  if (kind === "constellation")
+    return (
+      <ConstellationPreview
+        values={samples}
+        large
+        color={color}
+        xLimit={xLimit}
+        yLimit={yLimit}
+      />
+    );
+  if (kind === "spectrum_analyzer")
+    return (
+      <SpectrumDetailChart
+        samples={samples}
+        fftSize={fftSize}
+        window={window}
+      />
+    );
+  if (kind === "waterfall_sink")
+    return (
+      <WaterfallDetailChart
+        samples={samples}
+        fftSize={fftSize}
+        window={window}
+      />
+    );
+  return (
+    <div className="sink-detail-metric-grid">
+      {Object.entries(metrics).map(([key, value]) => (
+        <div key={key}>
+          <span>{key.replaceAll("_", " ")}</span>
+          <strong>{value.toExponential(6)}</strong>
+        </div>
+      ))}
+    </div>
+  );
 }
 
-function ScopeDetailChart({ samples, color }: { samples: string[]; color: string }) {
-  const [channel, setChannel] = useState<WaveformChannel>('iq'); const [sampleLimit, setSampleLimit] = useState(1024); const [yLimit, setYLimit] = useState(0); const [grid, setGrid] = useState(true)
-  const hasComplex = samples.some(value => /j/i.test(value)); const effectiveChannel = channel === 'iq' && !hasComplex ? 'real' : channel
-  return <div className="scope-detail-view"><div className="scope-detail-controls"><label>Channel<select value={channel} onChange={event => setChannel(event.target.value as WaveformChannel)}><option value="real">Real / I</option><option value="imaginary">Imaginary / Q</option><option value="magnitude">Magnitude</option><option value="iq">I + Q</option></select></label><label>Samples<input type="number" min="8" max="2048" step="8" value={sampleLimit} onChange={event => setSampleLimit(Math.max(8, Math.min(2048, Number(event.target.value) || 8)))} /></label><label>Y scale<input type="number" min="0" step="any" placeholder="Auto" value={yLimit || ''} onChange={event => setYLimit(Math.max(0, Number(event.target.value) || 0))} /></label><label className="scope-grid-toggle"><span>Grid</span><input type="checkbox" checked={grid} onChange={event => setGrid(event.target.checked)} /></label></div><WaveformPreview values={samples} large color={color} channel={effectiveChannel} yLimit={yLimit || undefined} showGrid={grid} sampleLimit={sampleLimit} /></div>
+function ScopeDetailChart({
+  samples,
+  color,
+}: {
+  samples: string[];
+  color: string;
+}) {
+  const [channel, setChannel] = useState<WaveformChannel>("iq");
+  const [sampleLimit, setSampleLimit] = useState(1024);
+  const [yLimit, setYLimit] = useState(0);
+  const [grid, setGrid] = useState(true);
+  const hasComplex = samples.some((value) => /j/i.test(value));
+  const effectiveChannel = channel === "iq" && !hasComplex ? "real" : channel;
+  return (
+    <div className="scope-detail-view">
+      <div className="scope-detail-controls">
+        <label>
+          Channel
+          <select
+            value={channel}
+            onChange={(event) =>
+              setChannel(event.target.value as WaveformChannel)
+            }
+          >
+            <option value="real">Real / I</option>
+            <option value="imaginary">Imaginary / Q</option>
+            <option value="magnitude">Magnitude</option>
+            <option value="iq">I + Q</option>
+          </select>
+        </label>
+        <label>
+          Samples
+          <NumericInput
+            integer
+            value={sampleLimit}
+            onValueChange={(value) =>
+              setSampleLimit(Math.max(8, Math.min(2048, value || 8)))
+            }
+          />
+        </label>
+        <label>
+          Y scale
+          <NumericInput
+            value={yLimit}
+            allowEmpty
+            onValueChange={(value) => setYLimit(Math.max(0, value || 0))}
+            placeholder="Auto"
+          />
+        </label>
+        <label className="scope-grid-toggle">
+          <span>Grid</span>
+          <input
+            type="checkbox"
+            checked={grid}
+            onChange={(event) => setGrid(event.target.checked)}
+          />
+        </label>
+      </div>
+      <WaveformPreview
+        values={samples}
+        large
+        color={color}
+        channel={effectiveChannel}
+        yLimit={yLimit || undefined}
+        showGrid={grid}
+        sampleLimit={sampleLimit}
+      />
+    </div>
+  );
 }
 
-export function SinkDetail({ node, metrics, onClose }: { node: FlowNode; metrics: Record<string, number>; onClose: () => void }) {
-  const kind = node.data.blockType as SinkKind; const currentSamples = node.data.portPreviews?.inputs?.in?.sample || []; const prefix = kind === 'power_meter' ? 'power_' : kind === 'constellation' ? 'constellation_' : kind === 'scope' ? 'scope_' : kind === 'source_analyzer' ? 'source_' : kind === 'evm_meter' ? 'evm_' : kind === 'spectrum_analyzer' ? 'spectrum_' : kind === 'waterfall_sink' ? 'waterfall_' : 'ser'; const currentMetrics = useMemo(() => Object.fromEntries(Object.entries(metrics).filter(([key]) => key.startsWith(prefix) || (kind === 'ser' && ['ser', 'symbol_errors', 'total_symbols'].includes(key)))), [kind, metrics, prefix])
-  const [tab, setTab] = useState<'chart' | 'edit' | 'references'>('chart'); const [name, setName] = useState(node.data.label); const [color, setColor] = useState('#2563eb'); const [style, setStyle] = useState<SinkReference['style']>('line'); const [xLimit, setXLimit] = useState(1.5); const [yLimit, setYLimit] = useState(1.5); const [editedMetrics, setEditedMetrics] = useState<Record<string, number>>(currentMetrics); const [references, setReferences] = useState<SinkReference[]>([]); const [selectedReferenceId, setSelectedReferenceId] = useState<string | null>(null); const [notice, setNotice] = useState(''); const selected = references.find(reference => reference.id === selectedReferenceId); const displayMetrics = selected?.metrics || editedMetrics; const displaySamples = selected?.samples || currentSamples; const displayXLimit = selected?.xLimit ?? xLimit; const displayYLimit = selected?.yLimit ?? yLimit
-  useEffect(() => { setReferences(readReferences(node.id)) }, [node.id]); useEffect(() => { setEditedMetrics(currentMetrics) }, [currentMetrics]); const makeReference = (): SinkReference => ({ id: `${kind}-${Date.now()}`, name: name.trim() || `${titleFor(kind)} reference`, kind, color, style, metrics: { ...editedMetrics }, samples: [...currentSamples], xLimit, yLimit, createdAt: new Date().toISOString() }); const persist = (next: SinkReference[]) => { setReferences(next); saveReferences(node.id, next) }; const saveReferenceFile = (reference: SinkReference) => { const blob = new Blob([JSON.stringify(reference, null, 2)], { type: 'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${reference.name.replace(/[^a-z0-9_-]+/gi, '_')}.${kind}.json`; link.click(); URL.revokeObjectURL(link.href); setNotice('Reference saved') }; const save = () => { const reference = selected ? { ...selected, name, color, style, metrics: { ...editedMetrics }, xLimit, yLimit } : makeReference(); persist(selected ? references.map(item => item.id === selected.id ? reference : item) : [...references, reference]); setSelectedReferenceId(reference.id); setNotice('Reference saved') }; const load = (file?: File) => { if (!file) return; const reader = new FileReader(); reader.onload = () => { try { const value = JSON.parse(String(reader.result)); if (value.kind !== kind || !value.metrics) throw new Error('Reference belongs to another sink type'); const reference = { ...value, id: `${kind}-${Date.now()}` } as SinkReference; persist([...references, reference]); setSelectedReferenceId(reference.id); setName(reference.name); setColor(reference.color); setStyle(reference.style); setXLimit(Number(reference.xLimit) > 0 ? Number(reference.xLimit) : 1.5); setYLimit(Number(reference.yLimit) > 0 ? Number(reference.yLimit) : 1.5); setNotice('Reference loaded') } catch (error) { setNotice((error as Error).message) } }; reader.readAsText(file) }
-  const Icon = iconFor(kind)
-  const detailChart = kind === 'scope' ? <ScopeDetailChart samples={displaySamples} color={selected?.color || color} /> : <SinkChartContent kind={kind} samples={displaySamples} color={selected?.color || color} xLimit={displayXLimit} yLimit={displayYLimit} metrics={displayMetrics} fftSize={Number(node.data.params.fft_size) || (kind === 'waterfall_sink' ? 64 : 256)} window={String(node.data.params.window || 'hann')} />
-  return createPortal(<div className="sink-detail-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}><section className="sink-detail" role="dialog" aria-modal="true"><header className="sink-detail-header"><div><small>SINK REPORT</small><h2>{name} details</h2></div><button onClick={onClose} aria-label="Close details"><X size={20} /></button></header><nav className="sink-detail-tabs"><button className={tab === 'chart' ? 'active' : ''} onClick={() => setTab('chart')}>Chart</button><button className={tab === 'edit' ? 'active' : ''} onClick={() => setTab('edit')}>Edit &amp; Data</button><button className={tab === 'references' ? 'active' : ''} onClick={() => setTab('references')}>References</button></nav>{tab === 'chart' && <div className="sink-detail-chart"><div className="sink-detail-title"><Icon size={18} /><strong>{titleFor(kind)}</strong><span>{selected ? `Reference: ${selected.name}` : 'Current run'}</span></div><SinkChartContent kind={kind} samples={displaySamples} color={selected?.color || color} xLimit={displayXLimit} yLimit={displayYLimit} metrics={displayMetrics} fftSize={Number(node.data.params.fft_size) || (kind === 'waterfall_sink' ? 64 : 256)} window={String(node.data.params.window || 'hann')} /><p className="sink-detail-note">This report is tied to the selected sink. Use Edit &amp; Data for presentation parameters and References to compare or archive additional runs.</p></div>}{tab === 'edit' && <div className="sink-detail-edit"><div className="sink-edit-grid"><label>Name<input value={name} onChange={event => setName(event.target.value)} /></label><label>Color<input type="color" value={color} onChange={event => setColor(event.target.value)} /></label><label>Style<select value={style} onChange={event => setStyle(event.target.value as SinkReference['style'])}><option value="line">Line</option><option value="bars">Bars</option><option value="dots">Dots</option></select></label></div>{kind === 'constellation' && <><h3>Axes</h3><div className="sink-edit-grid sink-axis-grid"><label>I limit (±)<input type="number" min="0.01" step="any" value={xLimit} onChange={event => setXLimit(Math.max(0.01, Number(event.target.value) || 0.01))} /></label><label>Q limit (±)<input type="number" min="0.01" step="any" value={yLimit} onChange={event => setYLimit(Math.max(0.01, Number(event.target.value) || 0.01))} /></label></div><small className="sink-axis-hint">Axes are symmetric around zero.</small></>}<h3>Metrics</h3><div className="sink-metric-editor">{Object.entries(editedMetrics).map(([key, value]) => <label key={key}>{key.replaceAll('_', ' ')}<input type="number" step="any" value={value} onChange={event => setEditedMetrics(current => ({ ...current, [key]: Number(event.target.value) }))} /></label>)}</div><h3>Captured samples</h3><textarea className="sink-sample-editor" value={displaySamples.join('\n')} readOnly /><div className="sink-detail-actions"><button onClick={save}>Save reference</button><button onClick={() => saveReferenceFile(selected || makeReference())}>Export JSON</button></div></div>}{tab === 'references' && <div className="sink-reference-editor"><div className="sink-reference-toolbar"><button onClick={() => save()}>Save current</button><label className="sink-load-button">Browse / Load<input type="file" accept="application/json,.json" hidden onChange={event => { load(event.target.files?.[0]); event.target.value = '' }} /></label></div>{references.length ? <div className="sink-reference-list">{references.map(reference => <button className={selectedReferenceId === reference.id ? 'active' : ''} key={reference.id} onClick={() => { setSelectedReferenceId(reference.id); setName(reference.name); setColor(reference.color); setStyle(reference.style); setXLimit(reference.xLimit || 1.5); setYLimit(reference.yLimit || 1.5); setEditedMetrics(reference.metrics) }}><span style={{ background: reference.color }} />{reference.name}<small>{new Date(reference.createdAt).toLocaleString()}</small></button>)}</div> : <p className="sink-detail-empty">No saved references for this sink.</p>}{selected && <div className="sink-reference-footer"><button onClick={() => saveReferenceFile(selected)}>Export selected</button><button onClick={() => { persist(references.filter(reference => reference.id !== selected.id)); setSelectedReferenceId(null); setNotice('Reference deleted') }}>Delete selected</button></div>}</div>}{notice && <div className="sink-detail-notice">{notice}</div>}</section></div>, document.body)
+export function SinkDetail({
+  node,
+  metrics,
+  onClose,
+}: {
+  node: FlowNode;
+  metrics: Record<string, number>;
+  onClose: () => void;
+}) {
+  const kind = node.data.blockType as SinkKind;
+  const currentSamples = node.data.portPreviews?.inputs?.in?.sample || [];
+  const prefix =
+    kind === "power_meter"
+      ? "power_"
+      : kind === "constellation"
+        ? "constellation_"
+        : kind === "scope"
+          ? "scope_"
+          : kind === "source_analyzer"
+            ? "source_"
+            : kind === "evm_meter"
+              ? "evm_"
+              : kind === "spectrum_analyzer"
+                ? "spectrum_"
+                : kind === "waterfall_sink"
+                  ? "waterfall_"
+                  : "ser";
+  const currentMetrics = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(metrics).filter(
+          ([key]) =>
+            key.startsWith(prefix) ||
+            (kind === "ser" &&
+              ["ser", "symbol_errors", "total_symbols"].includes(key)),
+        ),
+      ),
+    [kind, metrics, prefix],
+  );
+  const [tab, setTab] = useState<"chart" | "edit" | "references">("chart");
+  const [name, setName] = useState(node.data.label);
+  const [color, setColor] = useState("#2563eb");
+  const [style, setStyle] = useState<SinkReference["style"]>("line");
+  const [xLimit, setXLimit] = useState(1.5);
+  const [yLimit, setYLimit] = useState(1.5);
+  const [editedMetrics, setEditedMetrics] =
+    useState<Record<string, number>>(currentMetrics);
+  const [references, setReferences] = useState<SinkReference[]>([]);
+  const [selectedReferenceId, setSelectedReferenceId] = useState<string | null>(
+    null,
+  );
+  const [notice, setNotice] = useState("");
+  const selected = references.find(
+    (reference) => reference.id === selectedReferenceId,
+  );
+  const displayMetrics = selected?.metrics || editedMetrics;
+  const displaySamples = selected?.samples || currentSamples;
+  const displayXLimit = selected?.xLimit ?? xLimit;
+  const displayYLimit = selected?.yLimit ?? yLimit;
+  useEffect(() => {
+    setReferences(readReferences(node.id));
+  }, [node.id]);
+  useEffect(() => {
+    setEditedMetrics(currentMetrics);
+  }, [currentMetrics]);
+  const makeReference = (): SinkReference => ({
+    id: `${kind}-${Date.now()}`,
+    name: name.trim() || `${titleFor(kind)} reference`,
+    kind,
+    color,
+    style,
+    metrics: { ...editedMetrics },
+    samples: [...currentSamples],
+    xLimit,
+    yLimit,
+    createdAt: new Date().toISOString(),
+  });
+  const persist = (next: SinkReference[]) => {
+    setReferences(next);
+    saveReferences(node.id, next);
+  };
+  const saveReferenceFile = (reference: SinkReference) => {
+    const blob = new Blob([JSON.stringify(reference, null, 2)], {
+      type: "application/json",
+    });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${reference.name.replace(/[^a-z0-9_-]+/gi, "_")}.${kind}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setNotice("Reference saved");
+  };
+  const save = () => {
+    const reference = selected
+      ? {
+          ...selected,
+          name,
+          color,
+          style,
+          metrics: { ...editedMetrics },
+          xLimit,
+          yLimit,
+        }
+      : makeReference();
+    persist(
+      selected
+        ? references.map((item) => (item.id === selected.id ? reference : item))
+        : [...references, reference],
+    );
+    setSelectedReferenceId(reference.id);
+    setNotice("Reference saved");
+  };
+  const load = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const value = JSON.parse(String(reader.result));
+        if (value.kind !== kind || !value.metrics)
+          throw new Error("Reference belongs to another sink type");
+        const reference = {
+          ...value,
+          id: `${kind}-${Date.now()}`,
+        } as SinkReference;
+        persist([...references, reference]);
+        setSelectedReferenceId(reference.id);
+        setName(reference.name);
+        setColor(reference.color);
+        setStyle(reference.style);
+        setXLimit(
+          Number(reference.xLimit) > 0 ? Number(reference.xLimit) : 1.5,
+        );
+        setYLimit(
+          Number(reference.yLimit) > 0 ? Number(reference.yLimit) : 1.5,
+        );
+        setNotice("Reference loaded");
+      } catch (error) {
+        setNotice((error as Error).message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  const Icon = iconFor(kind);
+  const detailChart =
+    kind === "scope" ? (
+      <ScopeDetailChart
+        samples={displaySamples}
+        color={selected?.color || color}
+      />
+    ) : (
+      <SinkChartContent
+        kind={kind}
+        samples={displaySamples}
+        color={selected?.color || color}
+        xLimit={displayXLimit}
+        yLimit={displayYLimit}
+        metrics={displayMetrics}
+        fftSize={
+          Number(node.data.params.fft_size) ||
+          (kind === "waterfall_sink" ? 64 : 256)
+        }
+        window={String(node.data.params.window || "hann")}
+      />
+    );
+  return createPortal(
+    <div
+      className="sink-detail-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section className="sink-detail" role="dialog" aria-modal="true">
+        <header className="sink-detail-header">
+          <div>
+            <small>SINK REPORT</small>
+            <h2>{name} details</h2>
+          </div>
+          <button onClick={onClose} aria-label="Close details">
+            <X size={20} />
+          </button>
+        </header>
+        <nav className="sink-detail-tabs">
+          <button
+            className={tab === "chart" ? "active" : ""}
+            onClick={() => setTab("chart")}
+          >
+            Chart
+          </button>
+          <button
+            className={tab === "edit" ? "active" : ""}
+            onClick={() => setTab("edit")}
+          >
+            Edit &amp; Data
+          </button>
+          <button
+            className={tab === "references" ? "active" : ""}
+            onClick={() => setTab("references")}
+          >
+            References
+          </button>
+        </nav>
+        {tab === "chart" && (
+          <div className="sink-detail-chart">
+            <div className="sink-detail-title">
+              <Icon size={18} />
+              <strong>{titleFor(kind)}</strong>
+              <span>
+                {selected ? `Reference: ${selected.name}` : "Current run"}
+              </span>
+            </div>
+            <SinkChartContent
+              kind={kind}
+              samples={displaySamples}
+              color={selected?.color || color}
+              xLimit={displayXLimit}
+              yLimit={displayYLimit}
+              metrics={displayMetrics}
+              fftSize={
+                Number(node.data.params.fft_size) ||
+                (kind === "waterfall_sink" ? 64 : 256)
+              }
+              window={String(node.data.params.window || "hann")}
+            />
+            <p className="sink-detail-note">
+              This report is tied to the selected sink. Use Edit &amp; Data for
+              presentation parameters and References to compare or archive
+              additional runs.
+            </p>
+          </div>
+        )}
+        {tab === "edit" && (
+          <div className="sink-detail-edit">
+            <div className="sink-edit-grid">
+              <label>
+                Name
+                <input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                />
+              </label>
+              <label>
+                Color
+                <input
+                  type="color"
+                  value={color}
+                  onChange={(event) => setColor(event.target.value)}
+                />
+              </label>
+              <label>
+                Style
+                <select
+                  value={style}
+                  onChange={(event) =>
+                    setStyle(event.target.value as SinkReference["style"])
+                  }
+                >
+                  <option value="line">Line</option>
+                  <option value="bars">Bars</option>
+                  <option value="dots">Dots</option>
+                </select>
+              </label>
+            </div>
+            {kind === "constellation" && (
+              <>
+                <h3>Axes</h3>
+                <div className="sink-edit-grid sink-axis-grid">
+                  <label>
+                    I limit (±)
+                    <NumericInput
+                      value={xLimit}
+                      onValueChange={(value) =>
+                        setXLimit(Math.max(0.01, value || 0.01))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Q limit (±)
+                    <NumericInput
+                      value={yLimit}
+                      onValueChange={(value) =>
+                        setYLimit(Math.max(0.01, value || 0.01))
+                      }
+                    />
+                  </label>
+                </div>
+                <small className="sink-axis-hint">
+                  Axes are symmetric around zero.
+                </small>
+              </>
+            )}
+            <h3>Metrics</h3>
+            <div className="sink-metric-editor">
+              {Object.entries(editedMetrics).map(([key, value]) => (
+                <label key={key}>
+                  {key.replaceAll("_", " ")}
+                  <NumericInput
+                    value={value}
+                    onValueChange={(next) =>
+                      setEditedMetrics((current) => ({
+                        ...current,
+                        [key]: next,
+                      }))
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+            <h3>Captured samples</h3>
+            <textarea
+              className="sink-sample-editor"
+              value={displaySamples.join("\n")}
+              readOnly
+            />
+            <div className="sink-detail-actions">
+              <button onClick={save}>Save reference</button>
+              <button
+                onClick={() => saveReferenceFile(selected || makeReference())}
+              >
+                Export JSON
+              </button>
+            </div>
+          </div>
+        )}
+        {tab === "references" && (
+          <div className="sink-reference-editor">
+            <div className="sink-reference-toolbar">
+              <button onClick={() => save()}>Save current</button>
+              <label className="sink-load-button">
+                Browse / Load
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  hidden
+                  onChange={(event) => {
+                    load(event.target.files?.[0]);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            {references.length ? (
+              <div className="sink-reference-list">
+                {references.map((reference) => (
+                  <button
+                    className={
+                      selectedReferenceId === reference.id ? "active" : ""
+                    }
+                    key={reference.id}
+                    onClick={() => {
+                      setSelectedReferenceId(reference.id);
+                      setName(reference.name);
+                      setColor(reference.color);
+                      setStyle(reference.style);
+                      setXLimit(reference.xLimit || 1.5);
+                      setYLimit(reference.yLimit || 1.5);
+                      setEditedMetrics(reference.metrics);
+                    }}
+                  >
+                    <span style={{ background: reference.color }} />
+                    {reference.name}
+                    <small>
+                      {new Date(reference.createdAt).toLocaleString()}
+                    </small>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="sink-detail-empty">
+                No saved references for this sink.
+              </p>
+            )}
+            {selected && (
+              <div className="sink-reference-footer">
+                <button onClick={() => saveReferenceFile(selected)}>
+                  Export selected
+                </button>
+                <button
+                  onClick={() => {
+                    persist(
+                      references.filter(
+                        (reference) => reference.id !== selected.id,
+                      ),
+                    );
+                    setSelectedReferenceId(null);
+                    setNotice("Reference deleted");
+                  }}
+                >
+                  Delete selected
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        {notice && <div className="sink-detail-notice">{notice}</div>}
+      </section>
+    </div>,
+    document.body,
+  );
 }

@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
 
 type NumericInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'onChange'> & {
-  value: number
+  value: number | null
   onValueChange: (value: number) => void
   integer?: boolean
+  allowEmpty?: boolean
 }
 
 const COMPLETE_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
 const PARTIAL_NUMBER = /^[+-]?(?:(?:\d+(?:\.\d*)?|\.\d*)?(?:e[+-]?\d*)?)?$/i
 const GROUPED_INTEGER = /^[+-]?\d{1,3}(?:\.\d{3})+$/
 
-const formatNumber = (value: number) => {
+const formatNumber = (value: number | null) => {
+  if (value === null) return ''
   if (!Number.isFinite(value)) return String(value)
   const text = String(value)
   if (/[eE]/.test(text)) return text
@@ -28,7 +30,7 @@ const parseNumber = (text: string) => {
   return Number.isFinite(numeric) ? numeric : null
 }
 
-export function NumericInput({ value, onValueChange, integer = false, className = '', ...inputProps }: NumericInputProps) {
+export function NumericInput({ value, onValueChange, integer = false, allowEmpty = false, className = '', ...inputProps }: NumericInputProps) {
   const [draft, setDraft] = useState(() => formatNumber(value))
   const [focused, setFocused] = useState(false)
   const committedDraft = useRef(formatNumber(value))
@@ -42,6 +44,12 @@ export function NumericInput({ value, onValueChange, integer = false, className 
   }, [focused, value])
 
   const commitIfValid = (text: string) => {
+    if (allowEmpty && text.trim() === '') {
+      onValueChange(null as unknown as number)
+      committedDraft.current = ''
+      setDraft('')
+      return true
+    }
     const numeric = parseNumber(text)
     if (numeric === null || (integer && !Number.isSafeInteger(numeric))) return false
     onValueChange(numeric)

@@ -1,4 +1,4 @@
-import { useEffect, useState, type InputHTMLAttributes } from 'react'
+import { useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
 
 type NumericInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'onChange'> & {
   value: number
@@ -8,45 +8,87 @@ type NumericInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'v
 
 const COMPLETE_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
 const PARTIAL_NUMBER = /^[+-]?(?:(?:\d+(?:\.\d*)?|\.\d*)?(?:e[+-]?\d*)?)?$/i
+const GROUPED_INTEGER = /^[+-]?\d{1,3}(?:\.\d{3})+$/
+
+const formatNumber = (value: number) => {
+  if (!Number.isFinite(value)) return String(value)
+  const text = String(value)
+  if (/[eE]/.test(text)) return text
+  const [integer, fraction] = text.split('.')
+  const sign = integer.startsWith('-') || integer.startsWith('+') ? integer.slice(0, 1) : ''
+  const digits = sign ? integer.slice(1) : integer
+  const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `${sign}${grouped}${fraction === undefined ? '' : `.${fraction}`}`
+}
+
+const parseNumber = (text: string) => {
+  const trimmed = text.trim()
+  if (!COMPLETE_NUMBER.test(trimmed) && !GROUPED_INTEGER.test(trimmed)) return null
+  const numeric = Number(GROUPED_INTEGER.test(trimmed) ? trimmed.replaceAll('.', '') : trimmed)
+  return Number.isFinite(numeric) ? numeric : null
+}
 
 export function NumericInput({ value, onValueChange, integer = false, className = '', ...inputProps }: NumericInputProps) {
-  const [draft, setDraft] = useState(() => String(value))
+  const [draft, setDraft] = useState(() => formatNumber(value))
   const [focused, setFocused] = useState(false)
+  const committedDraft = useRef(formatNumber(value))
 
   useEffect(() => {
-    if (!focused) setDraft(String(value))
+    if (!focused) {
+      const next = formatNumber(value)
+      committedDraft.current = next
+      setDraft(next)
+    }
   }, [focused, value])
 
   const commitIfValid = (text: string) => {
-    if (!COMPLETE_NUMBER.test(text.trim())) return false
-    const numeric = Number(text)
-    if (!Number.isFinite(numeric) || (integer && !Number.isSafeInteger(numeric))) return false
+    const numeric = parseNumber(text)
+    if (numeric === null || (integer && !Number.isSafeInteger(numeric))) return false
     onValueChange(numeric)
+    const normalized = formatNumber(numeric)
+    committedDraft.current = normalized
+    setDraft(normalized)
     return true
   }
 
-  const invalid = draft !== '' && (!COMPLETE_NUMBER.test(draft.trim()) || !Number.isFinite(Number(draft)) || (integer && !Number.isSafeInteger(Number(draft))))
+  const parsedDraft = parseNumber(draft)
+  const invalid = draft !== '' && !PARTIAL_NUMBER.test(draft.trim()) && parsedDraft === null
 
   return <input
     {...inputProps}
     className={`${className}${invalid ? ' numeric-input-invalid' : ''}`}
     type="text"
-    inputMode={integer ? 'numeric' : 'decimal'}
+    inputMode="decimal"
     value={draft}
     aria-invalid={invalid || undefined}
-    onFocus={() => setFocused(true)}
+    onFocus={event => {
+      setFocused(true)
+      // Edit the unformatted value; grouping is restored after commit.
+      setDraft(String(value))
+      event.currentTarget.select()
+    }}
     onChange={event => {
       const next = event.target.value
       if (!PARTIAL_NUMBER.test(next.trim())) return
       setDraft(next)
-      commitIfValid(next)
     }}
     onBlur={() => {
       setFocused(false)
-      if (!commitIfValid(draft)) setDraft(String(value))
+      // Editing is transactional: an unfinished edit is discarded unless the
+      // user explicitly confirms it with Enter. This makes Backspace/delete
+      // safe and prevents min/max coercion while the field is being rewritten.
+      if (draft !== committedDraft.current) setDraft(committedDraft.current)
     }}
     onKeyDown={event => {
-      if (event.key === 'Enter') event.currentTarget.blur()
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        commitIfValid(draft)
+        event.currentTarget.blur()
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        setDraft(committedDraft.current)
+        event.currentTarget.blur()
+      }
       inputProps.onKeyDown?.(event)
     }}
   />
